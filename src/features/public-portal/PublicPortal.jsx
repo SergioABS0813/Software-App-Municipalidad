@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import municipalLogo from '../../assets/images/municipalidad-logo.png';
+import AdminDashboard from '../dashboard/AdminDashboard';
 import { eventCategories, events } from './data/events';
 import './PublicPortal.css';
 
@@ -11,11 +13,14 @@ const emptyRegistration = {
 };
 
 function PublicPortal() {
+  const [currentView, setCurrentView] = useState('portal');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [registration, setRegistration] = useState(emptyRegistration);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [receiptCode, setReceiptCode] = useState('');
 
   const filteredEvents = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -37,16 +42,22 @@ function PublicPortal() {
   const featuredEvent = filteredEvents[0] ?? events[0];
 
   function openEventDetail(event) {
+    setCurrentView('portal');
     setSelectedEvent(event);
     setRegistration(emptyRegistration);
     setIsRegistered(false);
+    setIsConfirmOpen(false);
+    setReceiptCode('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function closeEventDetail() {
+    setCurrentView('portal');
     setSelectedEvent(null);
     setRegistration(emptyRegistration);
     setIsRegistered(false);
+    setIsConfirmOpen(false);
+    setReceiptCode('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -59,22 +70,78 @@ function PublicPortal() {
 
   function submitRegistration(event) {
     event.preventDefault();
+    setIsConfirmOpen(true);
+  }
+
+  function confirmRegistration() {
+    if (!selectedEvent) {
+      return;
+    }
+
+    const documentSuffix = registration.documentNumber.slice(-4).padStart(4, '0');
+
+    setReceiptCode(`EC-${selectedEvent?.id ?? '000'}-${documentSuffix}`);
     setIsRegistered(true);
+    setIsConfirmOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function cancelRegistrationConfirmation() {
+    setIsConfirmOpen(false);
+  }
+
+  function openLogin() {
+    setCurrentView('login');
+    setSelectedEvent(null);
+    setIsConfirmOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function openAdminDashboard() {
+    setCurrentView('admin');
+    setSelectedEvent(null);
+    setIsConfirmOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   return (
     <main className="citizen-portal">
-      <PortalHeader onHome={closeEventDetail} />
+      {currentView !== 'login' && currentView !== 'admin' && (
+        <PortalHeader onHome={closeEventDetail} onLogin={openLogin} />
+      )}
 
-      {selectedEvent ? (
-        <EventDetail
-          event={selectedEvent}
-          isRegistered={isRegistered}
-          registration={registration}
-          onBack={closeEventDetail}
-          onFieldChange={updateRegistration}
-          onSubmit={submitRegistration}
-        />
+      {currentView === 'login' ? (
+        <LoginView onBack={closeEventDetail} onLoginSuccess={openAdminDashboard} />
+      ) : currentView === 'admin' ? (
+        <AdminDashboard onLogout={closeEventDetail} />
+      ) : selectedEvent ? (
+        <>
+          {isRegistered ? (
+            <RegistrationReceipt
+              event={selectedEvent}
+              receiptCode={receiptCode}
+              registration={registration}
+              onBack={closeEventDetail}
+              onPrint={() => window.print()}
+            />
+          ) : (
+            <EventDetail
+              event={selectedEvent}
+              registration={registration}
+              onBack={closeEventDetail}
+              onFieldChange={updateRegistration}
+              onSubmit={submitRegistration}
+            />
+          )}
+
+          {isConfirmOpen && (
+            <ConfirmRegistrationModal
+              eventTitle={selectedEvent.title}
+              onCancel={cancelRegistrationConfirmation}
+              onConfirm={confirmRegistration}
+            />
+          )}
+        </>
       ) : (
         <PortalHome
           featuredEvent={featuredEvent}
@@ -90,14 +157,18 @@ function PublicPortal() {
   );
 }
 
-function PortalHeader({ onHome }) {
+function PortalHeader({ onHome, onLogin }) {
   return (
     <header className="portal-header">
       <button className="brand brand-button" type="button" onClick={onHome}>
-        <span className="brand-mark">EC</span>
+        <img
+          alt="Logo Municipalidad de San Miguel"
+          className="municipality-logo brand-logo"
+          src={municipalLogo}
+        />
         <span>
-          <strong>Eventos Ciudadanos</strong>
-          <small>Gobierno local</small>
+          <strong>Municipalidad de San Miguel</strong>
+          <small>Portal de eventos</small>
         </span>
       </button>
 
@@ -105,12 +176,112 @@ function PortalHeader({ onHome }) {
         <a href="#eventos">Eventos</a>
         <a href="#agenda">Agenda</a>
         <a href="#ayuda">Ayuda</a>
+        <button type="button" onClick={onLogin}>
+          Ingresar
+        </button>
       </nav>
-
-      <button className="outline-button" type="button">
-        Ingresar
-      </button>
     </header>
+  );
+}
+
+function LoginView({ onBack, onLoginSuccess }) {
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+
+  return (
+    <section className="login-shell" aria-labelledby="login-title">
+      <div className="login-form-side">
+        <button className="login-brand" type="button" onClick={onBack}>
+          <img
+            alt="Logo Municipalidad de San Miguel"
+            className="municipality-logo brand-logo"
+            src={municipalLogo}
+          />
+          <strong>Municipalidad de San Miguel</strong>
+        </button>
+
+        <form
+          className="login-card"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onLoginSuccess();
+          }}
+        >
+          <div className="login-title">
+            <span>Portal de eventos</span>
+            <h1 id="login-title">Iniciar sesion</h1>
+            <p>Accede con tus credenciales institucionales.</p>
+          </div>
+
+          <label>
+            Correo institucional
+            <input
+              autoComplete="email"
+              placeholder="usuario@munisanmiguel.gob.pe"
+              type="email"
+            />
+          </label>
+          <label>
+            Contrasena
+            <span className="password-control">
+              <input
+                autoComplete="current-password"
+                type={isPasswordVisible ? 'text' : 'password'}
+              />
+              <button
+                aria-label={
+                  isPasswordVisible ? 'Ocultar contrasena' : 'Mostrar contrasena'
+                }
+                className="password-toggle"
+                type="button"
+                onClick={() =>
+                  setIsPasswordVisible((currentValue) => !currentValue)
+                }
+              >
+                {isPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
+              </button>
+            </span>
+          </label>
+          <div className="login-options">
+            <label className="remember-control">
+              <input type="checkbox" />
+              Recordarme
+            </label>
+            <button type="button">Olvide mi contrasena</button>
+          </div>
+          <button className="primary-button" type="submit">
+            Ingresar
+          </button>
+        </form>
+
+        <p className="login-footer">
+          <button type="button" onClick={onBack}>
+            Volver a eventos
+          </button>
+        </p>
+      </div>
+
+      <div className="login-art-side" aria-hidden="true" />
+    </section>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M2.8 12s3.2-5.5 9.2-5.5S21.2 12 21.2 12 18 17.5 12 17.5 2.8 12 2.8 12Z" />
+      <circle cx="12" cy="12" r="2.6" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M3.3 3.3 20.7 20.7" />
+      <path d="M9.7 5.9A10.1 10.1 0 0 1 12 5.6c6 0 9.2 6.4 9.2 6.4a16.6 16.6 0 0 1-3 3.8" />
+      <path d="M14.2 14.2A3 3 0 0 1 9.8 9.8" />
+      <path d="M6.5 7.6A16.6 16.6 0 0 0 2.8 12s3.2 6.4 9.2 6.4c1.1 0 2.1-.2 3-.6" />
+    </svg>
   );
 }
 
@@ -272,7 +443,6 @@ function AgendaSidebar() {
 
 function EventDetail({
   event,
-  isRegistered,
   registration,
   onBack,
   onFieldChange,
@@ -367,83 +537,185 @@ function EventDetail({
             <p>{event.organizer}</p>
           </div>
 
-          {isRegistered ? (
-            <div className="confirmation-card">
-              <span>Registro recibido</span>
-              <h2>Tu preinscripcion fue generada</h2>
-              <p>
-                Se envio una constancia a {registration.email}. Presenta tu DNI
-                en el punto de control del evento.
-              </p>
-              <div className="ticket-code">EC-{event.id}024</div>
-            </div>
-          ) : (
-            <form className="registration-form" onSubmit={onSubmit}>
-              <span className="section-kicker">Preinscripcion</span>
-              <h2>Reserva tu participacion</h2>
-              <label>
-                Nombre completo
-                <input
-                  required
-                  value={registration.fullName}
-                  onChange={(inputEvent) =>
-                    onFieldChange('fullName', inputEvent.target.value)
-                  }
-                />
-              </label>
-              <label>
-                DNI
-                <input
-                  required
-                  inputMode="numeric"
-                  maxLength="8"
-                  value={registration.documentNumber}
-                  onChange={(inputEvent) =>
-                    onFieldChange('documentNumber', inputEvent.target.value)
-                  }
-                />
-              </label>
-              <label>
-                Correo
-                <input
-                  required
-                  type="email"
-                  value={registration.email}
-                  onChange={(inputEvent) =>
-                    onFieldChange('email', inputEvent.target.value)
-                  }
-                />
-              </label>
-              <label>
-                Celular
-                <input
-                  required
-                  inputMode="tel"
-                  value={registration.phone}
-                  onChange={(inputEvent) =>
-                    onFieldChange('phone', inputEvent.target.value)
-                  }
-                />
-              </label>
-              <label className="terms-control">
-                <input
-                  required
-                  type="checkbox"
-                  checked={registration.acceptsTerms}
-                  onChange={(inputEvent) =>
-                    onFieldChange('acceptsTerms', inputEvent.target.checked)
-                  }
-                />
-                Acepto el uso de mis datos para gestionar mi participacion.
-              </label>
-              <button className="primary-button" type="submit">
-                Confirmar registro
-              </button>
-            </form>
-          )}
+          <form className="registration-form" onSubmit={onSubmit}>
+            <span className="section-kicker">Preinscripcion</span>
+            <h2>Reserva tu participacion</h2>
+            <label>
+              Nombre completo
+              <input
+                required
+                value={registration.fullName}
+                onChange={(inputEvent) =>
+                  onFieldChange('fullName', inputEvent.target.value)
+                }
+              />
+            </label>
+            <label>
+              DNI
+              <input
+                required
+                inputMode="numeric"
+                maxLength="8"
+                minLength="8"
+                value={registration.documentNumber}
+                onChange={(inputEvent) =>
+                  onFieldChange('documentNumber', inputEvent.target.value)
+                }
+              />
+            </label>
+            <label>
+              Correo
+              <input
+                required
+                type="email"
+                value={registration.email}
+                onChange={(inputEvent) =>
+                  onFieldChange('email', inputEvent.target.value)
+                }
+              />
+            </label>
+            <label>
+              Celular
+              <input
+                required
+                inputMode="tel"
+                value={registration.phone}
+                onChange={(inputEvent) =>
+                  onFieldChange('phone', inputEvent.target.value)
+                }
+              />
+            </label>
+            <label className="terms-control">
+              <input
+                required
+                type="checkbox"
+                checked={registration.acceptsTerms}
+                onChange={(inputEvent) =>
+                  onFieldChange('acceptsTerms', inputEvent.target.checked)
+                }
+              />
+              Acepto el uso de mis datos para gestionar mi participacion.
+            </label>
+            <button className="primary-button" type="submit">
+              Confirmar registro
+            </button>
+          </form>
         </aside>
       </div>
     </section>
+  );
+}
+
+function ConfirmRegistrationModal({ eventTitle, onCancel, onConfirm }) {
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section
+        aria-labelledby="confirm-registration-title"
+        aria-modal="true"
+        className="confirm-modal"
+        role="dialog"
+      >
+        <span className="section-kicker">Confirmar inscripcion</span>
+        <h2 id="confirm-registration-title">
+          Estas seguro de inscribirte al evento "{eventTitle}"?
+        </h2>
+        <p>
+          Al confirmar se generara tu constancia de inscripcion y se enviara una
+          copia al correo registrado.
+        </p>
+        <div className="modal-actions">
+          <button className="back-button" type="button" onClick={onCancel}>
+            Revisar datos
+          </button>
+          <button className="primary-button" type="button" onClick={onConfirm}>
+            Si, inscribirme
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function RegistrationReceipt({ event, receiptCode, registration, onBack, onPrint }) {
+  return (
+    <section className="receipt-shell" aria-labelledby="receipt-title">
+      <div className="receipt-actions no-print">
+        <button className="back-button" type="button" onClick={onBack}>
+          Volver a eventos
+        </button>
+        <button className="primary-button" type="button" onClick={onPrint}>
+          Descargar PDF
+        </button>
+      </div>
+
+      <article className="receipt-card">
+        <header className="receipt-header">
+          <div>
+            <span className="section-kicker">Constancia de inscripcion</span>
+            <h1 id="receipt-title">Inscripcion confirmada</h1>
+            <p>
+              Tu constancia fue generada correctamente. Tambien se enviara una
+              copia al correo {registration.email}.
+            </p>
+          </div>
+          <HardcodedQrCode value={receiptCode} />
+        </header>
+
+        <div className="receipt-code">{receiptCode}</div>
+
+        <dl className="receipt-details">
+          <div>
+            <dt>Participante</dt>
+            <dd>{registration.fullName}</dd>
+          </div>
+          <div>
+            <dt>DNI</dt>
+            <dd>{registration.documentNumber}</dd>
+          </div>
+          <div>
+            <dt>Evento</dt>
+            <dd>{event.title}</dd>
+          </div>
+          <div>
+            <dt>Fecha y hora</dt>
+            <dd>
+              {event.date} - {event.time}
+            </dd>
+          </div>
+          <div>
+            <dt>Lugar</dt>
+            <dd>{event.venue}</dd>
+          </div>
+          <div>
+            <dt>Direccion</dt>
+            <dd>{event.address}</dd>
+          </div>
+        </dl>
+
+        <div className="receipt-note">
+          Presenta esta constancia o el codigo QR en el punto de control del
+          evento. El envio de correo requiere integracion con backend en la
+          siguiente etapa.
+        </div>
+      </article>
+    </section>
+  );
+}
+
+function HardcodedQrCode({ value }) {
+  return (
+    <svg
+      aria-label={`Codigo QR ${value}`}
+      className="qr-preview"
+      role="img"
+      viewBox="0 0 116 116"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect width="116" height="116" fill="#ffffff" />
+      <path d="M8 8h28v28H8zM16 16v12h12V16zM80 8h28v28H80zM88 16v12h12V16zM8 80h28v28H8zM16 88v12h12V88z" fill="#0a56c2" />
+      <path d="M44 8h8v8h-8zM60 8h8v8h-8zM44 24h16v8H44zM68 24h8v8h-8zM44 40h8v8h-8zM60 40h24v8H60zM92 44h16v8H92zM8 44h8v8H8zM24 44h12v8H24zM48 56h8v8h-8zM64 56h8v8h-8zM80 56h28v8H80zM40 64h24v8H40zM72 68h8v8h-8zM92 72h16v8H92zM44 80h8v8h-8zM60 80h20v8H60zM88 88h8v8h-8zM104 88h4v20h-8V96h-8v-8h12zM44 96h8v12h-8zM60 100h28v8H60zM72 16h4v8h-8V12h4zM52 72h8v8h-8zM20 60h16v8H20zM8 64h8v8H8zM88 64h8v8h-8z" fill="#101828" />
+      <path d="M56 20h8v8h-8zM32 56h8v8h-8zM72 40h8v8h-8zM56 88h8v8h-8zM96 56h8v8h-8z" fill="#18c7f3" />
+    </svg>
   );
 }
 
