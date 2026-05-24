@@ -1,8 +1,28 @@
 import { useMemo, useState } from 'react';
 import municipalLogo from '../../assets/images/municipalidad-logo.png';
 import AdminDashboard from '../dashboard/AdminDashboard';
+import DirectivoDashboard from '../dashboard/DirectivoDashboard';
+import OperativoDashboard from '../dashboard/OperativoDashboard';
 import { eventCategories, events } from './data/events';
 import './PublicPortal.css';
+
+const institutionalUsers = [
+  {
+    email: 'admin@munisanmiguel.gob.pe',
+    password: 'admin123',
+    role: 'ADMINISTRADOR',
+  },
+  {
+    email: 'directivo@munisanmiguel.gob.pe',
+    password: 'directivo123',
+    role: 'DIRECTIVO',
+  },
+  {
+    email: 'operativo@munisanmiguel.gob.pe',
+    password: 'operativo123',
+    role: 'OPERATIVO',
+  },
+];
 
 const emptyRegistration = {
   fullName: '',
@@ -21,6 +41,7 @@ function PublicPortal() {
   const [isRegistered, setIsRegistered] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [receiptCode, setReceiptCode] = useState('');
+  const [authenticatedUser, setAuthenticatedUser] = useState(null);
 
   const filteredEvents = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -48,6 +69,7 @@ function PublicPortal() {
     setIsRegistered(false);
     setIsConfirmOpen(false);
     setReceiptCode('');
+    setAuthenticatedUser(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -58,6 +80,7 @@ function PublicPortal() {
     setIsRegistered(false);
     setIsConfirmOpen(false);
     setReceiptCode('');
+    setAuthenticatedUser(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -97,8 +120,15 @@ function PublicPortal() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function openAdminDashboard() {
-    setCurrentView('admin');
+  function openInstitutionalDashboard(user) {
+    setAuthenticatedUser(user);
+    const viewByRole = {
+      ADMINISTRADOR: 'admin',
+      DIRECTIVO: 'directivo',
+      OPERATIVO: 'operativo',
+    };
+
+    setCurrentView(viewByRole[user.role] ?? 'admin');
     setSelectedEvent(null);
     setIsConfirmOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -106,14 +136,24 @@ function PublicPortal() {
 
   return (
     <main className="citizen-portal">
-      {currentView !== 'login' && currentView !== 'admin' && (
+      {currentView !== 'login' &&
+        currentView !== 'admin' &&
+        currentView !== 'directivo' &&
+        currentView !== 'operativo' && (
         <PortalHeader onHome={closeEventDetail} onLogin={openLogin} />
       )}
 
       {currentView === 'login' ? (
-        <LoginView onBack={closeEventDetail} onLoginSuccess={openAdminDashboard} />
+        <LoginView
+          onBack={closeEventDetail}
+          onLoginSuccess={openInstitutionalDashboard}
+        />
       ) : currentView === 'admin' ? (
         <AdminDashboard onLogout={closeEventDetail} />
+      ) : currentView === 'directivo' ? (
+        <DirectivoDashboard user={authenticatedUser} onLogout={closeEventDetail} />
+      ) : currentView === 'operativo' ? (
+        <OperativoDashboard user={authenticatedUser} onLogout={closeEventDetail} />
       ) : selectedEvent ? (
         <>
           {isRegistered ? (
@@ -185,7 +225,37 @@ function PortalHeader({ onHome, onLogin }) {
 }
 
 function LoginView({ onBack, onLoginSuccess }) {
+  const [credentials, setCredentials] = useState({
+    email: '',
+    password: '',
+  });
+  const [loginError, setLoginError] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+
+  function updateCredential(field, value) {
+    setCredentials((currentCredentials) => ({
+      ...currentCredentials,
+      [field]: value,
+    }));
+    setLoginError('');
+  }
+
+  function submitLogin(event) {
+    event.preventDefault();
+
+    const user = institutionalUsers.find(
+      (institutionalUser) =>
+        institutionalUser.email === credentials.email.trim().toLowerCase() &&
+        institutionalUser.password === credentials.password,
+    );
+
+    if (!user) {
+      setLoginError('Credenciales incorrectas. Verifica el correo y la contrasena.');
+      return;
+    }
+
+    onLoginSuccess(user);
+  }
 
   return (
     <section className="login-shell" aria-labelledby="login-title">
@@ -201,10 +271,7 @@ function LoginView({ onBack, onLoginSuccess }) {
 
         <form
           className="login-card"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onLoginSuccess();
-          }}
+          onSubmit={submitLogin}
         >
           <div className="login-title">
             <span>Portal de eventos</span>
@@ -218,6 +285,8 @@ function LoginView({ onBack, onLoginSuccess }) {
               autoComplete="email"
               placeholder="usuario@munisanmiguel.gob.pe"
               type="email"
+              value={credentials.email}
+              onChange={(event) => updateCredential('email', event.target.value)}
             />
           </label>
           <label>
@@ -226,6 +295,10 @@ function LoginView({ onBack, onLoginSuccess }) {
               <input
                 autoComplete="current-password"
                 type={isPasswordVisible ? 'text' : 'password'}
+                value={credentials.password}
+                onChange={(event) =>
+                  updateCredential('password', event.target.value)
+                }
               />
               <button
                 aria-label={
@@ -251,6 +324,12 @@ function LoginView({ onBack, onLoginSuccess }) {
           <button className="primary-button" type="submit">
             Ingresar
           </button>
+          {loginError && <p className="login-error">{loginError}</p>}
+          <div className="login-test-users" aria-label="Credenciales de prueba">
+            <span>Admin: admin@munisanmiguel.gob.pe / admin123</span>
+            <span>Directivo: directivo@munisanmiguel.gob.pe / directivo123</span>
+            <span>Operativo: operativo@munisanmiguel.gob.pe / operativo123</span>
+          </div>
         </form>
 
         <p className="login-footer">

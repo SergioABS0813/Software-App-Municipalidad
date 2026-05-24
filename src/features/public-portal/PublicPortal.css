@@ -1063,6 +1063,29 @@
   padding: 0;
 }
 
+.login-error {
+  background: #fff4ed;
+  border-radius: 8px;
+  color: #c2410c;
+  font-size: 0.8rem;
+  font-weight: 750;
+  line-height: 1.45;
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.login-test-users {
+  background: var(--brand-soft);
+  border-radius: 8px;
+  color: var(--color-text-muted);
+  display: grid;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1.4;
+  padding: 10px 12px;
+}
+
 .login-footer {
   color: var(--color-text-muted);
   font-size: 0.86rem;
