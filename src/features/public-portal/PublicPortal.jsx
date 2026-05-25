@@ -283,17 +283,18 @@ function LoginView({ onBack, onLoginSuccess }) {
             Correo institucional
             <input
               autoComplete="email"
-              placeholder="usuario@munisanmiguel.gob.pe"
+              placeholder="Ingrese su correo electrónico"
               type="email"
               value={credentials.email}
               onChange={(event) => updateCredential('email', event.target.value)}
             />
           </label>
           <label>
-            Contrasena
+            Contraseña
             <span className="password-control">
               <input
                 autoComplete="current-password"
+                placeholder='Ingrese su contraseña'
                 type={isPasswordVisible ? 'text' : 'password'}
                 value={credentials.password}
                 onChange={(event) =>
@@ -319,7 +320,7 @@ function LoginView({ onBack, onLoginSuccess }) {
               <input type="checkbox" />
               Recordarme
             </label>
-            <button type="button">Olvide mi contrasena</button>
+            <button type="button">Recuperar contraseña</button>
           </div>
           <button className="primary-button" type="submit">
             Ingresar
@@ -391,7 +392,7 @@ function PortalHome({
               <input
                 id="event-search"
                 type="search"
-                placeholder="Nombre, distrito o lugar"
+                placeholder="Ingresar nombre o lugar del evento"
                 value={searchTerm}
                 onChange={(event) => onSearchChange(event.target.value)}
               />
