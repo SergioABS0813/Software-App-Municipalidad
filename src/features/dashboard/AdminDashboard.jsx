@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import municipalLogo from '../../assets/images/municipalidad-logo.png';
 import calendarCheck from '../../assets/icons/calendar-check.png';
 import clipboardCheck from '../../assets/icons/clipboard-check.png';
@@ -11,24 +11,28 @@ const managementStats = [
   {
     icon: calendarCheck,
     label: 'Publicados',
+    tone: 'is-published',
     trend: 'visibles en el portal',
     value: adminEvents.filter((event) => event.state === 'PUBLICADO').length,
   },
   {
     icon: fileEdit,
     label: 'Borradores',
+    tone: 'is-draft',
     trend: 'requieren completar datos',
     value: adminEvents.filter((event) => event.state === 'BORRADOR').length,
   },
   {
     icon: clipboardCheck,
     label: 'En revision',
+    tone: 'is-review',
     trend: 'pendientes del directivo',
     value: adminEvents.filter((event) => event.state === 'EN_REVISION').length,
   },
   {
     icon: triangleAlert,
     label: 'Observados',
+    tone: 'is-observed',
     trend: 'requieren correcciones',
     value: adminEvents.filter((event) => event.state === 'OBSERVADO').length,
   },
@@ -40,10 +44,48 @@ const operationalAlerts = [
   'Taller de Marinera fue observado por el directivo.',
 ];
 
+const adminNotifications = [
+  {
+    id: 1,
+    message: 'Carlos Ramirez creo el evento "Festival Juvenil".',
+    type: 'Nuevo evento creado',
+    unread: true,
+  },
+  {
+    id: 2,
+    message: 'Ana Torres envio "Carrera 5K" a revision.',
+    type: 'Evento enviado a revision',
+    unread: true,
+  },
+  {
+    id: 3,
+    message: 'Directivo observo "Taller de Marinera".',
+    type: 'Evento observado',
+    unread: true,
+  },
+  {
+    id: 4,
+    message: '"Voluntariado Local" fue aprobado.',
+    type: 'Evento aprobado',
+    unread: true,
+  },
+  {
+    id: 5,
+    message: '"Festival Cultural Barrial" fue publicado.',
+    type: 'Evento publicado',
+    unread: true,
+  },
+  {
+    id: 6,
+    message: '"Cine Familiar al Aire Libre" fue cancelado.',
+    type: 'Evento cancelado',
+    unread: true,
+  },
+];
+
 const publicationCriteria = [
-  'Ficha visible solo cuando tenga fecha, lugar, cupos y requisitos completos.',
-  'El administrador envia el evento a EN_REVISION cuando termina la ficha.',
-  'El directivo puede aprobarlo como PUBLICADO u observarlo como OBSERVADO.',
+  'Llenar la ficha del evento con los datos completos para que el directivo pueda revisarlas.',
+  'Las fichas en estado Observado son las que se tienen que editar para que sean revisadas nuevamente',
   'Los borradores incompletos deben quedar fuera de la agenda ciudadana.',
 ];
 
@@ -113,14 +155,42 @@ function getMissingReviewFields(form, existingEvent = null) {
 
 function AdminDashboard({ onLogout }) {
   const [currentAdminView, setCurrentAdminView] = useState('dashboard');
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notificationFilter, setNotificationFilter] = useState('all');
   const [pendingEventAction, setPendingEventAction] = useState(null);
   const [validationIssue, setValidationIssue] = useState(null);
   const [selectedAdminEvent, setSelectedAdminEvent] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [stateFilter, setStateFilter] = useState('Todos');
   const [categoryFilter, setCategoryFilter] = useState('Todas');
+  const notificationMenuRef = useRef(null);
+  const unreadNotifications = adminNotifications.filter(
+    (notification) => notification.unread,
+  ).length;
+  const visibleNotifications =
+    notificationFilter === 'unread'
+      ? adminNotifications.filter((notification) => notification.unread)
+      : adminNotifications;
   const isEventFormView =
     currentAdminView === 'new-event' || currentAdminView === 'edit-event';
+
+  useEffect(() => {
+    if (!isNotificationsOpen) {
+      return undefined;
+    }
+
+    function closeNotificationsOnOutsideClick(event) {
+      if (!notificationMenuRef.current?.contains(event.target)) {
+        setIsNotificationsOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', closeNotificationsOnOutsideClick);
+
+    return () => {
+      document.removeEventListener('mousedown', closeNotificationsOnOutsideClick);
+    };
+  }, [isNotificationsOpen]);
 
   const filteredAdminEvents = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -227,18 +297,85 @@ function AdminDashboard({ onLogout }) {
                 <span className="section-kicker">Panel administrativo</span>
                 <h1 id="admin-title">Gestion municipal de eventos</h1>
               </div>
-              <button
-                className="admin-primary-action"
-                type="button"
-                onClick={() => setCurrentAdminView('new-event')}
-              >
-                Nuevo evento
-              </button>
+              <div className="admin-topbar-actions">
+                <div className="notification-menu" ref={notificationMenuRef}>
+                  <button
+                    aria-expanded={isNotificationsOpen}
+                    aria-label={`${unreadNotifications} notificaciones sin leer`}
+                    className="notification-button"
+                    type="button"
+                    onClick={() => setIsNotificationsOpen((isOpen) => !isOpen)}
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    <span>{unreadNotifications}</span>
+                  </button>
+                  {isNotificationsOpen && (
+                    <div className="notification-dropdown" role="menu">
+                      <div className="notification-dropdown-header">
+                        <strong>Notificaciones</strong>
+                        <div className="notification-tabs" role="tablist">
+                          <button
+                            aria-selected={notificationFilter === 'all'}
+                            className={notificationFilter === 'all' ? 'active' : ''}
+                            type="button"
+                            onClick={() => setNotificationFilter('all')}
+                          >
+                            Todas
+                            <span>{adminNotifications.length}</span>
+                          </button>
+                          <button
+                            aria-selected={notificationFilter === 'unread'}
+                            className={notificationFilter === 'unread' ? 'active' : ''}
+                            type="button"
+                            onClick={() => setNotificationFilter('unread')}
+                          >
+                            No leidas
+                            <span>{unreadNotifications}</span>
+                          </button>
+                        </div>
+                      </div>
+                      <div className="notification-list">
+                        {visibleNotifications.map((notification) => (
+                          <article className="notification-item" key={notification.id}>
+                            <span aria-hidden="true" className="notification-item-icon">
+                              <svg viewBox="0 0 24 24">
+                                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                              </svg>
+                            </span>
+                            <div>
+                              <strong>{notification.type}</strong>
+                              <p>{notification.message}</p>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <button
+                  className="admin-new-event-action"
+                  type="button"
+                  onClick={() => {
+                    setIsNotificationsOpen(false);
+                    setCurrentAdminView('new-event');
+                  }}
+                >
+                  <span aria-hidden="true">+</span>
+                  Nuevo evento
+                </button>
+              </div>
             </header>
 
             <section className="admin-stats" id="resumen" aria-label="Resumen de gestion">
               {managementStats.map((stat) => (
-                <article className="admin-stat-card" key={stat.label}>
+                <article
+                  className={`admin-stat-card management-stat-card ${stat.tone}`}
+                  key={stat.label}
+                >
                   <img alt="" className="admin-stat-icon" src={stat.icon} />
                   <div>
                     <span>{stat.label}</span>
@@ -261,7 +398,7 @@ function AdminDashboard({ onLogout }) {
                 <label>
                   Buscar por nombre
                   <input
-                    placeholder="Ingrese el nombre del evento"
+                    placeholder="Ingrese el nombre..."
                     type="search"
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.target.value)}
@@ -338,13 +475,7 @@ function AdminDashboard({ onLogout }) {
 
             <section className="admin-bottom-grid">
               <article className="admin-panel validation-panel">
-                <span className="section-kicker">Criterios</span>
-                <h2>Publicacion de eventos</h2>
-                <p>
-                  Este bloque resume las reglas que ayudan al administrador a
-                  decidir si una ficha puede publicarse o debe mantenerse como
-                  borrador.
-                </p>
+                <span className="section-kicker">Criterios de publicación de eventos</span>
                 <div className="admin-checklist">
                   {publicationCriteria.map((item) => (
                     <p key={item}>{item}</p>
@@ -354,7 +485,6 @@ function AdminDashboard({ onLogout }) {
 
               <article className="admin-panel" id="observaciones">
                 <span className="section-kicker">Alertas</span>
-                <h2>Atencion operativa</h2>
                 <div className="admin-alerts">
                   {operationalAlerts.map((alert) => (
                     <p key={alert}>{alert}</p>
@@ -363,8 +493,7 @@ function AdminDashboard({ onLogout }) {
               </article>
 
               <article className="admin-panel admin-wide-panel" id="borradores">
-                <span className="section-kicker">Borradores</span>
-                <h2>Acciones pendientes</h2>
+                <span className="section-kicker">Acciones pendientes</span>
                 <div className="report-list">
                   <span>Completar direccion y mapa del evento 5K</span>
                   <span>Confirmar aforo de Mesa de Voluntariado</span>
