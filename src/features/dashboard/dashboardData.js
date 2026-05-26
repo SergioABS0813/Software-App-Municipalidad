@@ -2,6 +2,7 @@ import { events } from '../public-portal/data/events';
 
 const eventOperationalData = [
   {
+    pendingItems: [],
     referenceCost: 4200,
     locationReference: 'Ingreso por la puerta principal de la plaza.',
     registrationEnd: '2026-06-07T18:00',
@@ -13,6 +14,10 @@ const eventOperationalData = [
     },
   },
   {
+    pendingItems: [
+      'Corregir descripcion del evento.',
+      'Confirmar responsable municipal.',
+    ],
     referenceCost: 1800,
     locationReference: 'Aula 2, primer piso.',
     registrationEnd: '2026-06-10T12:00',
@@ -24,6 +29,7 @@ const eventOperationalData = [
     },
   },
   {
+    pendingItems: [],
     referenceCost: 6800,
     locationReference: 'Zona central del parque, modulo municipal.',
     registrationEnd: '2026-06-14T16:00',
@@ -35,6 +41,11 @@ const eventOperationalData = [
     },
   },
   {
+    pendingItems: [
+      'Completar punto de partida.',
+      'Agregar imagen referencial.',
+      'Definir fechas de inscripcion.',
+    ],
     referenceCost: 3600,
     locationReference: '',
     registrationEnd: '',
@@ -46,6 +57,7 @@ const eventOperationalData = [
     },
   },
   {
+    pendingItems: [],
     referenceCost: 2500,
     locationReference: '',
     registrationEnd: '2026-06-18T18:00',

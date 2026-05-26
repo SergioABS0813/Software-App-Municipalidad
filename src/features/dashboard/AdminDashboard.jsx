@@ -92,6 +92,24 @@ const publicationCriteria = [
 const stateOptions = ['Todos', ...new Set(adminEvents.map((event) => event.state))];
 const categoryOptions = ['Todas', ...new Set(adminEvents.map((event) => event.category))];
 
+function getEventStateTone(state) {
+  const stateToneMap = {
+    BORRADOR: 'state-draft',
+    CANCELADO: 'state-cancelled',
+    CERRADO: 'state-closed',
+    EN_REVISION: 'state-review',
+    FINALIZADO: 'state-finished',
+    OBSERVADO: 'state-observed',
+    PUBLICADO: 'state-published',
+  };
+
+  return stateToneMap[state] ?? 'state-default';
+}
+
+function getPendingTitle(state) {
+  return state === 'OBSERVADO' ? 'Observaciones' : 'Pendientes de ficha';
+}
+
 function hasValue(value) {
   if (Array.isArray(value)) {
     return value.length > 0;
@@ -163,7 +181,9 @@ function AdminDashboard({ onLogout }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [stateFilter, setStateFilter] = useState('Todos');
   const [categoryFilter, setCategoryFilter] = useState('Todas');
+  const [activePendingPopover, setActivePendingPopover] = useState(null);
   const notificationMenuRef = useRef(null);
+  const pendingPopoverRef = useRef(null);
   const unreadNotifications = adminNotifications.filter(
     (notification) => notification.unread,
   ).length;
@@ -191,6 +211,24 @@ function AdminDashboard({ onLogout }) {
       document.removeEventListener('mousedown', closeNotificationsOnOutsideClick);
     };
   }, [isNotificationsOpen]);
+
+  useEffect(() => {
+    if (!activePendingPopover) {
+      return undefined;
+    }
+
+    function closePendingPopoverOnOutsideClick(event) {
+      if (!pendingPopoverRef.current?.contains(event.target)) {
+        setActivePendingPopover(null);
+      }
+    }
+
+    document.addEventListener('mousedown', closePendingPopoverOnOutsideClick);
+
+    return () => {
+      document.removeEventListener('mousedown', closePendingPopoverOnOutsideClick);
+    };
+  }, [activePendingPopover]);
 
   const filteredAdminEvents = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -256,7 +294,6 @@ function AdminDashboard({ onLogout }) {
           <nav className="admin-nav" aria-label="Navegacion administrativa">
             <a className="active" href="#resumen">Resumen</a>
             <a href="#eventos-admin">Eventos</a>
-            <a href="#borradores">Borradores</a>
             <a href="#observaciones">Observaciones</a>
             <button className="admin-nav-logout" type="button" onClick={onLogout}>
               Salir del panel
@@ -436,7 +473,7 @@ function AdminDashboard({ onLogout }) {
                   <span>Estado</span>
                   <span>Categoria</span>
                   <span>Cupos</span>
-                  <span>Ficha</span>
+                  <span>Completitud</span>
                   <span>Accion</span>
                 </div>
                 {filteredAdminEvents.map((event) => (
@@ -446,26 +483,42 @@ function AdminDashboard({ onLogout }) {
                       <small>{event.date} - {event.venue}</small>
                     </span>
                     <span>
-                      <mark>{formatEventState(event.state)}</mark>
+                      <StateBadge state={event.state} />
                     </span>
                     <span>{event.category}</span>
                     <span>{event.spots}</span>
-                    <span>
+                    <span className="completeness-cell">
                       <CompletenessMeter compact value={event.completeness} />
+                      <PendingItemsControl
+                        activePendingPopover={activePendingPopover}
+                        event={event}
+                        onToggle={setActivePendingPopover}
+                        popoverRef={pendingPopoverRef}
+                      />
                     </span>
                     <span>
                       <button
-                        aria-label={`Editar ${event.title}`}
-                        className="table-icon-action"
-                        title="Editar evento"
+                        aria-label={
+                          event.state === 'FINALIZADO'
+                            ? `Ver detalle de ${event.title}`
+                            : `Editar ${event.title}`
+                        }
+                        className={
+                          event.state === 'FINALIZADO'
+                            ? 'table-icon-action is-detail'
+                            : 'table-icon-action'
+                        }
+                        title={event.state === 'FINALIZADO' ? 'Ver detalle' : 'Editar evento'}
                         type="button"
                         onClick={() => {
-                          setSelectedAdminEvent(event);
-                          setCurrentAdminView('edit-event');
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                          if (event.state !== 'FINALIZADO') {
+                            setSelectedAdminEvent(event);
+                            setCurrentAdminView('edit-event');
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }
                         }}
                       >
-                        <EditIcon />
+                        {event.state === 'FINALIZADO' ? <ViewIcon /> : <EditIcon />}
                       </button>
                     </span>
                   </div>
@@ -492,15 +545,6 @@ function AdminDashboard({ onLogout }) {
                 </div>
               </article>
 
-              <article className="admin-panel admin-wide-panel" id="borradores">
-                <span className="section-kicker">Acciones pendientes</span>
-                <div className="report-list">
-                  <span>Completar direccion y mapa del evento 5K</span>
-                  <span>Confirmar aforo de Mesa de Voluntariado</span>
-                  <span>Corregir observaciones del taller de Marinera</span>
-                  <span>Enviar borradores completos a revision directiva</span>
-                </div>
-              </article>
             </section>
           </>
         )}
@@ -529,10 +573,86 @@ function AdminDashboard({ onLogout }) {
   );
 }
 
+function PendingItemsControl({
+  activePendingPopover,
+  event,
+  onToggle,
+  popoverRef,
+}) {
+  const pendingItems = event.pendingItems ?? [];
+
+  if (pendingItems.length === 0) {
+    return null;
+  }
+
+  const isOpen = activePendingPopover?.eventId === event.id;
+  const placement = isOpen ? activePendingPopover.placement : 'bottom';
+
+  function togglePendingPopover(clickEvent) {
+    const buttonRect = clickEvent.currentTarget.getBoundingClientRect();
+    const shouldOpenUp = window.innerHeight - buttonRect.bottom < 220;
+
+    onToggle(
+      isOpen
+        ? null
+        : {
+            eventId: event.id,
+            placement: shouldOpenUp ? 'top' : 'bottom',
+          },
+    );
+  }
+
+  return (
+    <span className="pending-control" ref={isOpen ? popoverRef : null}>
+      <button
+        aria-expanded={isOpen}
+        aria-label={`${pendingItems.length} pendientes de ${event.title}`}
+        className="pending-control-button"
+        type="button"
+        onClick={togglePendingPopover}
+      >
+        <ChecklistIcon />
+        <span>{pendingItems.length}</span>
+      </button>
+      {isOpen && (
+        <span className={`pending-popover opens-${placement}`} role="dialog">
+          <strong>{getPendingTitle(event.state)}</strong>
+          <ul>
+            {pendingItems.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </span>
+      )}
+    </span>
+  );
+}
+
+function StateBadge({ state }) {
+  return (
+    <span className={`state-badge ${getEventStateTone(state)}`}>
+      {formatEventState(state)}
+    </span>
+  );
+}
+
+function ChecklistIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M8 6h13" />
+      <path d="M8 12h13" />
+      <path d="M8 18h13" />
+      <path d="M3 6l1 1 2-2" />
+      <path d="M3 12l1 1 2-2" />
+      <path d="M3 18l1 1 2-2" />
+    </svg>
+  );
+}
+
 function CompletenessMeter({ compact = false, value }) {
   return (
     <span
-      aria-label={`Ficha completa al ${value}%`}
+      aria-label={`Completitud al ${value}%`}
       className={compact ? 'completeness-meter compact' : 'completeness-meter'}
     >
       <span className="completeness-meter-track">
@@ -540,6 +660,15 @@ function CompletenessMeter({ compact = false, value }) {
       </span>
       <strong>{value}%</strong>
     </span>
+  );
+}
+
+function ViewIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
   );
 }
 
