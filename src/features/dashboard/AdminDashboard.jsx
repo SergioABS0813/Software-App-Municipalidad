@@ -526,26 +526,7 @@ function AdminDashboard({ onLogout }) {
               </div>
             </section>
 
-            <section className="admin-bottom-grid">
-              <article className="admin-panel validation-panel">
-                <span className="section-kicker">Criterios de publicación de eventos</span>
-                <div className="admin-checklist">
-                  {publicationCriteria.map((item) => (
-                    <p key={item}>{item}</p>
-                  ))}
-                </div>
-              </article>
-
-              <article className="admin-panel" id="observaciones">
-                <span className="section-kicker">Alertas</span>
-                <div className="admin-alerts">
-                  {operationalAlerts.map((alert) => (
-                    <p key={alert}>{alert}</p>
-                  ))}
-                </div>
-              </article>
-
-            </section>
+            
           </>
         )}
 
