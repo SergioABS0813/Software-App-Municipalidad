@@ -2,6 +2,69 @@
   grid-template-columns: minmax(260px, 1.35fr) 150px 130px 90px 110px;
 }
 
+.directive-shell .admin-stats {
+  align-items: stretch;
+  align-self: start;
+}
+
+.directive-stat-card {
+  align-items: center;
+  gap: 10px;
+  grid-template-columns: 40px minmax(0, 1fr);
+  height: 102px;
+  min-height: 0;
+  padding: 10px 14px;
+}
+
+.directive-stat-card .admin-stat-icon {
+  border-radius: 10px;
+  height: 40px;
+  padding: 8px;
+  width: 40px;
+}
+
+.directive-stat-card span,
+.directive-stat-card small {
+  max-width: 100%;
+}
+
+.directive-stat-card span {
+  font-size: 0.78rem;
+  line-height: 1.15;
+}
+
+.directive-stat-card strong {
+  font-size: 1.32rem;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.directive-stat-card small {
+  font-size: 0.78rem;
+  line-height: 1.15;
+  margin-top: 2px;
+}
+
+.directive-stat-card.is-decision {
+  --stat-bg: #e8f3ff;
+  --stat-color: #0a56c2;
+}
+
+.directive-stat-card.is-returned {
+  --stat-bg: #fff4ed;
+  --stat-color: #c2410c;
+}
+
+.directive-stat-card.is-month-approved {
+  --stat-bg: #edf7f1;
+  --stat-color: #16803c;
+}
+
+.directive-stat-card.is-month-report {
+  --stat-bg: #eef5f8;
+  --stat-color: #526b85;
+}
+
 .admin-nav-link {
   background: #ffffff;
   border: 0;

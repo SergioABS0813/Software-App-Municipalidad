@@ -2,6 +2,7 @@ import { useState } from 'react';
 import municipalLogo from '../../assets/images/municipalidad-logo.png';
 import calendarCheck from '../../assets/icons/calendar-check.png';
 import clipboardCheck from '../../assets/icons/clipboard-check.png';
+import fileEdit from '../../assets/icons/file-edit.png';
 import triangleAlert from '../../assets/icons/triangle-alert.png';
 import { adminEvents, formatEventState } from './dashboardData';
 import './AdminDashboard.css';
@@ -23,10 +24,12 @@ const eventReports = adminEvents
 
     return {
       ...event,
+      approvedAt: ['2026-05-08T15:30:00', '2026-05-14T11:45:00'][index] ?? '2026-05-20T09:00:00',
       cancelled,
       cancelledRegistrations,
       completedAt: ['08/06/2026', '14/06/2026'][index] ?? event.date,
       generatedAt: ['Hoy, 10:20 a.m.', 'Lun, 9:15 a.m.'][index] ?? 'Pendiente',
+      generatedAtDate: ['2026-05-28T10:20:00', '2026-05-25T09:15:00'][index] ?? '2026-05-20T09:00:00',
       manualValidated,
       qrValidated,
       registered,
@@ -55,30 +58,61 @@ const reviewFilters = [
   },
 ];
 
+const currentMonthReference = new Date('2026-05-28T12:00:00');
+const directiveApprovalAudit = [
+  // Mock temporal: reemplazar por fecha_aprobacion desde backend/API.
+  ...adminEvents
+    .filter((event) => event.state === 'PUBLICADO')
+    .map((event, index) => ({
+      eventId: event.id,
+      approvedAt: ['2026-05-18T10:30:00', '2026-04-22T16:45:00'][index] ?? '2026-05-21T09:00:00',
+    })),
+  ...eventReports.map((report) => ({
+    eventId: report.id,
+    approvedAt: report.approvedAt,
+  })),
+];
+
+function isDateInMonth(dateValue, referenceDate = currentMonthReference) {
+  const date = new Date(dateValue);
+
+  return (
+    !Number.isNaN(date.getTime()) &&
+    date.getFullYear() === referenceDate.getFullYear() &&
+    date.getMonth() === referenceDate.getMonth()
+  );
+}
+
 const directiveStats = [
   {
     icon: clipboardCheck,
     label: 'Por revisar',
-    trend: 'pendientes de aprobacion',
+    tone: 'is-decision',
+    trend: 'pendientes de decisión',
     value: adminEvents.filter((event) => event.state === 'EN_REVISION').length,
-  },
-  {
-    icon: calendarCheck,
-    label: 'Aprobados',
-    trend: 'publicados en el portal',
-    value: adminEvents.filter((event) => event.state === 'PUBLICADO').length,
   },
   {
     icon: triangleAlert,
     label: 'Observados',
+    tone: 'is-returned',
     trend: 'devueltos al administrador',
     value: adminEvents.filter((event) => event.state === 'OBSERVADO').length,
   },
   {
-    icon: clipboardCheck,
-    label: 'Reportes',
+    icon: calendarCheck,
+    label: 'Aprobados del mes',
+    tone: 'is-month-approved',
+    trend: 'aprobados en el mes actual',
+    value: directiveApprovalAudit.filter((approval) =>
+      isDateInMonth(approval.approvedAt),
+    ).length,
+  },
+  {
+    icon: fileEdit,
+    label: 'Reportes del mes',
+    tone: 'is-month-report',
     trend: 'eventos con reporte',
-    value: eventReports.length,
+    value: eventReports.filter((report) => isDateInMonth(report.generatedAtDate)).length,
   },
 ];
 
@@ -229,7 +263,10 @@ function DirectiveReviewDashboard({
 
       <section className="admin-stats" aria-label="Resumen directivo">
         {directiveStats.map((stat) => (
-          <article className="admin-stat-card" key={stat.label}>
+          <article
+            className={`admin-stat-card management-stat-card directive-stat-card ${stat.tone}`}
+            key={stat.label}
+          >
             <img alt="" className="admin-stat-icon" src={stat.icon} />
             <div>
               <span>{stat.label}</span>
