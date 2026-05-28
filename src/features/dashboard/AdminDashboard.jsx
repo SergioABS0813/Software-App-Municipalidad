@@ -138,6 +138,7 @@ function getEventChecklist(event, options = {}) {
   const items = checks.map((item) => ({
     complete: item.complete,
     label: item.complete ? item.completeLabel : item.pendingLabel,
+    positiveLabel: item.completeLabel,
   }));
 
   const hasUnaddressedObservation =
@@ -159,6 +160,51 @@ function getEventChecklist(event, options = {}) {
   };
 }
 
+function getCreationEventChecklist(event) {
+  const checks = [
+    {
+      complete:
+        hasValue(event.title) &&
+        hasValue(event.category) &&
+        hasValue(event.organizer) &&
+        hasValue(event.description),
+      completeLabel: 'Datos generales completos',
+    },
+    {
+      complete:
+        hasValue(event.date) &&
+        hasValue(event.time) &&
+        hasValue(event.registrationStart) &&
+        hasValue(event.registrationEnd) &&
+        Number(event.spots) > 0 &&
+        hasValue(event.referenceCost),
+      completeLabel: 'Programación e inscripción completas',
+    },
+    {
+      complete:
+        hasValue(event.venue) &&
+        hasValue(event.district) &&
+        hasValue(event.address) &&
+        hasValue(event.locationReference),
+      completeLabel: 'Ubicación registrada',
+    },
+    {
+      complete: Boolean(event.resources?.IMAGEN_PORTADA || event.resources?.AFICHE),
+      completeLabel: 'Recursos adjuntados',
+    },
+  ];
+  const completedChecks = checks.filter((item) => item.complete).length;
+
+  return {
+    completion: Math.round((completedChecks / checks.length) * 100),
+    hasCriticalPending: completedChecks !== checks.length,
+    items: checks.map((item) => ({
+      complete: item.complete,
+      positiveLabel: item.completeLabel,
+    })),
+  };
+}
+
 function getChecklistEventFromForm(form, event) {
   if (!form) {
     return event;
@@ -172,6 +218,7 @@ function getChecklistEventFromForm(form, event) {
     description: getNamedFormValue(form, 'description'),
     district: getNamedFormValue(form, 'district'),
     organizer: getNamedFormValue(form, 'area'),
+    referenceCost: getNamedFormValue(form, 'referenceCost'),
     registrationEnd: getNamedFormValue(form, 'registrationEnd'),
     registrationStart: getNamedFormValue(form, 'registrationStart'),
     resources: {
@@ -185,6 +232,7 @@ function getChecklistEventFromForm(form, event) {
     time: getNamedFormValue(form, 'eventEnd'),
     title: getNamedFormValue(form, 'title'),
     venue: getNamedFormValue(form, 'venue'),
+    locationReference: getNamedFormValue(form, 'reference'),
   };
 }
 
@@ -666,8 +714,7 @@ function PendingItemsControl({
         type="button"
         onClick={togglePendingPopover}
       >
-        <ChecklistIcon />
-        <span>{pendingItems.length}</span>
+        <span aria-hidden="true">i</span>
       </button>
       {isOpen && (
         <span className={`pending-popover opens-${placement}`} role="dialog">
@@ -691,19 +738,6 @@ function StateBadge({ state }) {
   );
 }
 
-function ChecklistIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M8 6h13" />
-      <path d="M8 12h13" />
-      <path d="M8 18h13" />
-      <path d="M3 6l1 1 2-2" />
-      <path d="M3 12l1 1 2-2" />
-      <path d="M3 18l1 1 2-2" />
-    </svg>
-  );
-}
-
 function CompletenessMeter({ compact = false, showValue = true, value }) {
   return (
     <span
@@ -719,13 +753,28 @@ function CompletenessMeter({ compact = false, showValue = true, value }) {
 }
 
 function DonutProgress({ value }) {
+  const normalizedValue = Math.min(100, Math.max(0, value));
+  const radius = 48;
+  const circumference = 2 * Math.PI * radius;
+  const progressOffset = circumference - (normalizedValue / 100) * circumference;
+
   return (
     <span
       aria-label={`Completitud al ${value}%`}
       className="donut-progress"
-      style={{ '--progress': `${value * 3.6}deg` }}
     >
-      <strong>{value}%</strong>
+      <svg aria-hidden="true" className="donut-progress-ring" viewBox="0 0 120 120">
+        <circle className="donut-progress-track" cx="60" cy="60" r={radius} />
+        <circle
+          className="donut-progress-value"
+          cx="60"
+          cy="60"
+          r={radius}
+          strokeDasharray={circumference}
+          strokeDashoffset={progressOffset}
+        />
+      </svg>
+      <strong>{normalizedValue}%</strong>
     </span>
   );
 }
@@ -818,6 +867,27 @@ function EditIcon() {
 
 function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
   const formRef = useRef(null);
+  const [checklistEvent, setChecklistEvent] = useState(() => ({
+    resources: {},
+    state: 'BORRADOR',
+  }));
+  const [missingReviewFields, setMissingReviewFields] = useState(() =>
+    getMissingReviewFields(null),
+  );
+  const checklist = getCreationEventChecklist(checklistEvent);
+  const canSendToReview = missingReviewFields.length === 0;
+
+  function syncChecklistFromForm() {
+    const form = formRef.current;
+
+    setChecklistEvent(
+      getChecklistEventFromForm(form, {
+        resources: {},
+        state: 'BORRADOR',
+      }),
+    );
+    setMissingReviewFields(getMissingReviewFields(form));
+  }
 
   function requestReview() {
     const missingFields = getMissingReviewFields(formRef.current);
@@ -837,7 +907,7 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
           <span className="section-kicker">Nuevo registro</span>
           <h1 id="new-event-title">Crear evento municipal</h1>
         </div>
-        <button className="admin-secondary-action" type="button" onClick={onBack}>
+        <button className="admin-new-event-action event-form-top-action" type="button" onClick={onBack}>
           Volver
         </button>
       </header>
@@ -845,6 +915,7 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
       <form
         className="event-form"
         ref={formRef}
+        onChange={syncChecklistFromForm}
         onSubmit={(event) => {
           event.preventDefault();
         }}
@@ -993,36 +1064,40 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
         </section>
 
         <aside className="event-form-aside">
-          <section className="admin-panel">
-            <span className="section-kicker">Estado</span>
-            <h2>Borrador</h2>
-            <p>
-              El evento se guardara como BORRADOR hasta que la ficha este lista
-              para enviarse a revisión directiva.
-            </p>
+          <section className="admin-panel compact-side-card new-event-completion-card">
+            <span className="section-kicker">Completitud de ficha</span>
+            <div className="side-ficha-summary">
+              <DonutProgress value={checklist.completion} />
+            </div>
           </section>
 
-          <section className="admin-panel">
-            <span className="section-kicker">Validación</span>
-            <h2>Antes de enviar</h2>
-            <div className="admin-checklist">
-              <p>Completar título, categoría y descripción.</p>
-              <p>Definir fechas del evento e inscripción.</p>
-              <p>Registrar aforo, costo referencial y ubicación exacta.</p>
-              <p>Adjuntar portada o afiche principal.</p>
+          <section className="admin-panel validation-side-card">
+            <span className="section-kicker">Revisión</span>
+            <h2>Validación de ficha</h2>
+            <div className="dynamic-checklist new-event-checklist">
+              {checklist.items.map((item) => (
+                <p
+                  className={item.complete ? 'is-complete' : 'is-pending'}
+                  key={item.positiveLabel}
+                >
+                  <span aria-hidden="true" />
+                  {item.positiveLabel}
+                </p>
+              ))}
             </div>
           </section>
 
           <div className="event-form-actions">
             <button
-              className="admin-secondary-action"
+              className="admin-secondary-action event-draft-action"
               type="button"
               onClick={() => onRequestAction('draft')}
             >
               Guardar borrador
             </button>
             <button
-              className="admin-primary-action"
+              className="admin-new-event-action event-review-action"
+              disabled={!canSendToReview}
               type="button"
               onClick={requestReview}
             >
@@ -1069,7 +1144,7 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
           <span className="section-kicker">Edición de evento</span>
           <h1 id="edit-event-title">Editar evento municipal</h1>
         </div>
-        <button className="admin-secondary-action" type="button" onClick={onBack}>
+        <button className="admin-new-event-action event-form-top-action" type="button" onClick={onBack}>
           Volver
         </button>
       </header>
@@ -1283,7 +1358,7 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
 
           <div className="event-form-actions">
             <button
-              className="admin-secondary-action"
+              className="admin-secondary-action event-draft-action"
               type="button"
               onClick={() => onRequestAction('save-changes')}
             >
@@ -1291,7 +1366,7 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
             </button>
             {['BORRADOR', 'OBSERVADO'].includes(event.state) && (
               <button
-                className="admin-primary-action"
+                className="admin-new-event-action event-review-action"
                 disabled={!canSendToReview}
                 type="button"
                 onClick={requestReview}
