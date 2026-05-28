@@ -38,12 +38,6 @@ const managementStats = [
   },
 ];
 
-const operationalAlerts = [
-  'Carrera Vecinal 5K requiere publicar punto de partida final.',
-  'Mesa de Voluntariado necesita confirmar responsable municipal.',
-  'Taller de Marinera fue observado por el directivo.',
-];
-
 const adminNotifications = [
   {
     id: 1,
@@ -83,12 +77,6 @@ const adminNotifications = [
   },
 ];
 
-const publicationCriteria = [
-  'Llenar la ficha del evento con los datos completos para que el directivo pueda revisarlas.',
-  'Las fichas en estado Observado son las que se tienen que editar para que sean revisadas nuevamente',
-  'Los borradores incompletos deben quedar fuera de la agenda ciudadana.',
-];
-
 const stateOptions = ['Todos', ...new Set(adminEvents.map((event) => event.state))];
 const categoryOptions = ['Todas', ...new Set(adminEvents.map((event) => event.category))];
 
@@ -108,6 +96,91 @@ function getEventStateTone(state) {
 
 function getPendingTitle(state) {
   return state === 'OBSERVADO' ? 'Observaciones' : 'Pendientes de ficha';
+}
+
+function getEventChecklist(event) {
+  const checks = [
+    {
+      complete:
+        hasValue(event.title) &&
+        hasValue(event.category) &&
+        hasValue(event.organizer) &&
+        hasValue(event.description),
+      completeLabel: 'Datos generales completos',
+      pendingLabel: 'Faltan datos generales',
+    },
+    {
+      complete:
+        hasValue(event.date) &&
+        hasValue(event.time) &&
+        hasValue(event.registrationStart) &&
+        hasValue(event.registrationEnd) &&
+        Number(event.spots) > 0,
+      completeLabel: 'Fechas e inscripcion completas',
+      pendingLabel: 'Falta programacion o aforo',
+    },
+    {
+      complete:
+        hasValue(event.venue) &&
+        hasValue(event.district) &&
+        hasValue(event.address),
+      completeLabel: 'Ubicacion registrada',
+      pendingLabel: 'Falta ubicacion',
+    },
+    {
+      complete: Boolean(event.resources?.IMAGEN_PORTADA || event.resources?.AFICHE),
+      completeLabel: 'Recursos adjuntados',
+      pendingLabel: 'Falta imagen referencial',
+    },
+  ];
+  const completedChecks = checks.filter((item) => item.complete).length;
+  const items = checks.map((item) => ({
+    complete: item.complete,
+    label: item.complete ? item.completeLabel : item.pendingLabel,
+  }));
+
+  if (event.state === 'OBSERVADO' && event.directorObservation) {
+    items.push({
+      complete: false,
+      isContextual: true,
+      label: 'Observacion pendiente de corregir',
+    });
+  }
+
+  return {
+    completion: Math.round((completedChecks / checks.length) * 100),
+    hasRequiredBlocksComplete: completedChecks === checks.length,
+    items,
+  };
+}
+
+function getChecklistEventFromForm(form, event) {
+  if (!form) {
+    return event;
+  }
+
+  return {
+    ...event,
+    address: getNamedFormValue(form, 'address'),
+    category: getNamedFormValue(form, 'category'),
+    date: getNamedFormValue(form, 'eventStart'),
+    description: getNamedFormValue(form, 'description'),
+    district: getNamedFormValue(form, 'district'),
+    organizer: getNamedFormValue(form, 'area'),
+    registrationEnd: getNamedFormValue(form, 'registrationEnd'),
+    registrationStart: getNamedFormValue(form, 'registrationStart'),
+    resources: {
+      ...event.resources,
+      AFICHE: Boolean(event.resources?.AFICHE || hasNamedFile(form, 'poster')),
+      IMAGEN_PORTADA: Boolean(
+        event.resources?.IMAGEN_PORTADA || hasNamedFile(form, 'coverImage'),
+      ),
+    },
+    spots: getNamedFormValue(form, 'capacity'),
+    time: getNamedFormValue(form, 'eventEnd'),
+    title: getNamedFormValue(form, 'title'),
+    venue: getNamedFormValue(form, 'venue'),
+  };
 }
 
 function hasValue(value) {
@@ -259,7 +332,7 @@ function AdminDashboard({ onLogout }) {
           />
           <span>
             <strong>San Miguel</strong>
-            <small>Gestion de eventos</small>
+            <small>Gestión de eventos</small>
           </span>
         </button>
 
@@ -273,12 +346,9 @@ function AdminDashboard({ onLogout }) {
             }
           >
             <a className="active" href="#datos-generales">Datos generales</a>
-            <a href="#programacion">Programacion</a>
-            <a href="#ubicacion">Ubicacion</a>
+            <a href="#programacion">Programación</a>
+            <a href="#ubicacion">Ubicación</a>
             <a href="#recursos">Recursos</a>
-            {currentAdminView === 'edit-event' && (
-              <a href="#observaciones-edicion">Observaciones</a>
-            )}
             <button
               className="admin-nav-logout"
               type="button"
@@ -294,7 +364,6 @@ function AdminDashboard({ onLogout }) {
           <nav className="admin-nav" aria-label="Navegacion administrativa">
             <a className="active" href="#resumen">Resumen</a>
             <a href="#eventos-admin">Eventos</a>
-            <a href="#observaciones">Observaciones</a>
             <button className="admin-nav-logout" type="button" onClick={onLogout}>
               Salir del panel
             </button>
@@ -630,7 +699,7 @@ function ChecklistIcon() {
   );
 }
 
-function CompletenessMeter({ compact = false, value }) {
+function CompletenessMeter({ compact = false, showValue = true, value }) {
   return (
     <span
       aria-label={`Completitud al ${value}%`}
@@ -639,7 +708,7 @@ function CompletenessMeter({ compact = false, value }) {
       <span className="completeness-meter-track">
         <span style={{ width: `${value}%` }} />
       </span>
-      <strong>{value}%</strong>
+      {showValue && <strong>{value}%</strong>}
     </span>
   );
 }
@@ -878,7 +947,15 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
 
 function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
   const formRef = useRef(null);
-  const canSendToReview = ['BORRADOR', 'OBSERVADO'].includes(event.state);
+  const [checklistEvent, setChecklistEvent] = useState(() => event);
+  const checklist = getEventChecklist(checklistEvent);
+  const canSendToReview =
+    ['BORRADOR', 'OBSERVADO'].includes(event.state) &&
+    checklist.hasRequiredBlocksComplete;
+
+  function syncChecklistFromForm() {
+    setChecklistEvent(getChecklistEventFromForm(formRef.current, event));
+  }
 
   function requestReview() {
     const missingFields = getMissingReviewFields(formRef.current, event);
@@ -906,6 +983,7 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
       <form
         className="event-form"
         ref={formRef}
+        onChange={syncChecklistFromForm}
         onSubmit={(formEvent) => {
           formEvent.preventDefault();
         }}
@@ -1057,52 +1135,45 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
             </div>
           </article>
 
-          <article className="event-form-section" id="observaciones-edicion">
-            <div className="form-section-heading">
-              <span className="section-kicker">Observaciones</span>
-              <h2>Control de cambios</h2>
-            </div>
-            <div className="admin-checklist">
-              {event.state === 'OBSERVADO' ? (
-                <p>
-                  El directivo observo este evento. Corrige la ficha y enviala
-                  nuevamente a revision.
-                </p>
-              ) : (
-                <p>
-                  Registra ajustes puntuales y guarda los cambios para mantener
-                  actualizada la ficha municipal.
-                </p>
-              )}
-              <p>Ultima actualizacion: {event.lastUpdate}</p>
-            </div>
-          </article>
+          
         </section>
 
         <aside className="event-form-aside">
-          <section className="admin-panel">
+          <section className="admin-panel compact-side-card">
             <span className="section-kicker">Ficha</span>
-            <h2>{event.completeness}% completa</h2>
-            <CompletenessMeter value={event.completeness} />
+            <h2>{checklist.completion}% completa</h2>
+            <CompletenessMeter showValue={false} value={checklist.completion} />
           </section>
 
-          <section className="admin-panel">
+          <section className="admin-panel compact-side-card">
             <span className="section-kicker">Estado actual</span>
             <h2>{formatEventState(event.state)}</h2>
-            <p>
-              {event.state === 'PUBLICADO'
-                ? 'Este evento ya es visible para el ciudadano. Los cambios deben mantenerse consistentes con la informacion publicada.'
-                : 'Puedes actualizar la ficha y conservarla dentro del flujo administrativo correspondiente.'}
-            </p>
+            <p>{getEditStateMessage(event.state)}</p>
           </section>
 
-          <section className="admin-panel">
+          {event.state === 'OBSERVADO' && event.directorObservation && (
+            <section className="admin-panel director-observation-panel">
+              <span className="section-kicker">Observacion del directivo</span>
+              <blockquote>{event.directorObservation}</blockquote>
+              {event.directorName && <small>Registrada por {event.directorName}</small>}
+            </section>
+          )}
+
+          <section className="admin-panel validation-side-card">
             <span className="section-kicker">Revision</span>
-            <h2>Antes de guardar</h2>
-            <div className="admin-checklist">
-              <p>Validar datos principales y categoria.</p>
-              <p>Confirmar fechas, cupos, costo referencial y lugar del evento.</p>
-              <p>Actualizar recursos si la ficha fue observada.</p>
+            <h2>Validacion de ficha</h2>
+            <div className="dynamic-checklist">
+              {checklist.items.map((item) => (
+                <p
+                  className={
+                    item.complete ? 'is-complete' : 'is-pending'
+                  }
+                  key={item.label}
+                >
+                  <span aria-hidden="true">{item.complete ? '✓' : '!'}</span>
+                  {item.label}
+                </p>
+              ))}
             </div>
           </section>
 
@@ -1128,6 +1199,18 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
       </form>
     </section>
   );
+}
+
+function getEditStateMessage(state) {
+  if (state === 'OBSERVADO') {
+    return 'Actualiza la ficha y enviala nuevamente a revision.';
+  }
+
+  if (state === 'PUBLICADO') {
+    return 'Mantén consistencia con la informacion publicada.';
+  }
+
+  return 'Actualiza la ficha dentro del flujo administrativo.';
 }
 
 function ValidationIssueModal({ missingFields, onClose }) {

@@ -15,9 +15,11 @@ const eventOperationalData = [
   },
   {
     pendingItems: [
-      'Corregir descripcion del evento.',
-      'Confirmar responsable municipal.',
+      '1 observacion del directivo "Mariana Fuentes".',
     ],
+    directorName: 'Mariana Fuentes',
+    directorObservation:
+      'Precisar el lugar exacto del evento y corregir la descripcion para indicar el publico objetivo.',
     referenceCost: 1800,
     locationReference: 'Aula 2, primer piso.',
     registrationEnd: '2026-06-10T12:00',
