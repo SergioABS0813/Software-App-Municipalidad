@@ -24,7 +24,7 @@ const managementStats = [
   },
   {
     icon: clipboardCheck,
-    label: 'En revision',
+    label: 'En revisión',
     tone: 'is-review',
     trend: 'pendientes del directivo',
     value: adminEvents.filter((event) => event.state === 'EN_REVISION').length,
@@ -47,8 +47,8 @@ const adminNotifications = [
   },
   {
     id: 2,
-    message: 'Ana Torres envio "Carrera 5K" a revision.',
-    type: 'Evento enviado a revision',
+    message: 'Ana Torres envió "Carrera 5K" a revisión.',
+    type: 'Evento enviado a revisión',
     unread: true,
   },
   {
@@ -98,7 +98,8 @@ function getPendingTitle(state) {
   return state === 'OBSERVADO' ? 'Observaciones' : 'Pendientes de ficha';
 }
 
-function getEventChecklist(event) {
+function getEventChecklist(event, options = {}) {
+  const observationAddressed = options.observationAddressed ?? false;
   const checks = [
     {
       complete:
@@ -116,16 +117,16 @@ function getEventChecklist(event) {
         hasValue(event.registrationStart) &&
         hasValue(event.registrationEnd) &&
         Number(event.spots) > 0,
-      completeLabel: 'Fechas e inscripcion completas',
-      pendingLabel: 'Falta programacion o aforo',
+      completeLabel: 'Fechas e inscripción completas',
+      pendingLabel: 'Falta programación o aforo',
     },
     {
       complete:
         hasValue(event.venue) &&
         hasValue(event.district) &&
         hasValue(event.address),
-      completeLabel: 'Ubicacion registrada',
-      pendingLabel: 'Falta ubicacion',
+      completeLabel: 'Ubicación registrada',
+      pendingLabel: 'Falta completar ubicación',
     },
     {
       complete: Boolean(event.resources?.IMAGEN_PORTADA || event.resources?.AFICHE),
@@ -139,16 +140,20 @@ function getEventChecklist(event) {
     label: item.complete ? item.completeLabel : item.pendingLabel,
   }));
 
-  if (event.state === 'OBSERVADO' && event.directorObservation) {
+  const hasUnaddressedObservation =
+    event.state === 'OBSERVADO' && event.directorObservation && !observationAddressed;
+
+  if (hasUnaddressedObservation) {
     items.push({
       complete: false,
       isContextual: true,
-      label: 'Observacion pendiente de corregir',
+      label: 'Observación pendiente de corregir',
     });
   }
 
   return {
     completion: Math.round((completedChecks / checks.length) * 100),
+    hasCriticalPending: completedChecks !== checks.length || hasUnaddressedObservation,
     hasRequiredBlocksComplete: completedChecks === checks.length,
     items,
   };
@@ -213,20 +218,20 @@ function hasNamedFile(form, name) {
 
 function getMissingReviewFields(form, existingEvent = null) {
   const requiredFields = [
-    ['title', 'Titulo del evento'],
-    ['category', 'Categoria'],
+    ['title', 'Título del evento'],
+    ['category', 'Categoría'],
     ['area', 'Area responsable'],
     ['description', 'Descripcion'],
     ['eventStart', 'Inicio o fecha del evento'],
     ['eventEnd', 'Fin u hora del evento'],
-    ['registrationStart', 'Inicio de inscripcion'],
-    ['registrationEnd', 'Fin de inscripcion'],
-    ['capacity', 'Aforo maximo'],
+    ['registrationStart', 'Inicio de inscripción'],
+    ['registrationEnd', 'Fin de inscripción'],
+    ['capacity', 'Aforo máximo'],
     ['referenceCost', 'Costo referencial'],
     ['venue', 'Lugar del evento'],
     ['district', 'Distrito'],
-    ['address', 'Direccion'],
-    ['reference', 'Referencia de ubicacion'],
+    ['address', 'Dirección'],
+    ['reference', 'Referencia de ubicación'],
   ];
   const missingFields = requiredFields
     .filter(([fieldName]) => !hasValue(getNamedFormValue(form, fieldName)))
@@ -524,7 +529,7 @@ function AdminDashboard({ onLogout }) {
                   </select>
                 </label>
                 <label>
-                  Categoria
+                  Categoría
                   <select
                     value={categoryFilter}
                     onChange={(event) => setCategoryFilter(event.target.value)}
@@ -540,10 +545,10 @@ function AdminDashboard({ onLogout }) {
                 <div className="admin-table-row admin-table-head">
                   <span>Evento</span>
                   <span>Estado</span>
-                  <span>Categoria</span>
+                  <span>Categoría</span>
                   <span>Cupos</span>
                   <span>Completitud</span>
-                  <span>Accion</span>
+                  <span>Acción</span>
                 </div>
                 {filteredAdminEvents.map((event) => (
                   <div className="admin-table-row" key={event.id}>
@@ -713,6 +718,86 @@ function CompletenessMeter({ compact = false, showValue = true, value }) {
   );
 }
 
+function DonutProgress({ value }) {
+  return (
+    <span
+      aria-label={`Completitud al ${value}%`}
+      className="donut-progress"
+      style={{ '--progress': `${value * 3.6}deg` }}
+    >
+      <strong>{value}%</strong>
+    </span>
+  );
+}
+
+function ResourceUploadCard({ accept, label, name, resourceType, showPreview = false }) {
+  const [fileName, setFileName] = useState('');
+  const [previewUrl, setPreviewUrl] = useState('');
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  function handleFileChange(event) {
+    const file = event.target.files?.[0];
+
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    if (!file) {
+      setFileName('');
+      setPreviewUrl('');
+      return;
+    }
+
+    setFileName(file.name);
+    setPreviewUrl(showPreview && file.type.startsWith('image/')
+      ? URL.createObjectURL(file)
+      : '');
+  }
+
+  return (
+    <label className={previewUrl ? 'resource-upload has-preview' : 'resource-upload'}>
+      <span className="resource-upload-heading">
+        <strong>{label}</strong>
+        <em>{resourceType}</em>
+      </span>
+      {showPreview && (
+        <span className="resource-preview">
+          {previewUrl ? (
+            <img alt={`Vista previa de ${label.toLowerCase()}`} src={previewUrl} />
+          ) : (
+            <small>Vista previa</small>
+          )}
+        </span>
+      )}
+      <span className="resource-file-row">
+        <input accept={accept} name={name} type="file" onChange={handleFileChange} />
+        {fileName && <small>{fileName}</small>}
+      </span>
+    </label>
+  );
+}
+
+function getStateSummaryText(state) {
+  const stateMessages = {
+    BORRADOR: 'Completa la ficha para enviarla a revisión.',
+    CANCELADO: 'Evento cancelado.',
+    CERRADO: 'Evento cerrado.',
+    EN_REVISION: 'Pendiente de aprobación directiva.',
+    FINALIZADO: 'Evento cerrado.',
+    OBSERVADO: 'Requiere correcciones antes de reenviar.',
+    PUBLICADO: 'Visible en el portal ciudadano.',
+  };
+
+  return stateMessages[state] ?? 'Estado registrado.';
+}
+
 function ViewIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -772,13 +857,13 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
             </div>
             <div className="form-grid">
               <label className="form-field span-2">
-                Titulo del evento
+                Título del evento
                 <input name="title" placeholder="Ej. Festival Cultural Barrial" />
               </label>
               <label className="form-field">
                 Categoria
                 <select defaultValue="" name="category">
-                  <option disabled value="">Seleccionar categoria</option>
+                  <option disabled value="">Seleccionar categoría</option>
                   {categoryOptions
                     .filter((category) => category !== 'Todas')
                     .map((category) => (
@@ -797,7 +882,7 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
                 </select>
               </label>
               <label className="form-field span-2">
-                Descripcion
+                Descripción
                 <textarea
                   name="description"
                   placeholder="Describe el objetivo, publico y actividades principales del evento."
@@ -808,8 +893,8 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
 
           <article className="event-form-section" id="programacion">
             <div className="form-section-heading">
-              <span className="section-kicker">Programacion</span>
-              <h2>Fechas e inscripcion</h2>
+              <span className="section-kicker">Programación</span>
+              <h2>Fechas e inscripción</h2>
             </div>
             <div className="form-grid">
               <label className="form-field">
@@ -821,15 +906,15 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
                 <input name="eventEnd" type="datetime-local" />
               </label>
               <label className="form-field">
-                Inicio de inscripcion
+                Inicio de inscripción
                 <input name="registrationStart" type="datetime-local" />
               </label>
               <label className="form-field">
-                Fin de inscripcion
+                Fin de inscripción
                 <input name="registrationEnd" type="datetime-local" />
               </label>
               <label className="form-field">
-                Aforo maximo
+                Aforo máximo
                 <input min="1" name="capacity" placeholder="120" type="number" />
               </label>
               <label className="form-field">
@@ -851,7 +936,7 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
 
           <article className="event-form-section" id="ubicacion">
             <div className="form-section-heading">
-              <span className="section-kicker">Ubicacion</span>
+              <span className="section-kicker">Ubicación</span>
               <h2>Lugar del evento</h2>
             </div>
             <div className="form-grid">
@@ -864,7 +949,7 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
                 <input name="district" value="San Miguel" readOnly />
               </label>
               <label className="form-field span-2">
-                Direccion
+                Dirección
                 <input name="address" placeholder="Av. Universitaria 1801" />
               </label>
               <label className="form-field span-2">
@@ -883,21 +968,26 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
               <h2>Material del evento</h2>
             </div>
             <div className="resource-grid">
-              <label className="resource-upload">
-                <strong>Imagen de portada</strong>
-                <span>IMAGEN_PORTADA</span>
-                <input name="coverImage" type="file" />
-              </label>
-              <label className="resource-upload">
-                <strong>Afiche</strong>
-                <span>AFICHE</span>
-                <input name="poster" type="file" />
-              </label>
-              <label className="resource-upload">
-                <strong>Documento</strong>
-                <span>DOCUMENTO</span>
-                <input name="document" type="file" />
-              </label>
+              <ResourceUploadCard
+                accept="image/*"
+                label="Imagen de portada"
+                name="coverImage"
+                resourceType="IMAGEN_PORTADA"
+                showPreview
+              />
+              <ResourceUploadCard
+                accept="image/*"
+                label="Afiche"
+                name="poster"
+                resourceType="AFICHE"
+                showPreview
+              />
+              <ResourceUploadCard
+                accept=".pdf,.doc,.docx"
+                label="Documento"
+                name="document"
+                resourceType="DOCUMENTO"
+              />
             </div>
           </article>
         </section>
@@ -908,17 +998,17 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
             <h2>Borrador</h2>
             <p>
               El evento se guardara como BORRADOR hasta que la ficha este lista
-              para enviarse a revision directiva.
+              para enviarse a revisión directiva.
             </p>
           </section>
 
           <section className="admin-panel">
-            <span className="section-kicker">Validacion</span>
+            <span className="section-kicker">Validación</span>
             <h2>Antes de enviar</h2>
             <div className="admin-checklist">
-              <p>Completar titulo, categoria y descripcion.</p>
-              <p>Definir fechas del evento e inscripcion.</p>
-              <p>Registrar aforo, costo referencial y ubicacion exacta.</p>
+              <p>Completar título, categoría y descripción.</p>
+              <p>Definir fechas del evento e inscripción.</p>
+              <p>Registrar aforo, costo referencial y ubicación exacta.</p>
               <p>Adjuntar portada o afiche principal.</p>
             </div>
           </section>
@@ -936,7 +1026,7 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
               type="button"
               onClick={requestReview}
             >
-              Enviar a revision
+              Enviar a revisión
             </button>
           </div>
         </aside>
@@ -948,12 +1038,16 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
 function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
   const formRef = useRef(null);
   const [checklistEvent, setChecklistEvent] = useState(() => event);
-  const checklist = getEventChecklist(checklistEvent);
+  const [hasFormChanges, setHasFormChanges] = useState(false);
+  const checklist = getEventChecklist(checklistEvent, {
+    observationAddressed: hasFormChanges,
+  });
   const canSendToReview =
     ['BORRADOR', 'OBSERVADO'].includes(event.state) &&
-    checklist.hasRequiredBlocksComplete;
+    !checklist.hasCriticalPending;
 
   function syncChecklistFromForm() {
+    setHasFormChanges(true);
     setChecklistEvent(getChecklistEventFromForm(formRef.current, event));
   }
 
@@ -972,7 +1066,7 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
     <section className="new-event-view" aria-labelledby="edit-event-title">
       <header className="admin-topbar">
         <div>
-          <span className="section-kicker">Edicion de evento</span>
+          <span className="section-kicker">Edición de evento</span>
           <h1 id="edit-event-title">Editar evento municipal</h1>
         </div>
         <button className="admin-secondary-action" type="button" onClick={onBack}>
@@ -996,11 +1090,11 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
             </div>
             <div className="form-grid">
               <label className="form-field span-2">
-                Titulo del evento
+                Título del evento
                 <input defaultValue={event.title} name="title" />
               </label>
               <label className="form-field">
-                Categoria
+                Categoría
                 <select defaultValue={event.category} name="category">
                   {categoryOptions
                     .filter((category) => category !== 'Todas')
@@ -1010,17 +1104,17 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
                 </select>
               </label>
               <label className="form-field">
-                Area responsable
+                Área responsable
                 <select defaultValue={event.organizer} name="area">
                   <option>{event.organizer}</option>
                   <option>Cultura</option>
-                  <option>Participacion Vecinal</option>
+                  <option>Participación Vecinal</option>
                   <option>Deporte</option>
                   <option>Comunicaciones</option>
                 </select>
               </label>
               <label className="form-field span-2">
-                Descripcion
+                Descripción
                 <textarea defaultValue={event.description} name="description" />
               </label>
             </div>
@@ -1028,8 +1122,8 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
 
           <article className="event-form-section" id="programacion">
             <div className="form-section-heading">
-              <span className="section-kicker">Programacion</span>
-              <h2>Fechas e inscripcion</h2>
+              <span className="section-kicker">Programación</span>
+              <h2>Fechas e inscripción</h2>
             </div>
             <div className="form-grid">
               <label className="form-field">
@@ -1041,7 +1135,7 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
                 <input defaultValue={event.time} name="eventEnd" />
               </label>
               <label className="form-field">
-                Inicio de inscripcion
+                Inicio de inscripción
                 <input
                   defaultValue={event.registrationStart}
                   name="registrationStart"
@@ -1049,7 +1143,7 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
                 />
               </label>
               <label className="form-field">
-                Fin de inscripcion
+                Fin de inscripción
                 <input
                   defaultValue={event.registrationEnd}
                   name="registrationEnd"
@@ -1057,7 +1151,7 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
                 />
               </label>
               <label className="form-field">
-                Aforo maximo
+                Aforo máximo
                 <input
                   defaultValue={event.spots}
                   min="1"
@@ -1084,7 +1178,7 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
 
           <article className="event-form-section" id="ubicacion">
             <div className="form-section-heading">
-              <span className="section-kicker">Ubicacion</span>
+              <span className="section-kicker">Ubicación</span>
               <h2>Lugar del evento</h2>
             </div>
             <div className="form-grid">
@@ -1097,7 +1191,7 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
                 <input defaultValue={event.district} name="district" />
               </label>
               <label className="form-field span-2">
-                Direccion
+                Dirección
                 <input defaultValue={event.address} name="address" />
               </label>
               <label className="form-field span-2">
@@ -1117,21 +1211,26 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
               <h2>Material del evento</h2>
             </div>
             <div className="resource-grid">
-              <label className="resource-upload">
-                <strong>Actualizar portada</strong>
-                <span>IMAGEN_PORTADA</span>
-                <input name="coverImage" type="file" />
-              </label>
-              <label className="resource-upload">
-                <strong>Actualizar afiche</strong>
-                <span>AFICHE</span>
-                <input name="poster" type="file" />
-              </label>
-              <label className="resource-upload">
-                <strong>Adjuntar documento</strong>
-                <span>DOCUMENTO</span>
-                <input name="document" type="file" />
-              </label>
+              <ResourceUploadCard
+                accept="image/*"
+                label="Actualizar portada"
+                name="coverImage"
+                resourceType="IMAGEN_PORTADA"
+                showPreview
+              />
+              <ResourceUploadCard
+                accept="image/*"
+                label="Actualizar afiche"
+                name="poster"
+                resourceType="AFICHE"
+                showPreview
+              />
+              <ResourceUploadCard
+                accept=".pdf,.doc,.docx"
+                label="Adjuntar documento"
+                name="document"
+                resourceType="DOCUMENTO"
+              />
             </div>
           </article>
 
@@ -1139,29 +1238,34 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
         </section>
 
         <aside className="event-form-aside">
-          <section className="admin-panel compact-side-card">
-            <span className="section-kicker">Ficha</span>
-            <h2>{checklist.completion}% completa</h2>
-            <CompletenessMeter showValue={false} value={checklist.completion} />
-          </section>
+          <div className="side-summary-grid">
+            <section className="admin-panel compact-side-card">
+              <span className="section-kicker">Completitud de ficha</span>
+              <div className="side-ficha-summary">
+                <DonutProgress value={checklist.completion} />
+              </div>
+            </section>
 
-          <section className="admin-panel compact-side-card">
-            <span className="section-kicker">Estado actual</span>
-            <h2>{formatEventState(event.state)}</h2>
-            <p>{getEditStateMessage(event.state)}</p>
-          </section>
+            <section className="admin-panel compact-side-card">
+              <span className="section-kicker">Estado actual</span>
+              <div className="side-state-summary">
+                <StateBadge state={event.state} />
+                <p>{getStateSummaryText(event.state)}</p>
+              </div>
+            </section>
+          </div>
 
           {event.state === 'OBSERVADO' && event.directorObservation && (
             <section className="admin-panel director-observation-panel">
-              <span className="section-kicker">Observacion del directivo</span>
+              <span className="section-kicker">Observación del directivo</span>
               <blockquote>{event.directorObservation}</blockquote>
               {event.directorName && <small>Registrada por {event.directorName}</small>}
             </section>
           )}
 
           <section className="admin-panel validation-side-card">
-            <span className="section-kicker">Revision</span>
-            <h2>Validacion de ficha</h2>
+            <span className="section-kicker">Revisión</span>
+            <h2>Validación de ficha</h2>
             <div className="dynamic-checklist">
               {checklist.items.map((item) => (
                 <p
@@ -1185,13 +1289,14 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
             >
               Guardar cambios
             </button>
-            {canSendToReview && (
+            {['BORRADOR', 'OBSERVADO'].includes(event.state) && (
               <button
                 className="admin-primary-action"
+                disabled={!canSendToReview}
                 type="button"
                 onClick={requestReview}
               >
-                Enviar a revision
+                Enviar a revisión
               </button>
             )}
           </div>
@@ -1199,18 +1304,6 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
       </form>
     </section>
   );
-}
-
-function getEditStateMessage(state) {
-  if (state === 'OBSERVADO') {
-    return 'Actualiza la ficha y enviala nuevamente a revision.';
-  }
-
-  if (state === 'PUBLICADO') {
-    return 'Mantén consistencia con la informacion publicada.';
-  }
-
-  return 'Actualiza la ficha dentro del flujo administrativo.';
 }
 
 function ValidationIssueModal({ missingFields, onClose }) {
@@ -1223,9 +1316,9 @@ function ValidationIssueModal({ missingFields, onClose }) {
         role="dialog"
       >
         <span className="section-kicker">Ficha incompleta</span>
-        <h2 id="validation-issue-title">Completa la informacion requerida</h2>
+        <h2 id="validation-issue-title">Completa la información requerida</h2>
         <p>
-          Para enviar este evento a revision directiva, primero registra los
+          Para enviar este evento a revisión directiva, primero registra los
           siguientes campos:
         </p>
         <ul className="validation-missing-list">
@@ -1251,10 +1344,10 @@ function ConfirmEventActionModal({ action, onCancel, onConfirm }) {
   const title = getEventActionTitle(actionType, action.eventTitle);
   const description = getEventActionDescription(actionType, isCreate);
   const confirmLabel = isSaveChanges
-    ? 'Si, guardar cambios'
+    ? 'Sí, guardar cambios'
     : isReview
-      ? 'Si, enviar a revision'
-      : 'Si, guardar borrador';
+      ? 'Sí, enviar a revisión'
+      : 'Sí, guardar borrador';
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -1268,7 +1361,7 @@ function ConfirmEventActionModal({ action, onCancel, onConfirm }) {
           {isSaveChanges
             ? 'Guardar cambios'
             : isReview
-              ? 'Enviar a revision'
+              ? 'Enviar a revisión'
               : 'Guardar borrador'}
         </span>
         <h2 id="confirm-event-action-title">{title}</h2>
@@ -1288,36 +1381,36 @@ function ConfirmEventActionModal({ action, onCancel, onConfirm }) {
 
 function getEventActionTitle(actionType, eventTitle) {
   if (actionType === 'save-changes') {
-    return `Estas seguro de guardar los cambios de "${eventTitle}"?`;
+    return `¿Estás seguro de guardar los cambios de "${eventTitle}"?`;
   }
 
   if (actionType === 'review-changes') {
-    return `Estas seguro de enviar "${eventTitle}" a revision?`;
+    return `¿Estás seguro de enviar "${eventTitle}" a revisión?`;
   }
 
   if (actionType === 'review') {
-    return 'Estas seguro de enviar este evento a revision?';
+    return '¿Estás seguro de enviar este evento a revisión?';
   }
 
-  return 'Estas seguro de guardar este evento como borrador?';
+  return '¿Estás seguro de guardar este evento como borrador?';
 }
 
 function getEventActionDescription(actionType, isCreate) {
   if (actionType === 'save-changes') {
-    return 'Los cambios quedaran registrados en la ficha del evento y volveras a la gestion municipal de eventos.';
+    return 'Los cambios quedarán registrados en la ficha del evento y volverás a la gestión municipal de eventos.';
   }
 
   if (actionType === 'review-changes') {
-    return 'La ficha corregida pasara a EN_REVISION para que el usuario directivo pueda aprobarla u observarla.';
+    return 'La ficha corregida pasará a EN_REVISION para que el usuario directivo pueda aprobarla u observarla.';
   }
 
   if (actionType === 'review') {
-    return 'El evento pasara a EN_REVISION para que el usuario directivo pueda aprobarlo u observarlo antes de publicarlo.';
+    return 'El evento pasará a EN_REVISION para que el usuario directivo pueda aprobarlo u observarlo antes de publicarlo.';
   }
 
   return isCreate
-    ? 'El evento permanecera como BORRADOR y podras completarlo o editarlo antes de enviarlo al directivo.'
-    : 'La ficha conservara sus cambios como BORRADOR dentro del flujo administrativo.';
+    ? 'El evento permanecerá como BORRADOR y podrás completarlo o editarlo antes de enviarlo al directivo.'
+    : 'La ficha conservará sus cambios como BORRADOR dentro del flujo administrativo.';
 }
 
 export default AdminDashboard;

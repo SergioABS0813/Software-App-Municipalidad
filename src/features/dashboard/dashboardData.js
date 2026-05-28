@@ -15,11 +15,11 @@ const eventOperationalData = [
   },
   {
     pendingItems: [
-      '1 observacion del directivo "Mariana Fuentes".',
+      '1 observación del directivo "Mariana Fuentes".',
     ],
     directorName: 'Mariana Fuentes',
     directorObservation:
-      'Precisar el lugar exacto del evento y corregir la descripcion para indicar el publico objetivo.',
+      'Precisar el lugar exacto del evento y corregir la descripción para indicar el público objetivo.',
     referenceCost: 1800,
     locationReference: 'Aula 2, primer piso.',
     registrationEnd: '2026-06-10T12:00',
@@ -46,7 +46,7 @@ const eventOperationalData = [
     pendingItems: [
       'Completar punto de partida.',
       'Agregar imagen referencial.',
-      'Definir fechas de inscripcion.',
+      'Definir fechas de inscripción.',
     ],
     referenceCost: 3600,
     locationReference: '',
@@ -76,7 +76,7 @@ const eventStateLabels = {
   BORRADOR: 'Borrador',
   CANCELADO: 'Cancelado',
   CERRADO: 'Cerrado',
-  EN_REVISION: 'En revision',
+  EN_REVISION: 'En revisión',
   FINALIZADO: 'Finalizado',
   OBSERVADO: 'Observado',
   PUBLICADO: 'Publicado',
