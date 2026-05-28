@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import municipalLogo from '../../assets/images/municipalidad-logo.png';
 import calendarCheck from '../../assets/icons/calendar-check.png';
 import clipboardCheck from '../../assets/icons/clipboard-check.png';
@@ -79,6 +79,11 @@ const adminNotifications = [
 
 const stateOptions = ['Todos', ...new Set(adminEvents.map((event) => event.state))];
 const categoryOptions = ['Todas', ...new Set(adminEvents.map((event) => event.category))];
+const fallbackAdminUser = {
+  email: 'admin@munisanmiguel.gob.pe',
+  fullName: 'Sergio Bustamante',
+  role: 'ADMINISTRADOR',
+};
 
 function getEventStateTone(state) {
   const stateToneMap = {
@@ -92,6 +97,33 @@ function getEventStateTone(state) {
   };
 
   return stateToneMap[state] ?? 'state-default';
+}
+
+function getUserDisplayName(user) {
+  return user?.fullName || user?.name || user?.email?.split('@')[0] || fallbackAdminUser.fullName;
+}
+
+function getUserInitials(name) {
+  const nameParts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (nameParts.length === 0) {
+    return 'AD';
+  }
+
+  return `${nameParts[0][0] ?? ''}${nameParts.at(-1)?.[0] ?? ''}`.toUpperCase();
+}
+
+function formatUserRole(role) {
+  const roleLabels = {
+    ADMINISTRADOR: 'Administrador',
+    DIRECTIVO: 'Directivo',
+    OPERATIVO: 'Operativo',
+  };
+
+  return roleLabels[role] ?? role ?? 'Administrador';
 }
 
 function getPendingTitle(state) {
@@ -297,7 +329,7 @@ function getMissingReviewFields(form, existingEvent = null) {
   return missingFields;
 }
 
-function AdminDashboard({ onLogout }) {
+function AdminDashboard({ onLogout, user }) {
   const [currentAdminView, setCurrentAdminView] = useState('dashboard');
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notificationFilter, setNotificationFilter] = useState('all');
@@ -319,6 +351,8 @@ function AdminDashboard({ onLogout }) {
       : adminNotifications;
   const isEventFormView =
     currentAdminView === 'new-event' || currentAdminView === 'edit-event';
+  const adminUser = user ?? fallbackAdminUser;
+  const adminUserName = getUserDisplayName(adminUser);
 
   useEffect(() => {
     if (!isNotificationsOpen) {
@@ -389,6 +423,16 @@ function AdminDashboard({ onLogout }) {
           </span>
         </button>
 
+        <section className="admin-user-card" aria-label="Usuario autenticado">
+          <span className="admin-user-avatar" aria-hidden="true">
+            {getUserInitials(adminUserName)}
+          </span>
+          <span className="admin-user-copy">
+            <strong>{adminUserName}</strong>
+            <small>{formatUserRole(adminUser.role)}</small>
+          </span>
+        </section>
+
         {isEventFormView ? (
           <nav
             className="admin-nav"
@@ -416,7 +460,6 @@ function AdminDashboard({ onLogout }) {
         ) : (
           <nav className="admin-nav" aria-label="Navegacion administrativa">
             <a className="active" href="#resumen">Resumen</a>
-            <a href="#eventos-admin">Eventos</a>
             <button className="admin-nav-logout" type="button" onClick={onLogout}>
               Salir del panel
             </button>
@@ -454,7 +497,7 @@ function AdminDashboard({ onLogout }) {
             <header className="admin-topbar">
               <div>
                 <span className="section-kicker">Panel administrativo</span>
-                <h1 id="admin-title">Gestion municipal de eventos</h1>
+                <h1 id="admin-title">Gestión municipal de eventos</h1>
               </div>
               <div className="admin-topbar-actions">
                 <div className="notification-menu" ref={notificationMenuRef}>

@@ -10,7 +10,7 @@
   background: #ffffff;
   border-right: 1px solid var(--color-border);
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto minmax(0, 1fr);
   min-height: 100svh;
   padding: 24px;
   position: sticky;
@@ -46,11 +46,65 @@
   margin-top: 5px;
 }
 
+.admin-user-card {
+  align-items: center;
+  background: #f6fbfe;
+  border: 1px solid rgba(2, 132, 199, 0.1);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 40px minmax(0, 1fr);
+  margin-top: 22px;
+  padding: 12px 10px;
+}
+
+.admin-user-avatar {
+  align-items: center;
+  background: linear-gradient(135deg, var(--brand-primary), #0284c7);
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 900;
+  height: 40px;
+  justify-content: center;
+  letter-spacing: 0;
+  width: 40px;
+}
+
+.admin-user-copy {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.admin-user-copy strong,
+.admin-user-copy small {
+  display: block;
+  line-height: 1.15;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-user-copy strong {
+  color: var(--color-text-strong);
+  font-size: 0.9rem;
+  font-weight: 820;
+}
+
+.admin-user-copy small {
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  font-weight: 720;
+}
+
 .admin-nav {
   align-content: start;
   display: grid;
   gap: 6px;
-  margin-top: 42px;
+  margin-top: 24px;
 }
 
 .admin-nav a,
@@ -621,6 +675,27 @@
   display: grid;
   overflow-x: auto;
   overflow-y: visible;
+  scrollbar-color: #9cc8df #eef8fd;
+  scrollbar-width: thin;
+}
+
+.admin-table::-webkit-scrollbar {
+  height: 9px;
+}
+
+.admin-table::-webkit-scrollbar-track {
+  background: #eef8fd;
+  border-radius: 999px;
+}
+
+.admin-table::-webkit-scrollbar-thumb {
+  background: #9cc8df;
+  border: 2px solid #eef8fd;
+  border-radius: 999px;
+}
+
+.admin-table::-webkit-scrollbar-thumb:hover {
+  background: #6fb4d6;
 }
 
 .admin-table-row {
@@ -1413,6 +1488,10 @@
     display: flex;
     flex-wrap: wrap;
     margin-top: 22px;
+  }
+
+  .admin-user-card {
+    max-width: 320px;
   }
 
   .admin-grid,

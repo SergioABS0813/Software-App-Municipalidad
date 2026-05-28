@@ -9,16 +9,19 @@ import './PublicPortal.css';
 const institutionalUsers = [
   {
     email: 'admin@munisanmiguel.gob.pe',
+    fullName: 'Sergio Bustamante',
     password: 'admin123',
     role: 'ADMINISTRADOR',
   },
   {
     email: 'directivo@munisanmiguel.gob.pe',
+    fullName: 'Mariana Fuentes',
     password: 'directivo123',
     role: 'DIRECTIVO',
   },
   {
     email: 'operativo@munisanmiguel.gob.pe',
+    fullName: 'Carlos Ramirez',
     password: 'operativo123',
     role: 'OPERATIVO',
   },
@@ -149,7 +152,7 @@ function PublicPortal() {
           onLoginSuccess={openInstitutionalDashboard}
         />
       ) : currentView === 'admin' ? (
-        <AdminDashboard onLogout={closeEventDetail} />
+        <AdminDashboard user={authenticatedUser} onLogout={closeEventDetail} />
       ) : currentView === 'directivo' ? (
         <DirectivoDashboard user={authenticatedUser} onLogout={closeEventDetail} />
       ) : currentView === 'operativo' ? (
