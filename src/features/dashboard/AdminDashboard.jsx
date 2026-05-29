@@ -5,6 +5,7 @@ import clipboardCheck from '../../assets/icons/clipboard-check.png';
 import fileEdit from '../../assets/icons/file-edit.png';
 import triangleAlert from '../../assets/icons/triangle-alert.png';
 import { adminEvents, formatEventState } from './dashboardData';
+import NotificationMenu from './NotificationMenu';
 import './AdminDashboard.css';
 
 const managementStats = [
@@ -331,8 +332,6 @@ function getMissingReviewFields(form, existingEvent = null) {
 
 function AdminDashboard({ onLogout, user }) {
   const [currentAdminView, setCurrentAdminView] = useState('dashboard');
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [notificationFilter, setNotificationFilter] = useState('all');
   const [pendingEventAction, setPendingEventAction] = useState(null);
   const [validationIssue, setValidationIssue] = useState(null);
   const [selectedAdminEvent, setSelectedAdminEvent] = useState(null);
@@ -340,37 +339,11 @@ function AdminDashboard({ onLogout, user }) {
   const [stateFilter, setStateFilter] = useState('Todos');
   const [categoryFilter, setCategoryFilter] = useState('Todas');
   const [activePendingPopover, setActivePendingPopover] = useState(null);
-  const notificationMenuRef = useRef(null);
   const pendingPopoverRef = useRef(null);
-  const unreadNotifications = adminNotifications.filter(
-    (notification) => notification.unread,
-  ).length;
-  const visibleNotifications =
-    notificationFilter === 'unread'
-      ? adminNotifications.filter((notification) => notification.unread)
-      : adminNotifications;
   const isEventFormView =
     currentAdminView === 'new-event' || currentAdminView === 'edit-event';
   const adminUser = user ?? fallbackAdminUser;
   const adminUserName = getUserDisplayName(adminUser);
-
-  useEffect(() => {
-    if (!isNotificationsOpen) {
-      return undefined;
-    }
-
-    function closeNotificationsOnOutsideClick(event) {
-      if (!notificationMenuRef.current?.contains(event.target)) {
-        setIsNotificationsOpen(false);
-      }
-    }
-
-    document.addEventListener('mousedown', closeNotificationsOnOutsideClick);
-
-    return () => {
-      document.removeEventListener('mousedown', closeNotificationsOnOutsideClick);
-    };
-  }, [isNotificationsOpen]);
 
   useEffect(() => {
     if (!activePendingPopover) {
@@ -500,69 +473,11 @@ function AdminDashboard({ onLogout, user }) {
                 <h1 id="admin-title">Gestión municipal de eventos</h1>
               </div>
               <div className="admin-topbar-actions">
-                <div className="notification-menu" ref={notificationMenuRef}>
-                  <button
-                    aria-expanded={isNotificationsOpen}
-                    aria-label={`${unreadNotifications} notificaciones sin leer`}
-                    className="notification-button"
-                    type="button"
-                    onClick={() => setIsNotificationsOpen((isOpen) => !isOpen)}
-                  >
-                    <svg aria-hidden="true" viewBox="0 0 24 24">
-                      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-                      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                    </svg>
-                    <span>{unreadNotifications}</span>
-                  </button>
-                  {isNotificationsOpen && (
-                    <div className="notification-dropdown" role="menu">
-                      <div className="notification-dropdown-header">
-                        <strong>Notificaciones</strong>
-                        <div className="notification-tabs" role="tablist">
-                          <button
-                            aria-selected={notificationFilter === 'all'}
-                            className={notificationFilter === 'all' ? 'active' : ''}
-                            type="button"
-                            onClick={() => setNotificationFilter('all')}
-                          >
-                            Todas
-                            <span>{adminNotifications.length}</span>
-                          </button>
-                          <button
-                            aria-selected={notificationFilter === 'unread'}
-                            className={notificationFilter === 'unread' ? 'active' : ''}
-                            type="button"
-                            onClick={() => setNotificationFilter('unread')}
-                          >
-                            No leidas
-                            <span>{unreadNotifications}</span>
-                          </button>
-                        </div>
-                      </div>
-                      <div className="notification-list">
-                        {visibleNotifications.map((notification) => (
-                          <article className="notification-item" key={notification.id}>
-                            <span aria-hidden="true" className="notification-item-icon">
-                              <svg viewBox="0 0 24 24">
-                                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-                                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                              </svg>
-                            </span>
-                            <div>
-                              <strong>{notification.type}</strong>
-                              <p>{notification.message}</p>
-                            </div>
-                          </article>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <NotificationMenu notifications={adminNotifications} />
                 <button
                   className="admin-new-event-action"
                   type="button"
                   onClick={() => {
-                    setIsNotificationsOpen(false);
                     setCurrentAdminView('new-event');
                   }}
                 >
