@@ -25,7 +25,7 @@ const managementStats = [
   },
   {
     icon: clipboardCheck,
-    label: 'En revisión',
+    label: 'Para revisión',
     tone: 'is-review',
     trend: 'pendientes del directivo',
     value: adminEvents.filter((event) =>
@@ -800,7 +800,7 @@ function getStateSummaryText(state) {
     BORRADOR: 'Completa la ficha para enviarla a revisión.',
     CANCELADO: 'Evento cancelado.',
     CERRADO: 'Evento cerrado.',
-    EN_REVISION: 'Pendiente de aprobación directiva.',
+    EN_REVISION: 'Pendiente de revisión directiva.',
     OBSERVADO_EN_REVISION: 'Ficha corregida y reenviada al directivo.',
     FINALIZADO: 'Evento cerrado.',
     OBSERVADO: 'Requiere correcciones antes de reenviar.',

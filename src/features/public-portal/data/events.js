@@ -47,7 +47,7 @@ export const events = [
     duration: '2 horas',
     organizer: 'Subgerencia de Juventudes',
     address: 'Av. Universitaria 1801, San Miguel',
-    audience: 'Jovenes de 13 a 25 anos',
+    audience: '13-25 años',
     description:
       'Taller participativo para introducir a los jovenes en fundamentos de marinera, coordinacion corporal y trabajo en pareja.',
     requirements: ['Ropa comoda', 'DNI o carnet escolar', 'Autorizacion del apoderado para menores'],

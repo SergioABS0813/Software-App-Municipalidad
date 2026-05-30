@@ -83,7 +83,7 @@ const directiveNotifications = [
   {
     id: 'directive-review-4',
     time: '05 jun. 2026',
-    message: 'Tienes eventos en revisión que requieren decisión directiva.',
+    message: 'Tienes eventos para revisión que requieren decisión directiva.',
     type: 'Recordatorio de revisión',
     unread: false,
   },
@@ -154,7 +154,7 @@ const eventHistoryItems = [
     id: 6,
     eventId: 2,
     type: 'RESENT_TO_REVIEW',
-    title: 'Evento reenviado a revisión',
+    title: 'Evento reenviado para revisión',
     actorName: 'Carlos Ramírez',
     actorRole: 'Administrador',
     dateTime: '2026-06-05T10:40:00',
@@ -362,8 +362,57 @@ function getReviewPendingTime(event) {
   return getReviewTimeMetric(event).value ?? 'Sin fecha';
 }
 
-function getResourceActionLabel(type) {
-  return type === 'VIDEO' ? 'Abrir' : 'Ver';
+function getResourceKind(type) {
+  if (type === 'VIDEO') {
+    return 'video';
+  }
+
+  if (type === 'DOCUMENTO') {
+    return 'document';
+  }
+
+  return 'image';
+}
+
+function getResourceValue(event, type) {
+  if (type === 'VIDEO') {
+    return event.resources?.[type] ?? event.videoUrl ?? true;
+  }
+
+  return event.resources?.[type];
+}
+
+function getResourcePreviewUrl(resourceValue, kind) {
+  if (typeof resourceValue === 'string') {
+    return resourceValue;
+  }
+
+  return kind === 'image' ? eventReviewPlaceholder : null;
+}
+
+function getEventMapsUrl(event) {
+  const latitude = event.coordinates?.lat ?? event.location?.lat ?? event.latitude;
+  const longitude = event.coordinates?.lng ?? event.coordinates?.lon ?? event.location?.lng ?? event.location?.lon ?? event.longitude;
+
+  if (latitude && longitude) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${latitude},${longitude}`)}`;
+  }
+
+  const locationQuery = [event.venue, event.address].filter(Boolean).join(', ');
+
+  if (!locationQuery) {
+    return null;
+  }
+
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationQuery)}`;
+}
+
+function getExecutiveReviewDescription(event) {
+  const executiveDescriptions = {
+    2: 'Taller de marinera orientado a jóvenes para fortalecer coordinación corporal y trabajo en pareja.',
+  };
+
+  return executiveDescriptions[event.id] ?? event.summary ?? event.description;
 }
 
 function getDirectiveStateTone(state) {
@@ -627,7 +676,7 @@ function DirectiveReviewDashboard({
             <span>Evento</span>
             <span>Estado</span>
             <span>Categoría</span>
-            <span>Tiempo pendiente</span>
+            <span>Pendiente desde</span>
             <span>Revisión</span>
           </div>
           {filteredReviewEvents.map((event) => (
@@ -1178,15 +1227,6 @@ function HistoryClockIcon() {
   );
 }
 
-function MiniClockIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" />
-    </svg>
-  );
-}
-
 function EventHistoryIcon({ type }) {
   const iconPaths = {
     APPROVED: (
@@ -1342,7 +1382,21 @@ function ReviewInfoList({ items }) {
           </span>
           <div>
             <dt>{item.label}</dt>
-            <dd>{item.value}</dd>
+            <dd>
+              {item.href ? (
+                <a
+                  aria-label={item.ariaLabel ?? `Abrir ${item.value}`}
+                  className="directive-info-link"
+                  href={item.href}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  {item.value}
+                </a>
+              ) : (
+                item.value
+              )}
+            </dd>
           </div>
         </div>
       ))}
@@ -1426,6 +1480,7 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
   const fichaRef = useRef(null);
   const recursosRef = useRef(null);
   const decisionRef = useRef(null);
+  const [previewResource, setPreviewResource] = useState(null);
   const canDecide = reviewableStates.includes(event.state);
   const reviewTimeMetric = getReviewTimeMetric(event);
   const shouldShowPreviousObservation =
@@ -1451,22 +1506,14 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
       label: 'Público objetivo',
       value: event.audience,
     },
-    {
-      icon: 'note',
-      label: 'Inscripción',
-      value: `${event.registrationStart} hasta ${event.registrationEnd}`,
-    },
   ];
   const locationInfoItems = [
     {
       icon: 'location',
       label: 'Lugar',
       value: event.venue,
-    },
-    {
-      icon: 'district',
-      label: 'Distrito',
-      value: event.district,
+      href: getEventMapsUrl(event),
+      ariaLabel: `Abrir ${event.venue} en Google Maps`,
     },
     {
       icon: 'route',
@@ -1479,6 +1526,15 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
       value: event.locationReference || 'Pendiente de completar',
     },
   ];
+
+  function openResourcePreview(resource) {
+    if (resource.externalUrl && resource.kind !== 'image') {
+      window.open(resource.externalUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    setPreviewResource(resource);
+  }
 
   useEffect(() => {
     const observedSections = [
@@ -1518,7 +1574,7 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
     <section className="directive-review-view" aria-labelledby="review-event-title">
       <header className="admin-topbar">
         <div>
-          <span className="section-kicker">Ficha en revisión</span>
+          <span className="section-kicker">Ficha para revisión</span>
           <h1 id="review-event-title">{event.title}</h1>
         </div>
         <div className="directive-review-topbar-actions">
@@ -1546,35 +1602,33 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
               </span>
               {reviewTimeMetric.value && (
                 <span className="directive-review-time-metric">
-                  <MiniClockIcon />
-                  {reviewTimeMetric.value}
+                  Pendiente desde {reviewTimeMetric.value.toLowerCase()}
                 </span>
               )}
             </div>
           </div>
-          <p>{event.description}</p>
+          <p>{getExecutiveReviewDescription(event)}</p>
           <dl className="directive-facts">
-            <div>
-              <dt>Ficha completa</dt>
-              <dd>{event.completeness}%</dd>
-            </div>
-            <div>
-              <dt>Cupos</dt>
-              <dd>{event.spots}</dd>
-            </div>
             <div>
               <dt>Área responsable</dt>
               <dd>{event.organizer}</dd>
             </div>
             <div>
-              <dt>Fecha y hora</dt>
+              <dt>Fecha</dt>
               <dd>{event.date} · {event.time}</dd>
             </div>
             <div>
               <dt>Lugar</dt>
               <dd>{event.venue}</dd>
             </div>
+            <div>
+              <dt>Aforo</dt>
+              <dd>{event.spots} participantes</dd>
+            </div>
           </dl>
+          <div className="directive-review-checks" aria-label="Indicadores de revisión">
+            <span>Corrección atendida</span>
+          </div>
         </article>
       </section>
 
@@ -1589,7 +1643,6 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
             <small>
               {event.previousObservation.role} {event.previousObservation.author} · {formatHistoryDateTime(event.previousObservation.dateTime)}
             </small>
-            <span className="previous-observation-followup">Corrección atendida</span>
           </div>
         </article>
       )}
@@ -1620,22 +1673,41 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
         </div>
         <div className="directive-resource-grid">
           {reviewResourceLabels.map(([type, label]) => {
-            const isVideo = type === 'VIDEO';
-            const isAvailable = isVideo || Boolean(event.resources?.[type]);
+            const kind = getResourceKind(type);
+            const resourceValue = getResourceValue(event, type);
+            const isAvailable = Boolean(resourceValue);
+            const previewUrl = getResourcePreviewUrl(resourceValue, kind);
+            const externalUrl = typeof resourceValue === 'string' && /^https?:\/\//i.test(resourceValue)
+              ? resourceValue
+              : null;
+            const resourceActionLabel = kind === 'video' ? 'Abrir video' : `Previsualizar ${label}`;
 
             return (
               <article
                 className={isAvailable ? 'directive-resource-card' : 'directive-resource-card missing'}
                 key={type}
               >
-                <div className={isVideo ? 'directive-video-preview' : `directive-resource-preview media-${event.accent}`}>
-                  <span>{isVideo ? 'Video' : event.category}</span>
+                <div className={kind === 'video' ? 'directive-video-preview' : `directive-resource-preview media-${event.accent}`}>
+                  <span>{kind === 'video' ? 'Video' : event.category}</span>
                 </div>
                 <strong>{label}</strong>
                 <div className="directive-resource-meta">
                   <small>{isAvailable ? type : 'No cargado'}</small>
-                  <button disabled={!isAvailable} type="button">
-                    {isAvailable ? getResourceActionLabel(type) : 'No disponible'}
+                  <button
+                    aria-label={isAvailable ? resourceActionLabel : `${label} no disponible`}
+                    className="directive-resource-action"
+                    disabled={!isAvailable}
+                    title={isAvailable ? resourceActionLabel : 'No disponible'}
+                    type="button"
+                    onClick={() => openResourcePreview({
+                      externalUrl,
+                      kind,
+                      label,
+                      previewUrl,
+                      type,
+                    })}
+                  >
+                    {isAvailable ? <ResourceActionIcon type={kind} /> : <span>No disponible</span>}
                   </button>
                 </div>
               </article>
@@ -1644,10 +1716,17 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
         </div>
       </section>
 
+      {previewResource && (
+        <ResourcePreviewModal
+          resource={previewResource}
+          onClose={() => setPreviewResource(null)}
+        />
+      )}
+
       <section className="directive-review-grid">
         <article className="admin-panel">
           <span className="section-kicker">Requisitos</span>
-          <h2>Condiciones publicadas</h2>
+          <h2>Condiciones para participar</h2>
           <ul className="directive-soft-list">
             {event.requirements.map((requirement) => (
               <li key={requirement}>{requirement}</li>
@@ -1696,6 +1775,122 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
         </div>
       </section>
     </section>
+  );
+}
+
+function ResourceActionIcon({ type }) {
+  const iconPaths = {
+    document: (
+      <>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+        <path d="M14 2v6h6" />
+        <path d="M8 13h8" />
+        <path d="M8 17h5" />
+      </>
+    ),
+    image: (
+      <>
+        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+        <circle cx="12" cy="12" r="3" />
+      </>
+    ),
+    video: (
+      <path d="m8 5 11 7-11 7Z" />
+    ),
+  };
+
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      {iconPaths[type] ?? iconPaths.image}
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  );
+}
+
+function ResourcePreviewModal({ resource, onClose }) {
+  useEffect(() => {
+    function closeOnEscape(event) {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    }
+
+    document.addEventListener('keydown', closeOnEscape);
+
+    return () => {
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [onClose]);
+
+  function closeOnBackdrop(event) {
+    if (event.target === event.currentTarget) {
+      onClose();
+    }
+  }
+
+  return (
+    <div className="resource-preview-backdrop" role="presentation" onMouseDown={closeOnBackdrop}>
+      <section
+        aria-labelledby="resource-preview-title"
+        aria-modal="true"
+        className={`resource-preview-modal is-${resource.kind}`}
+        role="dialog"
+      >
+        <header className="resource-preview-header">
+          <div>
+            <span className="section-kicker">Material adjunto</span>
+            <h2 id="resource-preview-title">{resource.label}</h2>
+          </div>
+          <button
+            aria-label="Cerrar previsualización"
+            className="resource-preview-close"
+            type="button"
+            onClick={onClose}
+          >
+            <CloseIcon />
+          </button>
+        </header>
+
+        <div className="resource-preview-body">
+          {resource.kind === 'image' && (
+            <img alt={resource.label} src={resource.previewUrl} />
+          )}
+          {resource.kind === 'document' && (
+            <div className="resource-document-viewer">
+              <span>
+                <ResourceActionIcon type="document" />
+              </span>
+              <strong>Documento cargado para revisión</strong>
+              <p>
+                Recurso disponible en la ficha. Cuando el backend entregue el
+                archivo PDF o documento visualizable, este espacio funcionará
+                como visor interno o abrirá el archivo en una nueva pestaña.
+              </p>
+            </div>
+          )}
+          {resource.kind === 'video' && (
+            <div className="resource-video-viewer">
+              <span>
+                <ResourceActionIcon type="video" />
+              </span>
+              <strong>Video referencial disponible</strong>
+              <p>
+                Previsualización preparada para reproducir el material
+                audiovisual cuando exista un archivo local o embebible.
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
   );
 }
 

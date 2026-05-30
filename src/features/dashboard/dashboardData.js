@@ -87,10 +87,10 @@ const eventStateLabels = {
   BORRADOR: 'Borrador',
   CANCELADO: 'Cancelado',
   CERRADO: 'Cerrado',
-  EN_REVISION: 'En revisión',
+  EN_REVISION: 'Para revisión',
   FINALIZADO: 'Finalizado',
   OBSERVADO: 'Observado',
-  OBSERVADO_EN_REVISION: 'Reenviado a revisión',
+  OBSERVADO_EN_REVISION: 'Reenviado',
   APROBADO: 'Aprobado',
   PUBLICADO: 'Publicado',
 };
