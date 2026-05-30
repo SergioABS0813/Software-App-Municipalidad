@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import municipalLogo from '../../assets/images/municipalidad-logo.png';
+import eventReviewPlaceholder from '../../assets/images/event-review-placeholder.png';
 import calendarCheck from '../../assets/icons/calendar-check.png';
 import clipboardCheck from '../../assets/icons/clipboard-check.png';
 import triangleAlert from '../../assets/icons/triangle-alert.png';
@@ -9,7 +10,7 @@ import './AdminDashboard.css';
 import './DirectivoDashboard.css';
 
 const reviewEvents = adminEvents.filter((event) =>
-  ['EN_REVISION', 'OBSERVADO'].includes(event.state),
+  ['EN_REVISION', 'OBSERVADO_EN_REVISION', 'OBSERVADO'].includes(event.state),
 );
 
 const eventReports = adminEvents
@@ -54,27 +55,34 @@ const reviewFilters = [
   },
 ];
 
+const reviewableStates = ['EN_REVISION', 'OBSERVADO_EN_REVISION'];
+const relativeTimeReference = new Date('2026-06-06T13:45:00');
+
 const directiveNotifications = [
   {
     id: 'directive-review-1',
+    time: 'Hace 10 min',
     message: 'Carlos Ramírez envió "Festival Cultural Barrial" a revisión.',
     type: 'Evento enviado a revisión',
     unread: true,
   },
   {
     id: 'directive-review-2',
+    time: 'Ayer',
     message: 'Carlos Ramírez corrigió "Carrera Vecinal 5K" y la volvió a enviar a revisión.',
     type: 'Evento reenviado',
     unread: true,
   },
   {
     id: 'directive-review-3',
+    time: 'Hoy',
     message: 'Nuevo evento pendiente de decisión.',
     type: 'Pendiente de revisión',
     unread: true,
   },
   {
     id: 'directive-review-4',
+    time: '05 jun. 2026',
     message: 'Tienes eventos en revisión que requieren decisión directiva.',
     type: 'Recordatorio de revisión',
     unread: false,
@@ -259,7 +267,7 @@ const directiveStats = [
     label: 'Por revisar',
     tone: 'is-decision',
     trend: 'pendientes de decisión',
-    value: adminEvents.filter((event) => event.state === 'EN_REVISION').length,
+    value: adminEvents.filter((event) => reviewableStates.includes(event.state)).length,
   },
   {
     icon: MessageWarningIcon,
@@ -293,10 +301,77 @@ const reviewResourceLabels = [
   ['VIDEO', 'Video referencial'],
 ];
 
+function formatRelativeTime(dateValue, referenceDate = relativeTimeReference) {
+  const date = new Date(dateValue);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Sin fecha registrada';
+  }
+
+  const diffInMinutes = Math.max(
+    0,
+    Math.round((referenceDate.getTime() - date.getTime()) / 60000),
+  );
+
+  if (diffInMinutes < 60) {
+    return `Hace ${diffInMinutes || 1} min`;
+  }
+
+  const diffInHours = Math.round(diffInMinutes / 60);
+
+  if (diffInHours < 24) {
+    return `Hace ${diffInHours} ${diffInHours === 1 ? 'hora' : 'horas'}`;
+  }
+
+  const diffInDays = Math.round(diffInHours / 24);
+
+  if (diffInDays < 7) {
+    return `Hace ${diffInDays} ${diffInDays === 1 ? 'día' : 'días'}`;
+  }
+
+  const diffInWeeks = Math.round(diffInDays / 7);
+
+  return `Hace ${diffInWeeks} ${diffInWeeks === 1 ? 'semana' : 'semanas'}`;
+}
+
+function getReviewTimeMetric(event) {
+  if (event.state === 'EN_REVISION') {
+    const dateValue = event.sentToReviewAt ?? event.lastUpdatedAt;
+
+    return {
+      value: dateValue ? formatRelativeTime(dateValue) : null,
+    };
+  }
+
+  if (event.state === 'OBSERVADO_EN_REVISION') {
+    const dateValue = event.resentToReviewAt ?? event.lastUpdatedAt;
+
+    return {
+      value: dateValue ? formatRelativeTime(dateValue) : null,
+    };
+  }
+
+  const dateValue = event.lastUpdatedAt;
+
+  return {
+    value: dateValue ? `Actualizado ${formatRelativeTime(dateValue).toLowerCase()}` : null,
+  };
+}
+
+function getReviewPendingTime(event) {
+  return getReviewTimeMetric(event).value ?? 'Sin fecha';
+}
+
+function getResourceActionLabel(type) {
+  return type === 'VIDEO' ? 'Abrir' : 'Ver';
+}
+
 function getDirectiveStateTone(state) {
   const stateToneMap = {
     EN_REVISION: 'state-review',
     OBSERVADO: 'state-observed',
+    OBSERVADO_EN_REVISION: 'state-reobserved',
+    APROBADO: 'state-published',
     PUBLICADO: 'state-published',
   };
 
@@ -309,10 +384,23 @@ function DirectivoDashboard({ onLogout }) {
   const [selectedReviewEvent, setSelectedReviewEvent] = useState(null);
   const [selectedReportEvent, setSelectedReportEvent] = useState(null);
   const [pendingDecision, setPendingDecision] = useState(null);
+  const [activeReviewSection, setActiveReviewSection] = useState('ficha-directiva');
   const filteredReviewEvents =
     reviewFilter === 'TODOS'
       ? reviewEvents
-      : reviewEvents.filter((event) => event.state === reviewFilter);
+      : reviewEvents.filter((event) =>
+        reviewFilter === 'EN_REVISION'
+          ? reviewableStates.includes(event.state)
+          : event.state === reviewFilter,
+      );
+
+  function navigateReviewSection(sectionId) {
+    setActiveReviewSection(sectionId);
+    document.getElementById(sectionId)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  }
 
   return (
     <section className="admin-shell directive-shell" aria-labelledby="directive-title">
@@ -334,9 +422,36 @@ function DirectivoDashboard({ onLogout }) {
             <>
               {selectedReviewEvent ? (
                 <>
-                  <a className="active" href="#ficha-directiva">Ficha</a>
-                  <a href="#recursos-directivos">Recursos</a>
-                  <a href="#decision-directiva">Decisión</a>
+                  <a
+                    className={activeReviewSection === 'ficha-directiva' ? 'active' : ''}
+                    href="#ficha-directiva"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigateReviewSection('ficha-directiva');
+                    }}
+                  >
+                    Ficha
+                  </a>
+                  <a
+                    className={activeReviewSection === 'recursos-directivos' ? 'active' : ''}
+                    href="#recursos-directivos"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigateReviewSection('recursos-directivos');
+                    }}
+                  >
+                    Recursos
+                  </a>
+                  <a
+                    className={activeReviewSection === 'decision-directiva' ? 'active' : ''}
+                    href="#decision-directiva"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigateReviewSection('decision-directiva');
+                    }}
+                  >
+                    Decisión
+                  </a>
                 </>
               ) : (
                 <>
@@ -346,11 +461,12 @@ function DirectivoDashboard({ onLogout }) {
                 </>
               )}
               <button
-                className="admin-nav-logout"
+                className="admin-nav-logout directive-return-panel-action"
                 type="button"
                 onClick={() => {
                   setSelectedReviewEvent(null);
                   setSelectedReportEvent(null);
+                  setActiveReviewSection('ficha-directiva');
                 }}
               >
                 Volver al panel
@@ -374,7 +490,7 @@ function DirectivoDashboard({ onLogout }) {
               </button>
             </>
           )}
-          <button className="admin-nav-logout" type="button" onClick={onLogout}>
+          <button className="admin-nav-logout directive-logout-action" type="button" onClick={onLogout}>
             Salir del panel
           </button>
         </nav>
@@ -384,7 +500,11 @@ function DirectivoDashboard({ onLogout }) {
         {selectedReviewEvent ? (
           <DirectiveReviewView
             event={selectedReviewEvent}
-            onBack={() => setSelectedReviewEvent(null)}
+            onActiveSectionChange={setActiveReviewSection}
+            onBack={() => {
+              setSelectedReviewEvent(null);
+              setActiveReviewSection('ficha-directiva');
+            }}
             onDecision={setPendingDecision}
           />
         ) : selectedReportEvent ? (
@@ -436,7 +556,11 @@ function DirectiveReviewDashboard({
     counts[filter.value] =
       filter.value === 'TODOS'
         ? reviewEvents.length
-        : reviewEvents.filter((event) => event.state === filter.value).length;
+        : reviewEvents.filter((event) =>
+          filter.value === 'EN_REVISION'
+            ? reviewableStates.includes(event.state)
+            : event.state === filter.value,
+        ).length;
 
     return counts;
   }, {});
@@ -503,6 +627,7 @@ function DirectiveReviewDashboard({
             <span>Evento</span>
             <span>Estado</span>
             <span>Categoría</span>
+            <span>Tiempo pendiente</span>
             <span>Revisión</span>
           </div>
           {filteredReviewEvents.map((event) => (
@@ -517,6 +642,9 @@ function DirectiveReviewDashboard({
                 </span>
               </span>
               <span>{event.category}</span>
+              <span>
+                <small>{getReviewPendingTime(event)}</small>
+              </span>
               <span>
                 <button
                   aria-label={`Revisar ${event.title}`}
@@ -1050,6 +1178,15 @@ function HistoryClockIcon() {
   );
 }
 
+function MiniClockIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
 function EventHistoryIcon({ type }) {
   const iconPaths = {
     APPROVED: (
@@ -1121,6 +1258,95 @@ function EventHistoryIcon({ type }) {
     <svg aria-hidden="true" viewBox="0 0 24 24">
       {iconPaths[type] ?? iconPaths.CREATED}
     </svg>
+  );
+}
+
+function ReviewInfoIcon({ type }) {
+  const iconPaths = {
+    audience: (
+      <>
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </>
+    ),
+    calendar: (
+      <>
+        <path d="M8 2v4" />
+        <path d="M16 2v4" />
+        <rect height="18" rx="2" width="18" x="3" y="4" />
+        <path d="M3 10h18" />
+      </>
+    ),
+    clock: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </>
+    ),
+    district: (
+      <>
+        <path d="M3 21h18" />
+        <path d="M5 21V7l7-4 7 4v14" />
+        <path d="M9 21v-6h6v6" />
+        <path d="M9 10h.01" />
+        <path d="M15 10h.01" />
+      </>
+    ),
+    location: (
+      <>
+        <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z" />
+        <circle cx="12" cy="10" r="3" />
+      </>
+    ),
+    note: (
+      <>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+        <path d="M14 2v6h6" />
+        <path d="M8 13h8" />
+        <path d="M8 17h5" />
+      </>
+    ),
+    reference: (
+      <>
+        <path d="M12 2v20" />
+        <path d="m17 5-5-3-5 3" />
+        <path d="m17 19-5 3-5-3" />
+        <path d="M4 12h16" />
+      </>
+    ),
+    route: (
+      <>
+        <circle cx="6" cy="19" r="3" />
+        <circle cx="18" cy="5" r="3" />
+        <path d="M9 19h2a4 4 0 0 0 4-4v-6" />
+      </>
+    ),
+  };
+
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      {iconPaths[type] ?? iconPaths.note}
+    </svg>
+  );
+}
+
+function ReviewInfoList({ items }) {
+  return (
+    <dl className="directive-info-list">
+      {items.map((item) => (
+        <div className="directive-info-row" key={item.label}>
+          <span className="directive-info-icon">
+            <ReviewInfoIcon type={item.icon} />
+          </span>
+          <div>
+            <dt>{item.label}</dt>
+            <dd>{item.value}</dd>
+          </div>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -1196,13 +1422,97 @@ function EventHistoryMenu({ historyItems }) {
   );
 }
 
-function DirectiveReviewView({ event, onBack, onDecision }) {
-  const canDecide = event.state === 'EN_REVISION';
+function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision }) {
+  const fichaRef = useRef(null);
+  const recursosRef = useRef(null);
+  const decisionRef = useRef(null);
+  const canDecide = reviewableStates.includes(event.state);
+  const reviewTimeMetric = getReviewTimeMetric(event);
+  const shouldShowPreviousObservation =
+    event.state === 'OBSERVADO_EN_REVISION' && event.previousObservation;
   const eventHistory = eventHistoryItems
     .filter((historyItem) => historyItem.eventId === event.id)
     .sort((firstItem, secondItem) =>
       new Date(secondItem.dateTime).getTime() - new Date(firstItem.dateTime).getTime(),
     );
+  const mainInfoItems = [
+    {
+      icon: 'calendar',
+      label: 'Fecha y hora',
+      value: `${event.date} · ${event.time}`,
+    },
+    {
+      icon: 'clock',
+      label: 'Duración',
+      value: event.duration,
+    },
+    {
+      icon: 'audience',
+      label: 'Público objetivo',
+      value: event.audience,
+    },
+    {
+      icon: 'note',
+      label: 'Inscripción',
+      value: `${event.registrationStart} hasta ${event.registrationEnd}`,
+    },
+  ];
+  const locationInfoItems = [
+    {
+      icon: 'location',
+      label: 'Lugar',
+      value: event.venue,
+    },
+    {
+      icon: 'district',
+      label: 'Distrito',
+      value: event.district,
+    },
+    {
+      icon: 'route',
+      label: 'Dirección',
+      value: event.address,
+    },
+    {
+      icon: 'reference',
+      label: 'Referencia',
+      value: event.locationReference || 'Pendiente de completar',
+    },
+  ];
+
+  useEffect(() => {
+    const observedSections = [
+      ['ficha-directiva', fichaRef.current],
+      ['recursos-directivos', recursosRef.current],
+      ['decision-directiva', decisionRef.current],
+    ].filter(([, element]) => Boolean(element));
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntry = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((firstEntry, secondEntry) =>
+            secondEntry.intersectionRatio - firstEntry.intersectionRatio,
+          )[0];
+
+        if (visibleEntry?.target.id) {
+          onActiveSectionChange(visibleEntry.target.id);
+        }
+      },
+      {
+        root: null,
+        rootMargin: '-120px 0px -45% 0px',
+        threshold: [0.2, 0.45, 0.7],
+      },
+    );
+
+    observedSections.forEach(([, element]) => observer.observe(element));
+    onActiveSectionChange('ficha-directiva');
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [onActiveSectionChange]);
 
   return (
     <section className="directive-review-view" aria-labelledby="review-event-title">
@@ -1213,23 +1523,39 @@ function DirectiveReviewView({ event, onBack, onDecision }) {
         </div>
         <div className="directive-review-topbar-actions">
           <EventHistoryMenu historyItems={eventHistory} />
-          <button className="admin-secondary-action" type="button" onClick={onBack}>
+          <button className="admin-new-event-action event-form-top-action" type="button" onClick={onBack}>
             Volver
           </button>
         </div>
       </header>
 
-      <section className="directive-review-hero" id="ficha-directiva">
+      <section className="directive-review-hero" id="ficha-directiva" ref={fichaRef}>
         <div className={`directive-review-media media-${event.accent}`}>
+          <img alt="" src={eventReviewPlaceholder} />
           <span>{event.category}</span>
         </div>
         <article className="admin-panel directive-review-summary">
-          <span className="section-kicker">{formatEventState(event.state)}</span>
-          <h2>Resumen para decisión</h2>
+          <div className="directive-summary-heading">
+            <div>
+              <span className="section-kicker">Evaluación directiva</span>
+              <h2>Resumen para decisión</h2>
+            </div>
+            <div className="directive-summary-status">
+              <span className={`state-badge ${getDirectiveStateTone(event.state)}`}>
+                {formatEventState(event.state)}
+              </span>
+              {reviewTimeMetric.value && (
+                <span className="directive-review-time-metric">
+                  <MiniClockIcon />
+                  {reviewTimeMetric.value}
+                </span>
+              )}
+            </div>
+          </div>
           <p>{event.description}</p>
           <dl className="directive-facts">
             <div>
-              <dt>Ficha</dt>
+              <dt>Ficha completa</dt>
               <dd>{event.completeness}%</dd>
             </div>
             <div>
@@ -1237,66 +1563,59 @@ function DirectiveReviewView({ event, onBack, onDecision }) {
               <dd>{event.spots}</dd>
             </div>
             <div>
-              <dt>Área</dt>
+              <dt>Área responsable</dt>
               <dd>{event.organizer}</dd>
+            </div>
+            <div>
+              <dt>Fecha y hora</dt>
+              <dd>{event.date} · {event.time}</dd>
+            </div>
+            <div>
+              <dt>Lugar</dt>
+              <dd>{event.venue}</dd>
             </div>
           </dl>
         </article>
       </section>
+
+      {shouldShowPreviousObservation && (
+        <article className="previous-observation-card">
+          <span className="previous-observation-icon">
+            <EventHistoryIcon type="OBSERVED" />
+          </span>
+          <div>
+            <span className="section-kicker">Observación anterior</span>
+            <p>{event.previousObservation.comment}</p>
+            <small>
+              {event.previousObservation.role} {event.previousObservation.author} · {formatHistoryDateTime(event.previousObservation.dateTime)}
+            </small>
+            <span className="previous-observation-followup">Corrección atendida</span>
+          </div>
+        </article>
+      )}
 
       <section className="directive-review-grid">
         <article className="admin-panel">
           <span className="section-kicker">Datos del evento</span>
           <h2>Información principal</h2>
-          <dl className="directive-detail-list">
-            <div>
-              <dt>Fecha y hora</dt>
-              <dd>{event.date} - {event.time}</dd>
-            </div>
-            <div>
-              <dt>Duración</dt>
-              <dd>{event.duration}</dd>
-            </div>
-            <div>
-              <dt>Público objetivo</dt>
-              <dd>{event.audience}</dd>
-            </div>
-            <div>
-              <dt>Inscripción</dt>
-              <dd>{event.registrationStart} hasta {event.registrationEnd}</dd>
-            </div>
-          </dl>
+          <ReviewInfoList items={mainInfoItems} />
         </article>
 
         <article className="admin-panel">
           <span className="section-kicker">Ubicación</span>
           <h2>Lugar y referencia</h2>
-          <dl className="directive-detail-list">
-            <div>
-              <dt>Lugar</dt>
-              <dd>{event.venue}</dd>
-            </div>
-            <div>
-              <dt>Distrito</dt>
-              <dd>{event.district}</dd>
-            </div>
-            <div>
-              <dt>Dirección</dt>
-              <dd>{event.address}</dd>
-            </div>
-            <div>
-              <dt>Referencia</dt>
-              <dd>{event.locationReference || 'Pendiente de completar'}</dd>
-            </div>
-          </dl>
+          <ReviewInfoList items={locationInfoItems} />
         </article>
       </section>
 
-      <section className="admin-panel" id="recursos-directivos">
+      <section className="admin-panel" id="recursos-directivos" ref={recursosRef}>
         <div className="admin-panel-heading">
           <div>
             <span className="section-kicker">Recursos</span>
             <h2>Material adjunto</h2>
+            <p className="directive-resource-purpose">
+              Validación de recursos visibles para la publicación ciudadana.
+            </p>
           </div>
         </div>
         <div className="directive-resource-grid">
@@ -1313,7 +1632,12 @@ function DirectiveReviewView({ event, onBack, onDecision }) {
                   <span>{isVideo ? 'Video' : event.category}</span>
                 </div>
                 <strong>{label}</strong>
-                <small>{isAvailable ? type : 'No cargado'}</small>
+                <div className="directive-resource-meta">
+                  <small>{isAvailable ? type : 'No cargado'}</small>
+                  <button disabled={!isAvailable} type="button">
+                    {isAvailable ? getResourceActionLabel(type) : 'No disponible'}
+                  </button>
+                </div>
               </article>
             );
           })}
@@ -1324,25 +1648,25 @@ function DirectiveReviewView({ event, onBack, onDecision }) {
         <article className="admin-panel">
           <span className="section-kicker">Requisitos</span>
           <h2>Condiciones publicadas</h2>
-          <div className="admin-checklist">
+          <ul className="directive-soft-list">
             {event.requirements.map((requirement) => (
-              <p key={requirement}>{requirement}</p>
+              <li key={requirement}>{requirement}</li>
             ))}
-          </div>
+          </ul>
         </article>
 
         <article className="admin-panel">
           <span className="section-kicker">Programa</span>
           <h2>Agenda prevista</h2>
-          <div className="admin-checklist">
+          <ol className="directive-program-list">
             {event.agenda.map((agendaItem) => (
-              <p key={agendaItem}>{agendaItem}</p>
+              <li key={agendaItem}>{agendaItem}</li>
             ))}
-          </div>
+          </ol>
         </article>
       </section>
 
-      <section className="admin-panel directive-decision-panel" id="decision-directiva">
+      <section className="admin-panel directive-decision-panel" id="decision-directiva" ref={decisionRef}>
         <div>
           <span className="section-kicker">Decisión</span>
           <h2>Aprobación directiva</h2>
@@ -1377,6 +1701,19 @@ function DirectiveReviewView({ event, onBack, onDecision }) {
 
 function DirectiveDecisionModal({ decision, onCancel, onConfirm }) {
   const isApproval = decision.type === 'approve';
+  const [observationComment, setObservationComment] = useState('');
+  const canSubmitDecision = isApproval || observationComment.trim().length > 0;
+
+  function submitDecision() {
+    if (!canSubmitDecision) {
+      return;
+    }
+
+    onConfirm({
+      comment: isApproval ? null : observationComment.trim(),
+      type: decision.type,
+    });
+  }
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -1391,26 +1728,36 @@ function DirectiveDecisionModal({ decision, onCancel, onConfirm }) {
         </span>
         <h2 id="directive-decision-title">
           {isApproval
-            ? `¿Estás seguro de aprobar "${decision.eventTitle}"?`
-            : `¿Estás seguro de observar "${decision.eventTitle}"?`}
+            ? '¿Deseas aprobar este evento?'
+            : `Registrar observación para "${decision.eventTitle}"`}
         </h2>
         <p>
           {isApproval
-            ? 'El evento pasará a PUBLICADO y será visible para los ciudadanos.'
-            : 'El evento pasará a OBSERVADO y volverá al administrador para correcciones.'}
+            ? 'Al aprobarlo, el evento quedará listo para publicación según el flujo definido.'
+            : 'Describe con claridad qué debe corregir el administrador antes de reenviar la ficha.'}
         </p>
         {!isApproval && (
           <label className="directive-observation-field">
             Comentario de observación
-            <textarea placeholder="Indica qué debe corregirse antes de publicar." />
+            <textarea
+              required
+              placeholder="Indica qué debe corregirse antes de publicar."
+              value={observationComment}
+              onChange={(event) => setObservationComment(event.target.value)}
+            />
           </label>
         )}
         <div className="modal-actions">
           <button className="back-button" type="button" onClick={onCancel}>
-            Revisar ficha
+            Cancelar
           </button>
-          <button className="primary-button" type="button" onClick={onConfirm}>
-            {isApproval ? 'Sí, aprobar' : 'Sí, observar'}
+          <button
+            className="primary-button"
+            disabled={!canSubmitDecision}
+            type="button"
+            onClick={submitDecision}
+          >
+            {isApproval ? 'Aprobar evento' : 'Enviar observación'}
           </button>
         </div>
       </section>

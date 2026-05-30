@@ -28,7 +28,9 @@ const managementStats = [
     label: 'En revisión',
     tone: 'is-review',
     trend: 'pendientes del directivo',
-    value: adminEvents.filter((event) => event.state === 'EN_REVISION').length,
+    value: adminEvents.filter((event) =>
+      ['EN_REVISION', 'OBSERVADO_EN_REVISION'].includes(event.state),
+    ).length,
   },
   {
     icon: triangleAlert,
@@ -94,6 +96,8 @@ function getEventStateTone(state) {
     EN_REVISION: 'state-review',
     FINALIZADO: 'state-finished',
     OBSERVADO: 'state-observed',
+    OBSERVADO_EN_REVISION: 'state-reobserved',
+    APROBADO: 'state-published',
     PUBLICADO: 'state-published',
   };
 
@@ -797,6 +801,7 @@ function getStateSummaryText(state) {
     CANCELADO: 'Evento cancelado.',
     CERRADO: 'Evento cerrado.',
     EN_REVISION: 'Pendiente de aprobación directiva.',
+    OBSERVADO_EN_REVISION: 'Ficha corregida y reenviada al directivo.',
     FINALIZADO: 'Evento cerrado.',
     OBSERVADO: 'Requiere correcciones antes de reenviar.',
     PUBLICADO: 'Visible en el portal ciudadano.',

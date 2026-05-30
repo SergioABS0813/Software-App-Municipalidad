@@ -107,7 +107,10 @@ export default function NotificationMenu({ notifications }) {
                   <BellIcon />
                 </span>
                 <div>
-                  <strong>{notification.type}</strong>
+                  <span className="notification-item-heading">
+                    <strong>{notification.type}</strong>
+                    {notification.time && <time>{notification.time}</time>}
+                  </span>
                   <p>{notification.message}</p>
                 </div>
               </article>

@@ -398,6 +398,20 @@
   line-height: 1.2;
 }
 
+.notification-item-heading {
+  align-items: baseline;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.notification-item-heading time {
+  color: var(--color-text-muted);
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
 .notification-item p {
   color: #526b85;
   font-size: 0.84rem;
@@ -773,6 +787,11 @@
 .state-badge.state-observed {
   --state-bg: #fff0e8;
   --state-color: #c2410c;
+}
+
+.state-badge.state-reobserved {
+  --state-bg: #e0f2fe;
+  --state-color: #0a56c2;
 }
 
 .state-badge.state-finished {
@@ -1472,6 +1491,13 @@
 
 .modal-actions.single-action {
   grid-template-columns: 1fr;
+}
+
+.confirm-modal .primary-button:disabled {
+  background: #cbdde8;
+  color: #587086;
+  cursor: not-allowed;
+  opacity: 0.82;
 }
 
 @media (max-width: 1100px) {
