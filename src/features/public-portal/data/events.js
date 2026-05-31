@@ -16,6 +16,7 @@ export const events = [
     time: '5:00 p.m.',
     venue: 'Plaza principal',
     district: 'Pueblo Libre',
+    aforoMaximo: null,
     spots: 120,
     status: 'Inscripcion abierta',
     summary:
@@ -39,6 +40,7 @@ export const events = [
     time: '4:30 p.m.',
     venue: 'Casa de la Juventud',
     district: 'San Miguel',
+    aforoMaximo: 35,
     spots: 35,
     status: 'Cupos limitados',
     summary:
@@ -62,6 +64,7 @@ export const events = [
     time: '7:00 p.m.',
     venue: 'Parque El Carmen',
     district: 'Pueblo Libre',
+    aforoMaximo: 200,
     spots: 200,
     status: 'Entrada libre',
     summary:
@@ -85,6 +88,7 @@ export const events = [
     time: '8:00 a.m.',
     venue: 'Malecon municipal',
     district: 'San Miguel',
+    aforoMaximo: null,
     spots: 80,
     status: 'Inscripcion abierta',
     summary:
@@ -108,6 +112,7 @@ export const events = [
     time: '6:00 p.m.',
     venue: 'Auditorio municipal',
     district: 'Pueblo Libre',
+    aforoMaximo: 60,
     spots: 60,
     status: 'Registro requerido',
     summary:

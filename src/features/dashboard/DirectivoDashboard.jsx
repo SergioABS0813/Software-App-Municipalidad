@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import municipalLogo from '../../assets/images/municipalidad-logo.png';
 import eventReviewPlaceholder from '../../assets/images/event-review-placeholder.png';
-import calendarCheck from '../../assets/icons/calendar-check.png';
-import clipboardCheck from '../../assets/icons/clipboard-check.png';
-import triangleAlert from '../../assets/icons/triangle-alert.png';
 import { adminEvents, formatEventState } from './dashboardData';
 import NotificationMenu from './NotificationMenu';
 import './AdminDashboard.css';
@@ -13,9 +10,22 @@ const reviewEvents = adminEvents.filter((event) =>
   ['EN_REVISION', 'OBSERVADO_EN_REVISION', 'OBSERVADO'].includes(event.state),
 );
 
+function getAforoMaximo(event) {
+  if (event.aforoMaximo === null) {
+    return null;
+  }
+
+  return event.aforoMaximo ?? event.spots ?? null;
+}
+
+function hasAforoMaximo(event) {
+  return Number(getAforoMaximo(event)) > 0;
+}
+
 const eventReports = adminEvents
   .filter((event) => event.state === 'FINALIZADO')
   .map((event, index) => {
+    const aforoMaximo = getAforoMaximo(event);
     const registered = [118, 192][index] ?? Math.round(event.spots * 0.82);
     const qrValidated = [86, 146][index] ?? Math.round(registered * 0.72);
     const manualValidated = [12, 18][index] ?? Math.round(registered * 0.12);
@@ -26,9 +36,13 @@ const eventReports = adminEvents
     return {
       ...event,
       approvedAt: ['2026-05-08T15:30:00', '2026-05-14T11:45:00'][index] ?? '2026-05-20T09:00:00',
+      aforoMaximo,
       cancelled,
       cancelledRegistrations,
       completedAt: ['08/06/2026', '14/06/2026'][index] ?? event.date,
+      digitalValidationRate: totalAttendance > 0
+        ? Math.round((qrValidated / totalAttendance) * 100)
+        : 0,
       generatedAt: ['Hoy, 10:20 a.m.', 'Lun, 9:15 a.m.'][index] ?? 'Pendiente',
       generatedAtDate: ['2026-05-28T10:20:00', '2026-05-25T09:15:00'][index] ?? '2026-05-20T09:00:00',
       manualValidated,
@@ -36,7 +50,9 @@ const eventReports = adminEvents
       registered,
       totalAttendance,
       turnoutRate: Math.round((totalAttendance / registered) * 100),
-      usedCapacityRate: Math.round((totalAttendance / event.spots) * 100),
+      usedCapacityRate: aforoMaximo && aforoMaximo > 0
+        ? Math.round((totalAttendance / aforoMaximo) * 100)
+        : null,
     };
   });
 
@@ -504,9 +520,36 @@ function DirectivoDashboard({ onLogout }) {
                 </>
               ) : (
                 <>
-                  <a className="active" href="#reporte-evento">Reporte</a>
-                  <a href="#reporte-asistencia">Asistencia</a>
-                  <a href="#reporte-exportacion">Exportación</a>
+                  <a
+                    className={activeReviewSection === 'report-section' ? 'active' : ''}
+                    href="#report-section"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigateReviewSection('report-section');
+                    }}
+                  >
+                    Reporte
+                  </a>
+                  <a
+                    className={activeReviewSection === 'attendance-section' ? 'active' : ''}
+                    href="#attendance-section"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigateReviewSection('attendance-section');
+                    }}
+                  >
+                    Asistencia
+                  </a>
+                  <a
+                    className={activeReviewSection === 'export-section' ? 'active' : ''}
+                    href="#export-section"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigateReviewSection('export-section');
+                    }}
+                  >
+                    Exportación
+                  </a>
                 </>
               )}
               <button
@@ -559,6 +602,7 @@ function DirectivoDashboard({ onLogout }) {
         ) : selectedReportEvent ? (
           <EventReportView
             report={selectedReportEvent}
+            onActiveSectionChange={setActiveReviewSection}
             onBack={() => setSelectedReportEvent(null)}
           />
         ) : (
@@ -566,7 +610,10 @@ function DirectivoDashboard({ onLogout }) {
             {currentDirectiveView === 'reports' ? (
               <ReportsDashboardView
                 reports={eventReports}
-                onSelectReport={setSelectedReportEvent}
+                onSelectReport={(report) => {
+                  setSelectedReportEvent(report);
+                  setActiveReviewSection('report-section');
+                }}
               />
             ) : (
               <DirectiveReviewDashboard
@@ -806,11 +853,8 @@ function ReportsDashboardView({ reports, onSelectReport }) {
       <section className="admin-table-panel admin-table-featured" id="reportes-evento">
         <div className="admin-panel-heading">
           <div>
-            <h2>Reportes concretos por evento</h2>
+            <h2>Resultados de eventos finalizados</h2>
           </div>
-          <span className="directive-badge">
-            Mostrando {filteredReports.length} de {reports.length}
-          </span>
         </div>
 
         <div className="reports-filter-grid" aria-label="Filtros de reportes">
@@ -852,7 +896,7 @@ function ReportsDashboardView({ reports, onSelectReport }) {
             <span>Evento</span>
             <span>Inscritos</span>
             <span>Asistentes</span>
-            <span>Culminacion</span>
+            <span>Fecha de cierre</span>
             <span>Reporte</span>
           </div>
           {filteredReports.map((report) => (
@@ -862,7 +906,10 @@ function ReportsDashboardView({ reports, onSelectReport }) {
                 <small>{report.date} - {report.venue}</small>
               </span>
               <span>{report.registered}</span>
-              <span>{report.totalAttendance}</span>
+              <span className="report-attendance-cell">
+                <strong>{report.totalAttendance}</strong>
+                <small>{report.turnoutRate}%</small>
+              </span>
               <span>{report.completedAt}</span>
               <span>
                 <button
@@ -899,11 +946,15 @@ function downloadReportCsv(report) {
     ['inscritos', report.registered],
     ['asistentes_validados', report.totalAttendance],
     ['tasa_asistencia', `${report.turnoutRate}%`],
-    ['aforo_utilizado', `${report.usedCapacityRate}%`],
+    [
+      report.usedCapacityRate === null ? 'validacion_digital' : 'aforo_utilizado',
+      report.usedCapacityRate === null
+        ? `${report.digitalValidationRate}%`
+        : `${report.usedCapacityRate}%`,
+    ],
     ['validaciones_qr', report.qrValidated],
     ['validaciones_manual', report.manualValidated],
-    ['asistencias_anuladas', report.cancelled],
-    ['inscripciones_canceladas', report.cancelledRegistrations],
+    ['validaciones_anuladas', report.cancelled],
     ['costo_referencial', report.referenceCost],
     ['fecha_generacion', report.generatedAt],
   ];
@@ -958,15 +1009,14 @@ function openReportPdf(report) {
           <div class="card"><span>Inscritos</span><strong>${report.registered}</strong></div>
           <div class="card"><span>Asistentes</span><strong>${report.totalAttendance}</strong></div>
           <div class="card"><span>Tasa asistencia</span><strong>${report.turnoutRate}%</strong></div>
-          <div class="card"><span>Aforo utilizado</span><strong>${report.usedCapacityRate}%</strong></div>
+          <div class="card"><span>${report.usedCapacityRate === null ? 'ValidaciÃ³n digital' : 'Aforo utilizado'}</span><strong>${report.usedCapacityRate === null ? report.digitalValidationRate : report.usedCapacityRate}%</strong></div>
         </section>
         <h2>Indicadores de control</h2>
         <table>
           <tr><th>Indicador</th><th>Valor</th></tr>
           <tr><td>Validaciones QR</td><td>${report.qrValidated}</td></tr>
           <tr><td>Validaciones manuales</td><td>${report.manualValidated}</td></tr>
-          <tr><td>Asistencias anuladas</td><td>${report.cancelled}</td></tr>
-          <tr><td>Inscripciones canceladas</td><td>${report.cancelledRegistrations}</td></tr>
+          <tr><td>Validaciones anuladas</td><td>${report.cancelled}</td></tr>
           <tr><td>Costo referencial</td><td>S/ ${report.referenceCost.toLocaleString('es-PE')}</td></tr>
           <tr><td>Fecha de generación</td><td>${report.generatedAt}</td></tr>
         </table>
@@ -987,7 +1037,167 @@ function slugify(value) {
     .replace(/(^-|-$)/g, '');
 }
 
-function EventReportView({ report, onBack }) {
+function EventReportView({ report, onActiveSectionChange, onBack }) {
+  const effectiveValidations = report.qrValidated + report.manualValidated;
+  const qrValidationRate = effectiveValidations > 0
+    ? Math.round((report.qrValidated / effectiveValidations) * 100)
+    : 0;
+  const manualValidationRate = effectiveValidations > 0
+    ? Math.round((report.manualValidated / effectiveValidations) * 100)
+    : 0;
+  const cancelledValidationRate = effectiveValidations > 0
+    ? Math.min(100, Math.round((report.cancelled / effectiveValidations) * 100))
+    : 0;
+  const reportRef = useRef(null);
+  const attendanceRef = useRef(null);
+  const exportRef = useRef(null);
+  const costPerAttendee = report.referenceCost && report.totalAttendance > 0
+    ? report.referenceCost / report.totalAttendance
+    : null;
+  const costPerAttendeeLabel = costPerAttendee
+    ? `S/ ${costPerAttendee.toLocaleString('es-PE', {
+        maximumFractionDigits: 2,
+        minimumFractionDigits: 2,
+      })}`
+    : 'No disponible';
+  const participationInsight =
+    report.turnoutRate >= 80
+      ? {
+          tone: 'positive',
+          title: 'Alta participación ciudadana',
+          text: `Se registraron ${report.totalAttendance} asistentes de ${report.registered} inscritos, alcanzando una tasa de asistencia del ${report.turnoutRate}%.`,
+        }
+      : report.turnoutRate >= 60
+        ? {
+            tone: 'neutral',
+            title: 'Participación moderada',
+            text: `Se registraron ${report.totalAttendance} asistentes de ${report.registered} inscritos, alcanzando una tasa de asistencia del ${report.turnoutRate}%.`,
+          }
+        : {
+            tone: 'warning',
+            title: 'Baja participación registrada',
+            text: `Se registraron ${report.totalAttendance} asistentes de ${report.registered} inscritos, alcanzando una tasa de asistencia del ${report.turnoutRate}%.`,
+          };
+  const capacityInsight = report.usedCapacityRate === null
+    ? {
+        tone: 'neutral',
+        title: 'Evento sin control de aforo',
+        text: 'Este evento no tuvo control de aforo, por lo que el análisis se centra en asistencia y validaciones.',
+      }
+    : report.usedCapacityRate >= 90
+      ? {
+          tone: 'warning',
+          title: 'Cercano a capacidad máxima',
+          text: `El aforo fue utilizado al ${report.usedCapacityRate}%. El evento estuvo cerca de su capacidad máxima.`,
+        }
+      : report.usedCapacityRate >= 60
+        ? {
+            tone: 'positive',
+            title: 'Uso adecuado del aforo',
+            text: `El aforo fue utilizado al ${report.usedCapacityRate}%. El uso del aforo fue adecuado.`,
+          }
+        : {
+            tone: 'warning',
+            title: 'Aforo parcialmente aprovechado',
+            text: `El aforo fue utilizado al ${report.usedCapacityRate}%. El aforo disponible no fue aprovechado en su totalidad.`,
+          };
+  const validationInsight = qrValidationRate >= 70
+    ? {
+        tone: 'positive',
+        title: 'Alta adopción QR',
+        text: 'La mayoría de validaciones se realizaron mediante QR, evidenciando una adecuada adopción del mecanismo digital.',
+      }
+    : {
+        tone: 'warning',
+        title: 'Uso manual relevante',
+        text: 'Se observa una participación relevante de validaciones manuales, por lo que podría revisarse la adopción del mecanismo QR.',
+      };
+  const executiveInsights = [
+    participationInsight,
+    capacityInsight,
+    validationInsight,
+    ...(costPerAttendee
+      ? [{
+          tone: 'neutral',
+          title: 'Costo estimado por asistente',
+          text: `El costo estimado por asistente fue de ${costPerAttendeeLabel}.`,
+        }]
+      : []),
+  ];
+  const capacityOrCostStat = report.usedCapacityRate === null
+    ? {
+        icon: ChartColumnIcon,
+        label: 'Costo por asistente',
+        tone: 'is-report-cost',
+        trend: 'estimado según asistentes',
+        value: costPerAttendeeLabel,
+      }
+    : {
+        icon: BadgeCheckIcon,
+        label: 'Aforo utilizado',
+        tone: 'is-report-capacity',
+        trend: 'asistentes sobre capacidad',
+        value: `${report.usedCapacityRate}%`,
+      };
+  const reportSummaryStats = [
+    {
+      icon: FileSearchIcon,
+      label: 'Inscritos',
+      tone: 'is-decision',
+      trend: 'registros confirmados',
+      value: report.registered,
+    },
+    {
+      icon: BadgeCheckIcon,
+      label: 'Asistentes',
+      tone: 'is-month-approved',
+      trend: 'validaciones totales',
+      value: report.totalAttendance,
+    },
+    {
+      icon: ChartColumnIcon,
+      label: 'Tasa asistencia',
+      tone: 'is-month-report',
+      trend: 'asistentes sobre inscritos',
+      value: `${report.turnoutRate}%`,
+    },
+    capacityOrCostStat,
+  ];
+
+  useEffect(() => {
+    const observedSections = [
+      ['report-section', reportRef.current],
+      ['attendance-section', attendanceRef.current],
+      ['export-section', exportRef.current],
+    ].filter(([, element]) => Boolean(element));
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntry = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((firstEntry, secondEntry) =>
+            secondEntry.intersectionRatio - firstEntry.intersectionRatio,
+          )[0];
+
+        if (visibleEntry?.target.id) {
+          onActiveSectionChange(visibleEntry.target.id);
+        }
+      },
+      {
+        root: null,
+        rootMargin: '-120px 0px -45% 0px',
+        threshold: [0.2, 0.45, 0.7],
+      },
+    );
+
+    observedSections.forEach(([, element]) => observer.observe(element));
+    onActiveSectionChange('report-section');
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [onActiveSectionChange]);
+
   return (
     <section className="event-report-view" aria-labelledby="event-report-title">
       <header className="admin-topbar">
@@ -1000,80 +1210,99 @@ function EventReportView({ report, onBack }) {
         </button>
       </header>
 
-      <section className="admin-stats" id="reporte-evento" aria-label="Resumen del reporte">
-        <article className="admin-stat-card">
-          <img alt="" className="admin-stat-icon" src={clipboardCheck} />
-          <div>
-            <span>Inscritos</span>
-            <strong>{report.registered}</strong>
-            <small>registros confirmados</small>
-          </div>
-        </article>
-        <article className="admin-stat-card">
-          <img alt="" className="admin-stat-icon" src={calendarCheck} />
-          <div>
-            <span>Asistentes</span>
-            <strong>{report.totalAttendance}</strong>
-            <small>validaciones totales</small>
-          </div>
-        </article>
-        <article className="admin-stat-card">
-          <img alt="" className="admin-stat-icon" src={triangleAlert} />
-          <div>
-            <span>Tasa asistencia</span>
-            <strong>{report.turnoutRate}%</strong>
-            <small>asistentes sobre inscritos</small>
-          </div>
-        </article>
-        <article className="admin-stat-card">
-          <img alt="" className="admin-stat-icon" src={clipboardCheck} />
-          <div>
-            <span>Aforo utilizado</span>
-            <strong>{report.usedCapacityRate}%</strong>
-            <small>asistentes sobre capacidad</small>
-          </div>
-        </article>
+      <section
+        className="admin-stats"
+        id="report-section"
+        ref={reportRef}
+        aria-label="Resumen del reporte"
+      >
+        {reportSummaryStats.map((stat) => (
+          <article
+            className={`admin-stat-card management-stat-card directive-stat-card ${stat.tone}`}
+            key={stat.label}
+          >
+            <span className="admin-stat-icon directive-stat-icon">
+              <stat.icon />
+            </span>
+            <div>
+              <span>{stat.label}</span>
+              <strong>{stat.value}</strong>
+              <small>{stat.trend}</small>
+            </div>
+          </article>
+        ))}
       </section>
 
-      <section className="directive-review-grid" id="reporte-asistencia">
+      <section className="admin-panel executive-summary-card" aria-labelledby="executive-summary-title">
+        <span className="section-kicker">Análisis</span>
+        <h2 id="executive-summary-title">Resumen ejecutivo</h2>
+        <div className="executive-insight-list">
+          {executiveInsights.map((insight) => (
+            <article className={`executive-insight is-${insight.tone}`} key={insight.title}>
+              <span className="executive-insight-marker" aria-hidden="true" />
+              <div>
+                <strong>{insight.title}</strong>
+                <p>{insight.text}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section
+        className="directive-review-grid"
+        id="attendance-section"
+        ref={attendanceRef}
+      >
         <article className="admin-panel">
           <span className="section-kicker">Asistencia</span>
-          <h2>Validaciones registradas</h2>
-          <dl className="directive-detail-list">
-            <div>
-              <dt>QR</dt>
-              <dd>{report.qrValidated}</dd>
-            </div>
-            <div>
-              <dt>Manual</dt>
-              <dd>{report.manualValidated}</dd>
-            </div>
-            <div>
-              <dt>Estado de asistencia</dt>
-              <dd>VALIDADA / ANULADA</dd>
-            </div>
-            <div>
-              <dt>Anuladas</dt>
-              <dd>{report.cancelled}</dd>
-            </div>
-            <div>
-              <dt>Inscripciones canceladas</dt>
-              <dd>{report.cancelledRegistrations}</dd>
-            </div>
-            <div>
-              <dt>Generado</dt>
-              <dd>{report.generatedAt}</dd>
-            </div>
-          </dl>
+          <h2>Métodos de validación</h2>
+          <div className="validation-methods" aria-label="Métodos de validación">
+            <article className="validation-method">
+              <div>
+                <strong>QR</strong>
+                <span>{report.qrValidated} validaciones</span>
+              </div>
+              <small>{qrValidationRate}%</small>
+              <span className="validation-method-bar" aria-hidden="true">
+                <span style={{ width: `${qrValidationRate}%` }} />
+              </span>
+            </article>
+            <article className="validation-method is-manual">
+              <div>
+                <strong>Manual</strong>
+                <span>{report.manualValidated} validaciones</span>
+              </div>
+              <small>{manualValidationRate}%</small>
+              <span className="validation-method-bar" aria-hidden="true">
+                <span style={{ width: `${manualValidationRate}%` }} />
+              </span>
+            </article>
+            <article className="validation-method is-cancelled">
+              <div>
+                <strong>Anuladas</strong>
+                <span>{report.cancelled} registros anulados</span>
+              </div>
+              <small>Fuera del total efectivo</small>
+              <span className="validation-method-bar" aria-hidden="true">
+                <span style={{ width: `${cancelledValidationRate}%` }} />
+              </span>
+            </article>
+          </div>
+          {report.generatedAt && (
+            <p className="validation-generated-note">
+              Generado: {report.generatedAt}
+            </p>
+          )}
         </article>
 
         <article className="admin-panel">
           <span className="section-kicker">Evento</span>
           <h2>Datos de referencia</h2>
-          <dl className="directive-detail-list">
+          <dl className="directive-detail-list directive-reference-list">
             <div>
               <dt>Fecha</dt>
-              <dd>{report.date} - {report.time}</dd>
+              <dd>{report.date} · {report.time}</dd>
             </div>
             <div>
               <dt>Lugar</dt>
@@ -1089,98 +1318,29 @@ function EventReportView({ report, onBack }) {
             </div>
             <div>
               <dt>Costo referencial</dt>
-              <dd>S/ {report.referenceCost.toLocaleString('es-PE')}</dd>
+              <dd>
+                <span>S/ {report.referenceCost.toLocaleString('es-PE')}</span>
+                {report.usedCapacityRate !== null && costPerAttendee && (
+                  <small>
+                    Costo por asistente: {costPerAttendeeLabel}
+                  </small>
+                )}
+              </dd>
             </div>
           </dl>
         </article>
       </section>
 
-      <section className="admin-table-panel admin-table-featured">
-        <div className="admin-panel-heading">
-          <div>
-            <span className="section-kicker">Detalle</span>
-            <h2>Resumen de validaciones</h2>
-          </div>
-        </div>
-        <div className="validation-summary-grid">
-          <article>
-            <span>Metodo</span>
-            <strong>QR</strong>
-            <dl>
-              <div>
-                <dt>Cantidad</dt>
-                <dd>{report.qrValidated}</dd>
-              </div>
-              <div>
-                <dt>Estado QR</dt>
-                <dd>USADO</dd>
-              </div>
-              <div>
-                <dt>Asistencia</dt>
-                <dd>VALIDADA</dd>
-              </div>
-              <div>
-                <dt>Responsable</dt>
-                <dd>Personal operativo</dd>
-              </div>
-            </dl>
-          </article>
-
-          <article>
-            <span>Metodo</span>
-            <strong>Manual</strong>
-            <dl>
-              <div>
-                <dt>Cantidad</dt>
-                <dd>{report.manualValidated}</dd>
-              </div>
-              <div>
-                <dt>Estado QR</dt>
-                <dd>No aplica</dd>
-              </div>
-              <div>
-                <dt>Asistencia</dt>
-                <dd>VALIDADA</dd>
-              </div>
-              <div>
-                <dt>Responsable</dt>
-                <dd>Personal operativo</dd>
-              </div>
-            </dl>
-          </article>
-
-          <article>
-            <span>Metodo</span>
-            <strong>Anulacion</strong>
-            <dl>
-              <div>
-                <dt>Cantidad</dt>
-                <dd>{report.cancelled}</dd>
-              </div>
-              <div>
-                <dt>Estado QR</dt>
-                <dd>REVOCADO</dd>
-              </div>
-              <div>
-                <dt>Asistencia</dt>
-                <dd>ANULADA</dd>
-              </div>
-              <div>
-                <dt>Responsable</dt>
-                <dd>Coordinacion del evento</dd>
-              </div>
-            </dl>
-          </article>
-        </div>
-      </section>
-
-      <section className="admin-panel directive-decision-panel" id="reporte-exportacion">
+      <section
+        className="admin-panel directive-decision-panel"
+        id="export-section"
+        ref={exportRef}
+      >
         <div>
           <span className="section-kicker">Exportación</span>
           <h2>Documento de reporte</h2>
           <p>
-            El reporte consolida inscripciones, asistencias y validaciones para
-            sustentar el seguimiento directivo del evento.
+            Descarga el reporte formal del evento o exporta los datos para análisis externo.
           </p>
         </div>
         <div className="directive-decision-actions">
@@ -1481,6 +1641,7 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
   const recursosRef = useRef(null);
   const decisionRef = useRef(null);
   const [previewResource, setPreviewResource] = useState(null);
+  const aforoMaximo = getAforoMaximo(event);
   const canDecide = reviewableStates.includes(event.state);
   const reviewTimeMetric = getReviewTimeMetric(event);
   const shouldShowPreviousObservation =
@@ -1621,10 +1782,12 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
               <dt>Lugar</dt>
               <dd>{event.venue}</dd>
             </div>
-            <div>
-              <dt>Aforo</dt>
-              <dd>{event.spots} participantes</dd>
-            </div>
+            {hasAforoMaximo(event) && (
+              <div>
+                <dt>Aforo</dt>
+                <dd>{aforoMaximo} participantes</dd>
+              </div>
+            )}
           </dl>
           <div className="directive-review-checks" aria-label="Indicadores de revisión">
             <span>Corrección atendida</span>
@@ -1750,9 +1913,7 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
           <span className="section-kicker">Decisión</span>
           <h2>Aprobación directiva</h2>
           <p>
-            Aprueba la publicación si la ficha está completa y alineada al
-            objetivo municipal. Si encuentras inconsistencias, observa el evento
-            para que el administrador corrija la ficha.
+            Selecciona una acción para continuar con el proceso de publicación.
           </p>
         </div>
         <div className="directive-decision-actions">
@@ -1768,7 +1929,11 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
             className="table-text-action observe"
             disabled={!canDecide}
             type="button"
-            onClick={() => onDecision({ eventTitle: event.title, type: 'observe' })}
+            onClick={() => onDecision({
+              eventTitle: event.title,
+              previousObservation: event.previousObservation ?? null,
+              type: 'observe',
+            })}
           >
             Observar
           </button>
@@ -1931,6 +2096,7 @@ function DirectiveDecisionModal({ decision, onCancel, onConfirm }) {
             ? 'Al aprobarlo, el evento quedará listo para publicación según el flujo definido.'
             : 'Describe con claridad qué debe corregir el administrador antes de reenviar la ficha.'}
         </p>
+        
         {!isApproval && (
           <label className="directive-observation-field">
             Comentario de observación

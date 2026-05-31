@@ -103,6 +103,14 @@ function hasData(value) {
   return value !== undefined && value !== null && String(value).trim().length > 0;
 }
 
+function hasCapacity(event) {
+  if (event.aforoMaximo === null) {
+    return true;
+  }
+
+  return Number(event.aforoMaximo ?? event.spots) > 0;
+}
+
 function calculateEventCompleteness(event) {
   const checklist = [
     hasData(event.title),
@@ -113,7 +121,7 @@ function calculateEventCompleteness(event) {
     hasData(event.date),
     hasData(event.time),
     hasData(event.duration),
-    Number(event.spots) > 0,
+    hasCapacity(event),
     hasData(event.registrationStart),
     hasData(event.registrationEnd),
     hasData(event.venue),
