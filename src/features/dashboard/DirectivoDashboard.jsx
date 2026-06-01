@@ -6,6 +6,28 @@ import NotificationMenu from './NotificationMenu';
 import './AdminDashboard.css';
 import './DirectivoDashboard.css';
 
+const fallbackDirectiveUser = {
+  fullName: 'Sergio Bustamante',
+  role: 'DIRECTIVO',
+};
+
+function getDirectiveUserInitials(name) {
+  const nameParts = String(name ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (nameParts.length === 0) {
+    return 'DI';
+  }
+
+  return `${nameParts[0][0] ?? ''}${nameParts.at(-1)?.[0] ?? ''}`.toUpperCase();
+}
+
+function formatDirectiveUserRole(role) {
+  return role === 'DIRECTIVO' ? 'Directivo' : role ?? 'Directivo';
+}
+
 const reviewEvents = adminEvents.filter((event) =>
   ['EN_REVISION', 'OBSERVADO_EN_REVISION', 'OBSERVADO'].includes(event.state),
 );
@@ -46,8 +68,10 @@ const eventReports = adminEvents
       generatedAt: ['Hoy, 10:20 a.m.', 'Lun, 9:15 a.m.'][index] ?? 'Pendiente',
       generatedAtDate: ['2026-05-28T10:20:00', '2026-05-25T09:15:00'][index] ?? '2026-05-20T09:00:00',
       manualValidated,
+      puntuacionPromedio: [4.7, 4.4][index] ?? null,
       qrValidated,
       registered,
+      totalValoraciones: [82, 136][index] ?? 0,
       totalAttendance,
       turnoutRate: Math.round((totalAttendance / registered) * 100),
       usedCapacityRate: aforoMaximo && aforoMaximo > 0
@@ -443,13 +467,15 @@ function getDirectiveStateTone(state) {
   return stateToneMap[state] ?? 'state-default';
 }
 
-function DirectivoDashboard({ onLogout }) {
+function DirectivoDashboard({ onLogout, user }) {
   const [currentDirectiveView, setCurrentDirectiveView] = useState('review');
   const [reviewFilter, setReviewFilter] = useState('TODOS');
   const [selectedReviewEvent, setSelectedReviewEvent] = useState(null);
   const [selectedReportEvent, setSelectedReportEvent] = useState(null);
   const [pendingDecision, setPendingDecision] = useState(null);
   const [activeReviewSection, setActiveReviewSection] = useState('ficha-directiva');
+  const directiveUser = user ?? fallbackDirectiveUser;
+  const directiveUserName = directiveUser.fullName || directiveUser.name || 'Sergio Bustamante';
   const filteredReviewEvents =
     reviewFilter === 'TODOS'
       ? reviewEvents
@@ -481,6 +507,16 @@ function DirectivoDashboard({ onLogout }) {
             <small>Panel directivo</small>
           </span>
         </button>
+
+        <section className="admin-user-card" aria-label="Usuario autenticado">
+          <span className="admin-user-avatar" aria-hidden="true">
+            {getDirectiveUserInitials(directiveUserName)}
+          </span>
+          <span className="admin-user-copy">
+            <strong>{directiveUserName}</strong>
+            <small>{formatDirectiveUserRole(directiveUser.role)}</small>
+          </span>
+        </section>
 
         <nav className="admin-nav" aria-label="Navegación directiva">
           {selectedReviewEvent || selectedReportEvent ? (
@@ -804,17 +840,71 @@ function ChartColumnIcon() {
   );
 }
 
+function parseReportCompletedDate(report) {
+  const [day, month, year] = String(report.completedAt ?? '').split('/').map(Number);
+
+  if (!day || !month || !year) {
+    return new Date(report.generatedAtDate ?? report.approvedAt ?? 0);
+  }
+
+  return new Date(year, month - 1, day);
+}
+
+function safePercent(numerator, denominator) {
+  if (!denominator || denominator <= 0) {
+    return null;
+  }
+
+  return Math.round((numerator / denominator) * 100);
+}
+
 function ReportsDashboardView({ reports, onSelectReport }) {
+  const availableReportYears = [
+    ...new Set(
+      reports
+        .map((report) => parseReportCompletedDate(report).getFullYear())
+        .filter((year) => Number.isFinite(year) && year > 0),
+    ),
+  ].sort((firstYear, secondYear) => secondYear - firstYear);
+  const reportYearOptions = availableReportYears.length > 0
+    ? availableReportYears
+    : [2026, 2025, 2024];
   const [reportSearch, setReportSearch] = useState('');
   const [reportCategory, setReportCategory] = useState('Todas');
+  const [reportYear, setReportYear] = useState(String(reportYearOptions[0]));
+  const [reportMonth, setReportMonth] = useState('all');
+  const [reportRanking, setReportRanking] = useState('top-5');
+  const [highlightTab, setHighlightTab] = useState('attendance');
   const [reportSort, setReportSort] = useState('recent');
-  const reportCategories = [
-    'Todas',
-    ...new Set(reports.map((report) => report.category)),
+  const reportCategoryOptions = ['Todas', 'Cultura', 'Deporte', 'Salud', 'Educación'];
+  const reportMonthOptions = [
+    ['all', 'Todos'],
+    ['0', 'Enero'],
+    ['1', 'Febrero'],
+    ['2', 'Marzo'],
+    ['3', 'Abril'],
+    ['4', 'Mayo'],
+    ['5', 'Junio'],
+    ['6', 'Julio'],
+    ['7', 'Agosto'],
+    ['8', 'Septiembre'],
+    ['9', 'Octubre'],
+    ['10', 'Noviembre'],
+    ['11', 'Diciembre'],
   ];
+  const reportRankingOptions = [
+    ['top-5', 'Top 5'],
+    ['top-10', 'Top 10'],
+    ['top-20', 'Top 20'],
+  ];
+  const selectedMonthLabel = reportMonthOptions.find(([value]) => value === reportMonth)?.[1] ?? 'Todos';
+  const highlightedPeriodLabel = reportMonth === 'all'
+    ? `del año ${reportYear}`
+    : `de ${selectedMonthLabel.toLowerCase()} ${reportYear}`;
   const filteredReports = reports
     .filter((report) => {
       const normalizedSearch = reportSearch.trim().toLowerCase();
+      const reportDate = parseReportCompletedDate(report);
       const matchesSearch =
         normalizedSearch.length === 0 ||
         [report.title, report.venue, report.category]
@@ -823,8 +913,23 @@ function ReportsDashboardView({ reports, onSelectReport }) {
           .includes(normalizedSearch);
       const matchesCategory =
         reportCategory === 'Todas' || report.category === reportCategory;
+      const matchesPeriod = (() => {
+        if (Number.isNaN(reportDate.getTime())) {
+          return false;
+        }
 
-      return matchesSearch && matchesCategory;
+        if (String(reportDate.getFullYear()) !== reportYear) {
+          return false;
+        }
+
+        if (reportMonth === 'all') {
+          return true;
+        }
+
+        return reportDate.getMonth() === Number(reportMonth);
+      })();
+
+      return matchesSearch && matchesCategory && matchesPeriod;
     })
     .sort((firstReport, secondReport) => {
       if (reportSort === 'attendance') {
@@ -837,23 +942,270 @@ function ReportsDashboardView({ reports, onSelectReport }) {
 
       return firstReport.id - secondReport.id;
     });
+  const totalFilteredAttendees = filteredReports.reduce(
+    (total, report) => total + report.totalAttendance,
+    0,
+  );
+  const totalFilteredRegistered = filteredReports.reduce(
+    (total, report) => total + report.registered,
+    0,
+  );
+  const totalFilteredQr = filteredReports.reduce(
+    (total, report) => total + report.qrValidated,
+    0,
+  );
+  const totalFilteredManual = filteredReports.reduce(
+    (total, report) => total + report.manualValidated,
+    0,
+  );
+  const averageAttendanceRate = safePercent(totalFilteredAttendees, totalFilteredRegistered);
+  const averageQrAdoption = safePercent(
+    totalFilteredQr,
+    totalFilteredQr + totalFilteredManual,
+  );
+  const globalReportStats = [
+    {
+      icon: FileSearchIcon,
+      label: 'Eventos finalizados',
+      tone: 'is-decision',
+      trend: 'según filtros activos',
+      value: filteredReports.length,
+    },
+    {
+      icon: BadgeCheckIcon,
+      label: 'Asistentes totales',
+      tone: 'is-month-approved',
+      trend: 'validaciones acumuladas',
+      value: totalFilteredAttendees,
+    },
+    {
+      icon: ChartColumnIcon,
+      label: 'Tasa promedio',
+      tone: 'is-month-report',
+      trend: 'asistentes sobre inscritos',
+      value: averageAttendanceRate === null ? 'No disponible' : `${averageAttendanceRate}%`,
+    },
+    {
+      icon: ChartColumnIcon,
+      label: 'Adopción QR promedio',
+      tone: 'is-report-capacity',
+      trend: 'sobre validaciones efectivas',
+      value: averageQrAdoption === null ? 'No disponible' : `${averageQrAdoption}%`,
+    },
+  ];
+  const rankingLimit = Number(reportRanking.replace('top-', ''));
+  const hasSatisfactionData = filteredReports.some((report) =>
+    Number(report.puntuacionPromedio) > 0 && Number(report.totalValoraciones) > 0,
+  );
+  const activeHighlightTab =
+    highlightTab === 'satisfaction' && !hasSatisfactionData ? 'attendance' : highlightTab;
+  const highlightedTabs = [
+    ['attendance', 'Más asistidos'],
+    ['attendance-rate', 'Mayor tasa de asistencia'],
+    ['qr-adoption', 'Mejor adopción QR'],
+    ['low-participation', 'Menor participación'],
+  ];
+  const highlightedRankingTabs = [
+    ...highlightedTabs.slice(0, 3),
+    [
+      'satisfaction',
+      hasSatisfactionData ? 'Mayor satisfacción' : 'Mayor satisfacción · Próximamente',
+      !hasSatisfactionData,
+    ],
+    ...highlightedTabs.slice(3),
+  ];
+  const highlightedReports = [...filteredReports]
+    .sort((firstReport, secondReport) => {
+      const firstAttendanceRate = safePercent(firstReport.totalAttendance, firstReport.registered) ?? 0;
+      const secondAttendanceRate = safePercent(secondReport.totalAttendance, secondReport.registered) ?? 0;
+      const firstQrRate = safePercent(
+        firstReport.qrValidated,
+        firstReport.qrValidated + firstReport.manualValidated,
+      ) ?? 0;
+      const secondQrRate = safePercent(
+        secondReport.qrValidated,
+        secondReport.qrValidated + secondReport.manualValidated,
+      ) ?? 0;
+
+      if (activeHighlightTab === 'attendance-rate') {
+        return secondAttendanceRate - firstAttendanceRate;
+      }
+
+      if (activeHighlightTab === 'qr-adoption') {
+        return secondQrRate - firstQrRate;
+      }
+
+      if (activeHighlightTab === 'satisfaction') {
+        return (secondReport.puntuacionPromedio ?? 0) - (firstReport.puntuacionPromedio ?? 0);
+      }
+
+      if (activeHighlightTab === 'low-participation') {
+        return firstAttendanceRate - secondAttendanceRate;
+      }
+
+      return secondReport.totalAttendance - firstReport.totalAttendance;
+    })
+    .slice(0, rankingLimit);
+
+  function getHighlightMetric(report) {
+    const attendanceRate = safePercent(report.totalAttendance, report.registered) ?? 0;
+    const qrRate = safePercent(
+      report.qrValidated,
+      report.qrValidated + report.manualValidated,
+    );
+
+    if (activeHighlightTab === 'attendance-rate') {
+      return `${attendanceRate}% asistencia`;
+    }
+
+    if (activeHighlightTab === 'qr-adoption') {
+      return qrRate === null ? 'Sin validaciones' : `${qrRate}% QR`;
+    }
+
+    if (activeHighlightTab === 'satisfaction') {
+      return Number(report.puntuacionPromedio) > 0
+        ? `${report.puntuacionPromedio.toFixed(1)} / 5 · ${report.totalValoraciones} valoraciones`
+        : 'Sin valoraciones';
+    }
+
+    if (activeHighlightTab === 'low-participation') {
+      return `${attendanceRate}% asistencia`;
+    }
+
+    return `${report.totalAttendance} asistentes`;
+  }
 
   return (
     <section className="reports-dashboard-view" aria-labelledby="reports-title">
       <header className="admin-topbar">
         <div>
           <span className="section-kicker">Reportes directivos</span>
-          <h1 id="reports-title">Historial de eventos finalizados</h1>
+          <h1 id="reports-title">Análisis de eventos finalizados</h1>
+          <p>Consulta métricas acumuladas, rankings y reportes individuales de los eventos municipales.</p>
         </div>
         <div className="admin-topbar-actions">
           <NotificationMenu notifications={directiveNotifications} />
         </div>
       </header>
 
+      <section className="reports-global-filters" aria-label="Filtros globales de análisis">
+        <label>
+          Año
+          <select
+            value={reportYear}
+            onChange={(event) => setReportYear(event.target.value)}
+          >
+            {reportYearOptions.map((year) => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Mes
+          <select
+            value={reportMonth}
+            onChange={(event) => setReportMonth(event.target.value)}
+          >
+            {reportMonthOptions.map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Categoría
+          <select
+            value={reportCategory}
+            onChange={(event) => setReportCategory(event.target.value)}
+          >
+            {reportCategoryOptions.map((category) => (
+              <option key={category}>{category}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Ranking
+          <select
+            value={reportRanking}
+            onChange={(event) => setReportRanking(event.target.value)}
+          >
+            {reportRankingOptions.map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </label>
+      </section>
+
+      <section className="admin-stats reports-global-stats" aria-label="Métricas globales de eventos finalizados">
+        {globalReportStats.map((stat) => (
+          <article
+            className={`admin-stat-card management-stat-card directive-stat-card ${stat.tone}`}
+            key={stat.label}
+          >
+            <span className="admin-stat-icon directive-stat-icon">
+              <stat.icon />
+            </span>
+            <div>
+              <span>{stat.label}</span>
+              <strong>{stat.value}</strong>
+              <small>{stat.trend}</small>
+            </div>
+          </article>
+        ))}
+      </section>
+
+      <section className="admin-panel highlighted-events-panel" aria-labelledby="highlighted-events-title">
+        <div className="admin-panel-heading">
+          <div>
+            <span className="section-kicker">Rankings</span>
+            <h2 id="highlighted-events-title">Eventos destacados {highlightedPeriodLabel}</h2>
+          </div>
+        </div>
+        <div className="highlight-tabs" role="tablist" aria-label="Rankings de eventos finalizados">
+          {highlightedRankingTabs.map(([value, label, disabled]) => (
+            <button
+              aria-selected={activeHighlightTab === value}
+              className={activeHighlightTab === value ? 'active' : ''}
+              disabled={disabled}
+              key={value}
+              role="tab"
+              type="button"
+              onClick={() => setHighlightTab(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="highlighted-events-grid">
+          {highlightedReports.map((report, index) => (
+            <article className="highlighted-event-card" key={report.id}>
+              <span className="highlight-rank">#{index + 1}</span>
+              <div>
+                <strong>{report.title}</strong>
+                <small>{report.category}</small>
+              </div>
+              <span className="highlight-metric">{getHighlightMetric(report)}</span>
+              <small>{report.totalAttendance} asistentes · {report.registered} inscritos</small>
+              <button
+                aria-label={`Ver reporte de ${report.title}`}
+                className="table-icon-action"
+                title="Ver reporte"
+                type="button"
+                onClick={() => {
+                  onSelectReport(report);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              >
+                <AnalyticsIcon />
+              </button>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <section className="admin-table-panel admin-table-featured" id="reportes-evento">
         <div className="admin-panel-heading">
           <div>
-            <h2>Resultados de eventos finalizados</h2>
+            <h2>Historial de eventos finalizados</h2>
           </div>
         </div>
 
@@ -866,17 +1218,6 @@ function ReportsDashboardView({ reports, onSelectReport }) {
               value={reportSearch}
               onChange={(event) => setReportSearch(event.target.value)}
             />
-          </label>
-          <label>
-            Categoría
-            <select
-              value={reportCategory}
-              onChange={(event) => setReportCategory(event.target.value)}
-            >
-              {reportCategories.map((category) => (
-                <option key={category}>{category}</option>
-              ))}
-            </select>
           </label>
           <label>
             Ordenar por
@@ -1060,70 +1401,98 @@ function EventReportView({ report, onActiveSectionChange, onBack }) {
         minimumFractionDigits: 2,
       })}`
     : 'No disponible';
-  const participationInsight =
-    report.turnoutRate >= 80
-      ? {
-          tone: 'positive',
-          title: 'Alta participación ciudadana',
-          text: `Se registraron ${report.totalAttendance} asistentes de ${report.registered} inscritos, alcanzando una tasa de asistencia del ${report.turnoutRate}%.`,
-        }
-      : report.turnoutRate >= 60
-        ? {
-            tone: 'neutral',
-            title: 'Participación moderada',
-            text: `Se registraron ${report.totalAttendance} asistentes de ${report.registered} inscritos, alcanzando una tasa de asistencia del ${report.turnoutRate}%.`,
-          }
-        : {
-            tone: 'warning',
-            title: 'Baja participación registrada',
-            text: `Se registraron ${report.totalAttendance} asistentes de ${report.registered} inscritos, alcanzando una tasa de asistencia del ${report.turnoutRate}%.`,
-          };
-  const capacityInsight = report.usedCapacityRate === null
-    ? {
-        tone: 'neutral',
-        title: 'Evento sin control de aforo',
-        text: 'Este evento no tuvo control de aforo, por lo que el análisis se centra en asistencia y validaciones.',
-      }
-    : report.usedCapacityRate >= 90
-      ? {
-          tone: 'warning',
-          title: 'Cercano a capacidad máxima',
-          text: `El aforo fue utilizado al ${report.usedCapacityRate}%. El evento estuvo cerca de su capacidad máxima.`,
-        }
-      : report.usedCapacityRate >= 60
-        ? {
-            tone: 'positive',
-            title: 'Uso adecuado del aforo',
-            text: `El aforo fue utilizado al ${report.usedCapacityRate}%. El uso del aforo fue adecuado.`,
-          }
-        : {
-            tone: 'warning',
-            title: 'Aforo parcialmente aprovechado',
-            text: `El aforo fue utilizado al ${report.usedCapacityRate}%. El aforo disponible no fue aprovechado en su totalidad.`,
-          };
-  const validationInsight = qrValidationRate >= 70
-    ? {
-        tone: 'positive',
-        title: 'Alta adopción QR',
-        text: 'La mayoría de validaciones se realizaron mediante QR, evidenciando una adecuada adopción del mecanismo digital.',
-      }
-    : {
-        tone: 'warning',
-        title: 'Uso manual relevante',
-        text: 'Se observa una participación relevante de validaciones manuales, por lo que podría revisarse la adopción del mecanismo QR.',
-      };
-  const executiveInsights = [
-    participationInsight,
-    capacityInsight,
-    validationInsight,
-    ...(costPerAttendee
-      ? [{
+  const unassistedRegistered = Math.max(0, report.registered - report.totalAttendance);
+  const goalValue = report.metaValor ?? report.goalValue;
+  const goalType = report.metaTipo ?? report.goalType;
+  const hasConfiguredGoal = Boolean(goalType && goalValue);
+  const goalEvaluation = (() => {
+    if (!goalType || !goalValue) {
+      return null;
+    }
+
+    if (goalType === 'CANTIDAD_ASISTENTES') {
+      const goalCompletion = safePercent(report.totalAttendance, goalValue);
+      const attendanceDifference = report.totalAttendance - goalValue;
+
+      return [
+        {
           tone: 'neutral',
-          title: 'Costo estimado por asistente',
-          text: `El costo estimado por asistente fue de ${costPerAttendeeLabel}.`,
-        }]
-      : []),
-  ];
+          title: 'Cumplimiento de meta',
+          text: goalCompletion === null
+            ? 'No hay datos suficientes para calcular el cumplimiento de meta.'
+            : `Se registraron ${report.totalAttendance} asistentes frente a una meta de ${goalValue}, alcanzando un cumplimiento del ${goalCompletion}%.`,
+        },
+        {
+          tone: 'neutral',
+          title: 'Diferencia frente a meta',
+          text: attendanceDifference > 0
+            ? `La meta fue superada por ${attendanceDifference} asistentes.`
+            : attendanceDifference === 0
+              ? 'La meta establecida fue alcanzada.'
+              : `Faltaron ${Math.abs(attendanceDifference)} asistentes para alcanzar la meta definida.`,
+        },
+      ];
+    }
+
+    if (goalType === 'PORCENTAJE_ASISTENCIA') {
+      const goalCompletion = safePercent(report.turnoutRate, goalValue);
+      const rateDifference = report.turnoutRate - goalValue;
+
+      return [
+        {
+          tone: 'neutral',
+          title: 'Cumplimiento de meta',
+          text: goalCompletion === null
+            ? 'No hay datos suficientes para calcular el cumplimiento de meta.'
+            : `La tasa de asistencia fue de ${report.turnoutRate}%, frente a una meta establecida de ${goalValue}%, alcanzando un cumplimiento del ${goalCompletion}%.`,
+        },
+        {
+          tone: 'neutral',
+          title: 'Diferencia frente a meta',
+          text: rateDifference > 0
+            ? `La meta fue superada en ${rateDifference} puntos porcentuales.`
+            : rateDifference === 0
+              ? 'La meta establecida fue alcanzada.'
+              : `Faltaron ${Math.abs(rateDifference)} puntos porcentuales para alcanzar la meta definida.`,
+        },
+      ];
+    }
+
+    return null;
+  })();
+  const attendanceGapInsight = {
+    tone: 'neutral',
+    title: 'Brecha de asistencia',
+    text: `${unassistedRegistered} inscritos no registraron asistencia.`,
+  };
+  const digitalValidationInsight = {
+    tone: 'neutral',
+    title: 'Validación digital',
+    text: effectiveValidations > 0
+      ? `El ${qrValidationRate}% de las validaciones efectivas se realizaron mediante QR.`
+      : 'No se registraron validaciones efectivas para calcular adopción QR.',
+  };
+  const capacityInsight = {
+    tone: 'neutral',
+    title: 'Aforo',
+    text: report.usedCapacityRate === null
+      ? 'Evento sin control de aforo configurado.'
+      : `El evento utilizó ${report.usedCapacityRate}% de la capacidad configurada.`,
+  };
+  const operationalInsight = unassistedRegistered > 0
+    ? attendanceGapInsight
+    : digitalValidationInsight;
+  const executiveSummaryTitle = hasConfiguredGoal ? 'Evaluación de meta' : 'Lectura operativa';
+  const executiveInsights = hasConfiguredGoal
+    ? [
+        ...(goalEvaluation ?? []),
+        operationalInsight,
+      ]
+    : [
+        attendanceGapInsight,
+        digitalValidationInsight,
+        capacityInsight,
+      ];
   const capacityOrCostStat = report.usedCapacityRate === null
     ? {
         icon: ChartColumnIcon,
@@ -1205,7 +1574,7 @@ function EventReportView({ report, onActiveSectionChange, onBack }) {
           <span className="section-kicker">Reporte por evento</span>
           <h1 id="event-report-title">{report.title}</h1>
         </div>
-        <button className="admin-secondary-action" type="button" onClick={onBack}>
+        <button className="admin-new-event-action event-form-top-action" type="button" onClick={onBack}>
           Volver
         </button>
       </header>
@@ -1235,7 +1604,7 @@ function EventReportView({ report, onActiveSectionChange, onBack }) {
 
       <section className="admin-panel executive-summary-card" aria-labelledby="executive-summary-title">
         <span className="section-kicker">Análisis</span>
-        <h2 id="executive-summary-title">Resumen ejecutivo</h2>
+        <h2 id="executive-summary-title">{executiveSummaryTitle}</h2>
         <div className="executive-insight-list">
           {executiveInsights.map((insight) => (
             <article className={`executive-insight is-${insight.tone}`} key={insight.title}>
@@ -1312,11 +1681,11 @@ function EventReportView({ report, onActiveSectionChange, onBack }) {
               <dt>Categoría</dt>
               <dd>{report.category}</dd>
             </div>
-            <div>
+            <div className="is-emphasis">
               <dt>Estado</dt>
               <dd>{formatEventState(report.state)}</dd>
             </div>
-            <div>
+            <div className="is-emphasis">
               <dt>Costo referencial</dt>
               <dd>
                 <span>S/ {report.referenceCost.toLocaleString('es-PE')}</span>

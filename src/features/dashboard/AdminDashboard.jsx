@@ -135,6 +135,14 @@ function getPendingTitle(state) {
   return state === 'OBSERVADO' ? 'Observaciones' : 'Pendientes de ficha';
 }
 
+function hasValidAforo(event) {
+  if (event.aforoMaximo === null || event.capacityMode === 'none') {
+    return true;
+  }
+
+  return Number(event.aforoMaximo ?? event.spots) > 0;
+}
+
 function getEventChecklist(event, options = {}) {
   const observationAddressed = options.observationAddressed ?? false;
   const checks = [
@@ -153,7 +161,7 @@ function getEventChecklist(event, options = {}) {
         hasValue(event.time) &&
         hasValue(event.registrationStart) &&
         hasValue(event.registrationEnd) &&
-        Number(event.spots) > 0,
+        hasValidAforo(event),
       completeLabel: 'Fechas e inscripción completas',
       pendingLabel: 'Falta programación o aforo',
     },
@@ -213,7 +221,7 @@ function getCreationEventChecklist(event) {
         hasValue(event.time) &&
         hasValue(event.registrationStart) &&
         hasValue(event.registrationEnd) &&
-        Number(event.spots) > 0 &&
+        hasValidAforo(event) &&
         hasValue(event.referenceCost),
       completeLabel: 'Programación e inscripción completas',
     },
@@ -265,7 +273,24 @@ function getChecklistEventFromForm(form, event) {
         event.resources?.IMAGEN_PORTADA || hasNamedFile(form, 'coverImage'),
       ),
     },
-    spots: getNamedFormValue(form, 'capacity'),
+    aforoMaximo:
+      getNamedFormValue(form, 'capacityMode') === 'none'
+        ? null
+        : getNamedFormValue(form, 'capacity'),
+    capacityMode: getNamedFormValue(form, 'capacityMode'),
+    encuestaComentarioHabilitado: isNamedChecked(form, 'surveyCommentsEnabled'),
+    encuestaSatisfaccionHabilitada: isNamedChecked(form, 'surveyEnabled'),
+    metaAsistenciaHabilitada: isNamedChecked(form, 'attendanceGoalEnabled'),
+    metaTipo: isNamedChecked(form, 'attendanceGoalEnabled')
+      ? getNamedFormValue(form, 'attendanceGoalType')
+      : null,
+    metaValor: isNamedChecked(form, 'attendanceGoalEnabled')
+      ? getNamedFormValue(form, 'attendanceGoalValue')
+      : null,
+    spots:
+      getNamedFormValue(form, 'capacityMode') === 'none'
+        ? ''
+        : getNamedFormValue(form, 'capacity'),
     time: getNamedFormValue(form, 'eventEnd'),
     title: getNamedFormValue(form, 'title'),
     venue: getNamedFormValue(form, 'venue'),
@@ -288,11 +313,21 @@ function getNamedFormControl(form, name) {
 function getNamedFormValue(form, name) {
   const control = getNamedFormControl(form, name);
 
-  if (!control || control instanceof RadioNodeList) {
+  if (!control) {
     return '';
   }
 
+  if (control instanceof RadioNodeList) {
+    return control.value;
+  }
+
   return control.value;
+}
+
+function isNamedChecked(form, name) {
+  const control = getNamedFormControl(form, name);
+
+  return Boolean(control?.checked);
 }
 
 function hasNamedFile(form, name) {
@@ -311,7 +346,6 @@ function getMissingReviewFields(form, existingEvent = null) {
     ['eventEnd', 'Fin u hora del evento'],
     ['registrationStart', 'Inicio de inscripción'],
     ['registrationEnd', 'Fin de inscripción'],
-    ['capacity', 'Aforo máximo'],
     ['referenceCost', 'Costo referencial'],
     ['venue', 'Lugar del evento'],
     ['district', 'Distrito'],
@@ -321,6 +355,29 @@ function getMissingReviewFields(form, existingEvent = null) {
   const missingFields = requiredFields
     .filter(([fieldName]) => !hasValue(getNamedFormValue(form, fieldName)))
     .map(([, label]) => label);
+  const capacityMode = getNamedFormValue(form, 'capacityMode');
+  const attendanceGoalEnabled = isNamedChecked(form, 'attendanceGoalEnabled');
+  const attendanceGoalType = getNamedFormValue(form, 'attendanceGoalType');
+  const attendanceGoalValue = Number(getNamedFormValue(form, 'attendanceGoalValue'));
+
+  if (capacityMode !== 'none' && Number(getNamedFormValue(form, 'capacity')) <= 0) {
+    missingFields.push('Aforo máximo');
+  }
+
+  if (attendanceGoalEnabled) {
+    if (!attendanceGoalType) {
+      missingFields.push('Tipo de meta de asistencia');
+    }
+
+    if (
+      (attendanceGoalType === 'CANTIDAD_ASISTENTES' && attendanceGoalValue <= 0) ||
+      (attendanceGoalType === 'PORCENTAJE_ASISTENCIA' &&
+        (attendanceGoalValue < 1 || attendanceGoalValue > 100)) ||
+      Number.isNaN(attendanceGoalValue)
+    ) {
+      missingFields.push('Valor de meta de asistencia');
+    }
+  }
   const hasMainResource =
     hasNamedFile(form, 'coverImage') ||
     hasNamedFile(form, 'poster') ||
@@ -421,6 +478,7 @@ function AdminDashboard({ onLogout, user }) {
           >
             <a className="active" href="#datos-generales">Datos generales</a>
             <a href="#programacion">Programación</a>
+            <a href="#evaluacion">Evaluación</a>
             <a href="#ubicacion">Ubicación</a>
             <a href="#recursos">Recursos</a>
             <button
@@ -828,8 +886,132 @@ function EditIcon() {
   );
 }
 
+function EvaluationTrackingSection({
+  capacityValue = '',
+  capacityMode,
+  goalEnabled,
+  goalType = 'CANTIDAD_ASISTENTES',
+  goalValue = '',
+  surveyCommentsEnabled,
+  surveyEnabled,
+}) {
+  const hasDefinedCapacity = capacityMode !== 'none';
+  const isPercentageGoal = goalType === 'PORCENTAJE_ASISTENCIA';
+
+  return (
+    <article className="event-form-section" id="evaluacion">
+      <div className="form-section-heading">
+        <span className="section-kicker">Evaluación</span>
+        <h2>Evaluación y seguimiento</h2>
+      </div>
+      <div className="form-grid">
+        <fieldset className="form-field span-2 form-choice-group">
+          <legend>Control de aforo</legend>
+          <label>
+            <input
+              defaultChecked={hasDefinedCapacity}
+              name="capacityMode"
+              type="radio"
+              value="defined"
+            />
+            Con aforo definido
+          </label>
+          <label>
+            <input
+              defaultChecked={!hasDefinedCapacity}
+              name="capacityMode"
+              type="radio"
+              value="none"
+            />
+            Sin control de aforo
+          </label>
+        </fieldset>
+
+        {hasDefinedCapacity && (
+          <label className="form-field">
+            Aforo máximo
+            <input
+              defaultValue={capacityValue}
+              min="1"
+              name="capacity"
+              placeholder="120"
+              type="number"
+            />
+          </label>
+        )}
+
+        <label className="form-switch-field span-2">
+          <input
+            defaultChecked={goalEnabled}
+            name="attendanceGoalEnabled"
+            type="checkbox"
+          />
+          <span>
+            <strong>Definir meta de asistencia</strong>
+            <small>Opcional para reportes directivos y seguimiento posterior.</small>
+          </span>
+        </label>
+
+        {goalEnabled && (
+          <>
+            <label className="form-field">
+              Tipo de meta
+              <select defaultValue={goalType} name="attendanceGoalType">
+                <option value="CANTIDAD_ASISTENTES">Cantidad de asistentes</option>
+                <option value="PORCENTAJE_ASISTENCIA">Porcentaje de asistencia sobre inscritos</option>
+              </select>
+            </label>
+            <label className="form-field">
+              Valor de meta
+              <input
+                defaultValue={goalValue}
+                max={isPercentageGoal ? '100' : undefined}
+                min="1"
+                name="attendanceGoalValue"
+                placeholder={isPercentageGoal ? '80' : '100'}
+                type="number"
+              />
+            </label>
+          </>
+        )}
+
+        <label className="form-switch-field span-2">
+          <input
+            defaultChecked={surveyEnabled}
+            name="surveyEnabled"
+            type="checkbox"
+          />
+          <span>
+            <strong>Enviar encuesta de satisfacción al finalizar el evento</strong>
+            <small>Prepara una encuesta de 1 a 5 estrellas para una futura automatización.</small>
+          </span>
+        </label>
+
+        {surveyEnabled && (
+          <label className="form-switch-field span-2 nested-switch">
+            <input
+              defaultChecked={surveyCommentsEnabled}
+              name="surveyCommentsEnabled"
+              type="checkbox"
+            />
+            <span>
+              <strong>Permitir comentario opcional</strong>
+              <small>El ciudadano podrá agregar una breve opinión junto a su calificación.</small>
+            </span>
+          </label>
+        )}
+      </div>
+    </article>
+  );
+}
+
 function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
   const formRef = useRef(null);
+  const [capacityMode, setCapacityMode] = useState('defined');
+  const [goalEnabled, setGoalEnabled] = useState(false);
+  const [goalType, setGoalType] = useState('CANTIDAD_ASISTENTES');
+  const [surveyEnabled, setSurveyEnabled] = useState(false);
+  const [surveyCommentsEnabled, setSurveyCommentsEnabled] = useState(false);
   const [checklistEvent, setChecklistEvent] = useState(() => ({
     resources: {},
     state: 'BORRADOR',
@@ -843,6 +1025,11 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
   function syncChecklistFromForm() {
     const form = formRef.current;
 
+    setCapacityMode(getNamedFormValue(form, 'capacityMode') || 'defined');
+    setGoalEnabled(isNamedChecked(form, 'attendanceGoalEnabled'));
+    setGoalType(getNamedFormValue(form, 'attendanceGoalType') || 'CANTIDAD_ASISTENTES');
+    setSurveyEnabled(isNamedChecked(form, 'surveyEnabled'));
+    setSurveyCommentsEnabled(isNamedChecked(form, 'surveyCommentsEnabled'));
     setChecklistEvent(
       getChecklistEventFromForm(form, {
         resources: {},
@@ -948,10 +1135,6 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
                 <input name="registrationEnd" type="datetime-local" />
               </label>
               <label className="form-field">
-                Aforo máximo
-                <input min="1" name="capacity" placeholder="120" type="number" />
-              </label>
-              <label className="form-field">
                 Costo referencial
                 <input
                   min="0"
@@ -967,6 +1150,14 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
               </label>
             </div>
           </article>
+
+          <EvaluationTrackingSection
+            capacityMode={capacityMode}
+            goalEnabled={goalEnabled}
+            goalType={goalType}
+            surveyCommentsEnabled={surveyCommentsEnabled}
+            surveyEnabled={surveyEnabled}
+          />
 
           <article className="event-form-section" id="ubicacion">
             <div className="form-section-heading">
@@ -1075,6 +1266,12 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
 
 function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
   const formRef = useRef(null);
+  const initialCapacityMode = event.aforoMaximo === null ? 'none' : 'defined';
+  const [capacityMode, setCapacityMode] = useState(initialCapacityMode);
+  const [goalEnabled, setGoalEnabled] = useState(Boolean(event.metaTipo));
+  const [goalType, setGoalType] = useState(event.metaTipo ?? 'CANTIDAD_ASISTENTES');
+  const [surveyEnabled, setSurveyEnabled] = useState(Boolean(event.encuestaSatisfaccionHabilitada));
+  const [surveyCommentsEnabled, setSurveyCommentsEnabled] = useState(Boolean(event.encuestaComentarioHabilitado));
   const [checklistEvent, setChecklistEvent] = useState(() => event);
   const [hasFormChanges, setHasFormChanges] = useState(false);
   const checklist = getEventChecklist(checklistEvent, {
@@ -1086,6 +1283,11 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
 
   function syncChecklistFromForm() {
     setHasFormChanges(true);
+    setCapacityMode(getNamedFormValue(formRef.current, 'capacityMode') || 'defined');
+    setGoalEnabled(isNamedChecked(formRef.current, 'attendanceGoalEnabled'));
+    setGoalType(getNamedFormValue(formRef.current, 'attendanceGoalType') || 'CANTIDAD_ASISTENTES');
+    setSurveyEnabled(isNamedChecked(formRef.current, 'surveyEnabled'));
+    setSurveyCommentsEnabled(isNamedChecked(formRef.current, 'surveyCommentsEnabled'));
     setChecklistEvent(getChecklistEventFromForm(formRef.current, event));
   }
 
@@ -1189,15 +1391,6 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
                 />
               </label>
               <label className="form-field">
-                Aforo máximo
-                <input
-                  defaultValue={event.spots}
-                  min="1"
-                  name="capacity"
-                  type="number"
-                />
-              </label>
-              <label className="form-field">
                 Costo referencial
                 <input
                   defaultValue={event.referenceCost}
@@ -1213,6 +1406,16 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
               </label>
             </div>
           </article>
+
+          <EvaluationTrackingSection
+            capacityMode={capacityMode}
+            capacityValue={event.aforoMaximo ?? event.spots ?? ''}
+            goalEnabled={goalEnabled}
+            goalType={goalType}
+            goalValue={event.metaValor ?? ''}
+            surveyCommentsEnabled={surveyCommentsEnabled}
+            surveyEnabled={surveyEnabled}
+          />
 
           <article className="event-form-section" id="ubicacion">
             <div className="form-section-heading">
