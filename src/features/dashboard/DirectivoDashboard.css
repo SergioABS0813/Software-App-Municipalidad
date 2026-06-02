@@ -763,6 +763,20 @@
   margin-top: auto;
 }
 
+@media (max-width: 1200px) {
+  .reports-global-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .highlighted-events-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .directive-resource-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .directive-review-view {
   display: grid;
   gap: 22px;
@@ -1743,7 +1757,70 @@
   font-weight: 400;
 }
 
+@media (max-width: 1100px) {
+  .directive-shell .admin-sidebar {
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    overflow: visible;
+    position: static;
+  }
+
+  .directive-shell .admin-main {
+    min-width: 0;
+  }
+
+  .directive-shell .admin-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reports-main-table,
+  .directive-shell .admin-table {
+    overflow-x: auto;
+  }
+
+  .reports-main-table .admin-table-row {
+    min-width: 760px;
+  }
+
+  .directive-review-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .directive-review-media {
+    min-height: 220px;
+  }
+}
+
+@media (max-width: 860px) {
+  .highlighted-events-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 720px) {
+  .directive-shell .admin-main {
+    padding: 20px;
+  }
+
+  .directive-shell .admin-nav {
+    display: grid;
+    gap: 10px;
+  }
+
+  .directive-shell .admin-user-card {
+    max-width: none;
+  }
+
+  .directive-shell .admin-topbar {
+    align-items: start;
+    gap: 14px;
+  }
+
+  .directive-shell .admin-topbar-actions {
+    justify-content: flex-start;
+  }
+
   .directive-actions {
     flex-direction: column;
   }
@@ -1752,10 +1829,32 @@
   .directive-review-grid,
   .directive-resource-grid,
   .directive-decision-panel,
+  .directive-shell .admin-stats,
   .reports-global-filters,
   .highlighted-events-grid,
   .reports-filter-grid {
     grid-template-columns: 1fr;
+  }
+
+  .reports-global-filters {
+    padding: 14px;
+  }
+
+  .highlight-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
+  }
+
+  .highlight-tabs button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .reports-main-table .admin-table-row,
+  .directive-shell .admin-table-row {
+    min-width: 720px;
   }
 
   .directive-facts {

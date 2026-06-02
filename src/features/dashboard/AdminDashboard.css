@@ -4,6 +4,11 @@
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
   min-height: 100svh;
+  transition: grid-template-columns 0.22s ease;
+}
+
+.admin-shell.is-sidebar-collapsed {
+  grid-template-columns: 84px minmax(0, 1fr);
 }
 
 .admin-sidebar {
@@ -15,6 +20,92 @@
   padding: 24px;
   position: sticky;
   top: 0;
+  transition: padding 0.22s ease;
+}
+
+.sidebar-collapse-button {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  box-shadow: 0 10px 24px rgba(10, 86, 194, 0.08);
+  color: var(--brand-primary);
+  cursor: pointer;
+  display: inline-flex;
+  height: 30px;
+  justify-content: center;
+  position: absolute;
+  right: -15px;
+  top: 24px;
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+  width: 30px;
+  z-index: 5;
+}
+
+.sidebar-collapse-button:hover {
+  background: var(--brand-sky);
+  border-color: rgba(10, 86, 194, 0.24);
+  transform: translateX(-1px);
+}
+
+.sidebar-collapse-button span {
+  border-bottom: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+  display: block;
+  height: 8px;
+  transform: rotate(45deg);
+  transition: transform 0.18s ease;
+  width: 8px;
+}
+
+.admin-shell.is-sidebar-collapsed .sidebar-collapse-button span {
+  transform: rotate(-135deg);
+}
+
+.admin-shell.is-sidebar-collapsed .admin-sidebar {
+  padding: 24px 14px;
+}
+
+.admin-shell.is-sidebar-collapsed .admin-brand {
+  justify-content: center;
+  width: 100%;
+}
+
+.admin-shell.is-sidebar-collapsed .admin-brand span,
+.admin-shell.is-sidebar-collapsed .admin-user-copy {
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  white-space: nowrap;
+  width: 0;
+}
+
+.admin-shell.is-sidebar-collapsed .admin-user-card {
+  gap: 0;
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding: 10px 0;
+}
+
+.admin-shell.is-sidebar-collapsed .admin-nav a,
+.admin-shell.is-sidebar-collapsed .admin-nav-logout,
+.admin-shell.is-sidebar-collapsed .admin-nav-link {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 42px;
+  overflow: hidden;
+  padding-left: 0;
+  padding-right: 0;
+  text-indent: 120%;
+  white-space: nowrap;
+}
+
+.admin-shell.is-sidebar-collapsed .admin-nav a::first-letter,
+.admin-shell.is-sidebar-collapsed .admin-nav-logout::first-letter,
+.admin-shell.is-sidebar-collapsed .admin-nav-link::first-letter {
+  text-indent: 0;
 }
 
 .admin-brand {
@@ -91,13 +182,13 @@
 .admin-user-copy strong {
   color: var(--color-text-strong);
   font-size: 0.9rem;
-  font-weight: 820;
+  font-weight: 600;
 }
 
 .admin-user-copy small {
   color: var(--color-text-muted);
   font-size: 0.76rem;
-  font-weight: 720;
+  font-weight: 400;
 }
 
 .admin-nav {
@@ -109,23 +200,68 @@
 
 .admin-nav a,
 .admin-nav-logout,
+.admin-nav-link,
 .admin-secondary-action {
   border-radius: 8px;
-  color: var(--color-text);
-  font-weight: 750;
+  color: #334f6b;
+  font-weight: 500;
   text-decoration: none;
 }
 
 .admin-nav a,
-.admin-nav-logout {
+.admin-nav-logout,
+.admin-nav-link {
   padding: 12px 14px;
+}
+
+.admin-nav a,
+.admin-nav-link {
+  overflow: hidden;
+  position: relative;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    padding-left 160ms ease;
+}
+
+.admin-nav a::before,
+.admin-nav-link::before {
+  background: var(--brand-primary);
+  border-radius: 999px;
+  content: '';
+  height: 58%;
+  left: 8px;
+  opacity: 0;
+  position: absolute;
+  top: 21%;
+  transform: scaleY(0.4);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+  width: 3px;
 }
 
 .admin-nav a.active,
 .admin-nav a:hover,
+.admin-nav-link.active,
+.admin-nav-link:hover,
 .admin-nav-logout:hover {
+  background: rgba(224, 242, 254, 0.55);
+  color: var(--brand-primary);
+}
+
+.admin-nav a.active,
+.admin-nav-link.active {
   background: var(--brand-sky);
   color: var(--brand-primary);
+  font-weight: 650;
+  padding-left: 18px;
+}
+
+.admin-nav a.active::before,
+.admin-nav-link.active::before {
+  opacity: 1;
+  transform: scaleY(1);
 }
 
 .admin-nav-logout,
@@ -135,6 +271,12 @@
   cursor: pointer;
   font: inherit;
   text-align: left;
+}
+
+.admin-nav-logout {
+  border-top: 1px solid var(--color-border);
+  margin-top: 12px;
+  padding-top: 16px;
 }
 
 .admin-secondary-action {
@@ -1569,13 +1711,53 @@
 }
 
 @media (max-width: 1100px) {
-  .admin-shell {
+  .admin-shell,
+  .admin-shell.is-sidebar-collapsed {
     grid-template-columns: 1fr;
   }
 
   .admin-sidebar {
     min-height: auto;
     position: static;
+  }
+
+  .sidebar-collapse-button {
+    display: none;
+  }
+
+  .admin-shell.is-sidebar-collapsed .admin-sidebar {
+    padding: 24px;
+  }
+
+  .admin-shell.is-sidebar-collapsed .admin-brand {
+    justify-content: flex-start;
+    width: auto;
+  }
+
+  .admin-shell.is-sidebar-collapsed .admin-brand span,
+  .admin-shell.is-sidebar-collapsed .admin-user-copy {
+    opacity: 1;
+    overflow: hidden;
+    pointer-events: auto;
+    position: static;
+    width: auto;
+  }
+
+  .admin-shell.is-sidebar-collapsed .admin-user-card {
+    gap: 10px;
+    grid-template-columns: 40px minmax(0, 1fr);
+    justify-items: stretch;
+    padding: 12px 10px;
+  }
+
+  .admin-shell.is-sidebar-collapsed .admin-nav a,
+  .admin-shell.is-sidebar-collapsed .admin-nav-logout,
+  .admin-shell.is-sidebar-collapsed .admin-nav-link {
+    display: inline-flex;
+    justify-content: flex-start;
+    padding-left: 14px;
+    padding-right: 14px;
+    text-indent: 0;
   }
 
   .admin-nav {

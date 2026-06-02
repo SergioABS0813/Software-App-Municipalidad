@@ -469,6 +469,7 @@ function getDirectiveStateTone(state) {
 
 function DirectivoDashboard({ onLogout, user }) {
   const [currentDirectiveView, setCurrentDirectiveView] = useState('review');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [reviewFilter, setReviewFilter] = useState('TODOS');
   const [selectedReviewEvent, setSelectedReviewEvent] = useState(null);
   const [selectedReportEvent, setSelectedReportEvent] = useState(null);
@@ -494,8 +495,21 @@ function DirectivoDashboard({ onLogout, user }) {
   }
 
   return (
-    <section className="admin-shell directive-shell" aria-labelledby="directive-title">
+    <section
+      className={`admin-shell directive-shell${isSidebarCollapsed ? ' is-sidebar-collapsed' : ''}`}
+      aria-labelledby="directive-title"
+    >
       <aside className="admin-sidebar">
+        <button
+          className="sidebar-collapse-button"
+          type="button"
+          aria-label={isSidebarCollapsed ? 'Mostrar sidebar' : 'Ocultar sidebar'}
+          title={isSidebarCollapsed ? 'Mostrar sidebar' : 'Ocultar sidebar'}
+          onClick={() => setIsSidebarCollapsed((isCollapsed) => !isCollapsed)}
+        >
+          <span aria-hidden="true" />
+        </button>
+
         <button className="admin-brand" type="button" onClick={onLogout}>
           <img
             alt="Logo Municipalidad de San Miguel"

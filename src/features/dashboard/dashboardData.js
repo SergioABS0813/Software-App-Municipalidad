@@ -1,7 +1,18 @@
 import { events } from '../public-portal/data/events';
 
+function buildTodayDateTime(hours, minutes = 0) {
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+
+  return date.toISOString();
+}
+
 const eventOperationalData = [
   {
+    controlAsistenciaHabilitado: true,
+    operativeEndAt: buildTodayDateTime(23, 0),
+    operativosAsignados: ['operativo-2'],
+    operativeStartAt: buildTodayDateTime(8, 0),
     pendingItems: [],
     referenceCost: 4200,
     lastUpdatedAt: '2026-05-18T10:45:00',
@@ -15,6 +26,10 @@ const eventOperationalData = [
     },
   },
   {
+    controlAsistenciaHabilitado: true,
+    operativeEndAt: buildTodayDateTime(18, 30),
+    operativosAsignados: ['operativo-1'],
+    operativeStartAt: buildTodayDateTime(8, 30),
     pendingItems: [
       '1 observación del directivo "Mariana Fuentes".',
     ],
@@ -39,6 +54,10 @@ const eventOperationalData = [
     },
   },
   {
+    controlAsistenciaHabilitado: true,
+    operativeEndAt: buildTodayDateTime(22, 30),
+    operativosAsignados: ['operativo-1'],
+    operativeStartAt: buildTodayDateTime(18, 0),
     pendingItems: [],
     referenceCost: 6800,
     lastUpdatedAt: '2026-05-14T11:45:00',
@@ -52,6 +71,8 @@ const eventOperationalData = [
     },
   },
   {
+    controlAsistenciaHabilitado: false,
+    operativosAsignados: [],
     pendingItems: [
       'Completar punto de partida.',
       'Agregar imagen referencial.',
@@ -69,6 +90,10 @@ const eventOperationalData = [
     },
   },
   {
+    controlAsistenciaHabilitado: true,
+    operativeEndAt: buildTodayDateTime(23, 30),
+    operativosAsignados: ['operativo-1'],
+    operativeStartAt: buildTodayDateTime(6, 0),
     pendingItems: [],
     referenceCost: 2500,
     lastUpdatedAt: '2026-06-06T08:45:00',
@@ -87,6 +112,7 @@ const eventStateLabels = {
   BORRADOR: 'Borrador',
   CANCELADO: 'Cancelado',
   CERRADO: 'Cerrado',
+  EN_CURSO: 'En curso',
   EN_REVISION: 'Para revisión',
   FINALIZADO: 'Finalizado',
   OBSERVADO: 'Observado',
@@ -140,7 +166,7 @@ function calculateEventCompleteness(event) {
 }
 
 export const adminEvents = events.map((event, index) => {
-  const state = ['FINALIZADO', 'OBSERVADO_EN_REVISION', 'FINALIZADO', 'BORRADOR', 'EN_REVISION'][index];
+  const state = ['FINALIZADO', 'OBSERVADO_EN_REVISION', 'FINALIZADO', 'BORRADOR', 'PUBLICADO'][index];
   const lastUpdate = ['Hoy, 9:30 a.m.', 'Ayer, 4:10 p.m.', 'Lun, 11:20 a.m.', 'Pendiente', 'Hoy, 8:45 a.m.'][index];
   const operationalData = eventOperationalData[index];
   const adminEvent = {

@@ -393,6 +393,7 @@ function getMissingReviewFields(form, existingEvent = null) {
 
 function AdminDashboard({ onLogout, user }) {
   const [currentAdminView, setCurrentAdminView] = useState('dashboard');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [pendingEventAction, setPendingEventAction] = useState(null);
   const [validationIssue, setValidationIssue] = useState(null);
   const [selectedAdminEvent, setSelectedAdminEvent] = useState(null);
@@ -443,8 +444,21 @@ function AdminDashboard({ onLogout, user }) {
   }, [categoryFilter, searchTerm, stateFilter]);
 
   return (
-    <section className="admin-shell" aria-labelledby="admin-title">
+    <section
+      className={`admin-shell${isSidebarCollapsed ? ' is-sidebar-collapsed' : ''}`}
+      aria-labelledby="admin-title"
+    >
       <aside className="admin-sidebar">
+        <button
+          className="sidebar-collapse-button"
+          type="button"
+          aria-label={isSidebarCollapsed ? 'Mostrar sidebar' : 'Ocultar sidebar'}
+          title={isSidebarCollapsed ? 'Mostrar sidebar' : 'Ocultar sidebar'}
+          onClick={() => setIsSidebarCollapsed((isCollapsed) => !isCollapsed)}
+        >
+          <span aria-hidden="true" />
+        </button>
+
         <button className="admin-brand" type="button" onClick={onLogout}>
           <img
             alt="Logo Municipalidad de San Miguel"
