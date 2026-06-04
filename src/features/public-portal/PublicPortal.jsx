@@ -35,6 +35,82 @@ const emptyRegistration = {
   acceptsTerms: false,
 };
 
+const eventMonthIndex = {
+  abr: 3,
+  ago: 7,
+  dic: 11,
+  ene: 0,
+  feb: 1,
+  jul: 6,
+  jun: 5,
+  mar: 2,
+  may: 4,
+  nov: 10,
+  oct: 9,
+  sep: 8,
+};
+
+function parseEventDateTime(event) {
+  const dateMatch = event.date?.match(/(\d{1,2})\s+([a-záéíóúñ]{3})/i);
+
+  if (!dateMatch) {
+    return null;
+  }
+
+  const day = Number(dateMatch[1]);
+  const monthKey = dateMatch[2]
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  const month = eventMonthIndex[monthKey];
+
+  if (!Number.isFinite(day) || month === undefined) {
+    return null;
+  }
+
+  const timeMatch = event.time?.match(/(\d{1,2})(?::(\d{2}))?\s*(a\.m\.|p\.m\.)?/i);
+  let hours = timeMatch ? Number(timeMatch[1]) : 0;
+  const minutes = timeMatch?.[2] ? Number(timeMatch[2]) : 0;
+  const meridiem = timeMatch?.[3]?.toLowerCase();
+
+  if (meridiem === 'p.m.' && hours < 12) {
+    hours += 12;
+  }
+
+  if (meridiem === 'a.m.' && hours === 12) {
+    hours = 0;
+  }
+
+  const currentYear = new Date().getFullYear();
+  const eventDate = new Date(currentYear, month, day, hours, minutes);
+
+  if (Number.isNaN(eventDate.getTime())) {
+    return null;
+  }
+
+  return eventDate;
+}
+
+function getClosestStartingEvent(eventList) {
+  const now = new Date();
+  const sortedEvents = [...eventList].sort((firstEvent, secondEvent) => {
+    const firstDate = parseEventDateTime(firstEvent);
+    const secondDate = parseEventDateTime(secondEvent);
+    const firstTime = firstDate?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    const secondTime = secondDate?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    const firstIsPast = firstTime < now.getTime();
+    const secondIsPast = secondTime < now.getTime();
+
+    if (firstIsPast !== secondIsPast) {
+      return firstIsPast ? 1 : -1;
+    }
+
+    return firstTime - secondTime;
+  });
+
+  return sortedEvents[0] ?? null;
+}
+
 function PublicPortal() {
   const [currentView, setCurrentView] = useState('portal');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
@@ -63,7 +139,10 @@ function PublicPortal() {
     });
   }, [searchTerm, selectedCategory]);
 
-  const featuredEvent = filteredEvents[0] ?? events[0];
+  const featuredEvent = useMemo(
+    () => getClosestStartingEvent(filteredEvents.length > 0 ? filteredEvents : events) ?? events[0],
+    [filteredEvents],
+  );
 
   function openEventDetail(event) {
     setCurrentView('portal');
@@ -498,7 +577,7 @@ function AgendaSidebar() {
     <aside className="sidebar" id="agenda" aria-label="Resumen de agenda">
       <section className="summary-panel">
         <span className="section-kicker">Resumen</span>
-        <h2>Participacion activa</h2>
+        <h2>Participación activa</h2>
         <div className="stats-grid">
           <strong>
             {events.length}
@@ -512,7 +591,7 @@ function AgendaSidebar() {
       </section>
 
       <section className="next-panel">
-        <h2>Proximas fechas</h2>
+        <h2>Próximas fechas</h2>
         {events.slice(0, 3).map((event) => (
           <div className="mini-event" key={event.id}>
             <time>{event.date}</time>

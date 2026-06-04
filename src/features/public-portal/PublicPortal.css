@@ -122,11 +122,17 @@
 .event-card-footer button,
 .back-button,
 .category-tabs button {
-  border: 0;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
+  box-shadow: none;
   cursor: pointer;
   font-family: inherit;
-  font-weight: 750;
+  font-weight: 780;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease;
 }
 
 .hero-section {
@@ -207,10 +213,17 @@
 .search-control button,
 .event-card-footer button,
 .primary-button {
-  background: var(--brand-primary);
-  color: #ffffff;
+  background: var(--brand-soft);
+  color: var(--brand-primary);
   min-height: 48px;
   padding: 0 18px;
+}
+
+.search-control button:hover,
+.event-card-footer button:hover,
+.primary-button:hover {
+  border-color: rgba(10, 86, 194, 0.28);
+  box-shadow: 0 12px 26px rgba(10, 86, 194, 0.11);
 }
 
 .featured-event {
@@ -304,21 +317,26 @@
 
 .featured-content dl div {
   background: var(--brand-soft);
+  border: 1px solid rgba(2, 132, 199, 0.08);
   border-radius: 8px;
-  padding: 12px;
+  padding: 11px 12px;
 }
 
 .featured-content dt {
   color: var(--color-text-muted);
-  font-size: 0.72rem;
-  font-weight: 800;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
   text-transform: uppercase;
 }
 
 .featured-content dd {
-  color: var(--color-text-strong);
-  font-weight: 850;
-  margin: 4px 0 0;
+  color: #163a5c;
+  font-size: 0.95rem;
+  font-weight: 620;
+  line-height: 1.25;
+  margin: 6px 0 0;
 }
 
 .featured-action {
@@ -362,16 +380,16 @@
 .category-tabs button {
   background: #ffffff;
   border: 1px solid var(--color-border);
-  color: var(--color-text);
+  color: #334f6b;
   min-height: 40px;
   padding: 0 14px;
 }
 
 .category-tabs button.active,
 .category-tabs button:hover {
-  background: var(--brand-primary);
-  border-color: var(--brand-primary);
-  color: #ffffff;
+  background: var(--brand-sky);
+  border-color: rgba(10, 86, 194, 0.18);
+  color: var(--brand-primary);
 }
 
 .events-list {
@@ -449,6 +467,7 @@
 .summary-panel h2,
 .next-panel h2 {
   font-size: 1.35rem;
+  font-weight: 800;
 }
 
 .stats-grid {
@@ -477,8 +496,8 @@
 .mini-event {
   border-top: 1px solid var(--color-border);
   display: grid;
-  gap: 5px;
-  padding: 14px 0;
+  gap: 4px;
+  padding: 12px 0;
 }
 
 .mini-event:last-child {
@@ -487,14 +506,16 @@
 
 .mini-event time {
   color: var(--brand-accent);
-  font-size: 0.78rem;
-  font-weight: 850;
+  font-size: 0.74rem;
+  font-weight: 750;
+  line-height: 1.2;
 }
 
 .mini-event span {
-  color: var(--color-text-strong);
-  font-weight: 750;
-  line-height: 1.35;
+  color: #334f6b;
+  font-size: 0.9rem;
+  font-weight: 560;
+  line-height: 1.3;
 }
 
 .detail-shell {
@@ -505,14 +526,16 @@
 
 .back-button {
   background: #ffffff;
-  border: 1px solid var(--color-border);
-  color: var(--color-text-strong);
+  border-color: rgba(82, 107, 133, 0.18);
+  color: #334f6b;
   min-height: 42px;
   padding: 0 14px;
 }
 
 .back-button:hover {
-  background: var(--brand-sky);
+  background: #f6fbfe;
+  border-color: rgba(2, 132, 199, 0.2);
+  color: #0284c7;
 }
 
 .detail-hero {
@@ -610,20 +633,23 @@
 
 .detail-facts div {
   background: var(--brand-soft);
+  border: 1px solid rgba(2, 132, 199, 0.08);
   border-radius: 8px;
   padding: 14px;
 }
 
 .detail-facts dt {
   color: var(--color-text-muted);
-  font-size: 0.72rem;
-  font-weight: 850;
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
 .detail-facts dd {
-  color: var(--color-text-strong);
-  font-weight: 800;
+  color: #163a5c;
+  font-weight: 560;
+  line-height: 1.35;
   margin: 6px 0 0;
 }
 
@@ -671,12 +697,13 @@
 .capacity-card span {
   display: block;
   font-size: 3rem;
-  font-weight: 900;
+  font-weight: 780;
   line-height: 1;
 }
 
 .capacity-card strong {
   display: block;
+  font-weight: 650;
   margin-top: 8px;
 }
 
@@ -697,7 +724,7 @@
   display: grid;
   gap: 7px;
   font-size: 0.84rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .registration-form input {
@@ -714,7 +741,7 @@
   align-items: start;
   color: var(--color-text);
   display: grid;
-  font-weight: 650;
+  font-weight: 500;
   gap: 10px;
   grid-template-columns: auto 1fr;
   line-height: 1.45;
