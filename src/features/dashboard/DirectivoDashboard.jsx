@@ -318,7 +318,7 @@ const directiveStats = [
   },
   {
     icon: BadgeCheckIcon,
-    label: 'Aprobados del mes',
+    label: 'Publicados del mes',
     tone: 'is-month-approved',
     trend: 'aprobados en el mes actual',
     value: directiveApprovalAudit.filter((approval) =>

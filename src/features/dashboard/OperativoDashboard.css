@@ -350,6 +350,72 @@
   gap: 10px;
 }
 
+.operative-shell .admin-primary-action,
+.operative-shell .confirm-modal .primary-button:not(.danger-action) {
+  align-items: center;
+  background: var(--brand-soft);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: none;
+  color: var(--brand-primary);
+  display: inline-flex;
+  font: inherit;
+  font-weight: 780;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease;
+}
+
+.operative-shell .admin-primary-action:hover,
+.operative-shell .confirm-modal .primary-button:not(.danger-action):hover {
+  border-color: rgba(10, 86, 194, 0.28);
+  box-shadow: 0 12px 26px rgba(10, 86, 194, 0.11);
+}
+
+.operative-shell .admin-primary-action:disabled,
+.operative-shell .admin-primary-action:disabled:hover,
+.operative-shell .confirm-modal .primary-button:not(.danger-action):disabled,
+.operative-shell .confirm-modal .primary-button:not(.danger-action):disabled:hover {
+  background: #edf3f8;
+  border-color: var(--color-border);
+  box-shadow: none;
+  color: #6c8198;
+  cursor: not-allowed;
+  opacity: 0.82;
+}
+
+.operative-shell .admin-secondary-action,
+.operative-shell .confirm-modal .back-button {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid rgba(82, 107, 133, 0.18);
+  border-radius: 8px;
+  box-shadow: none;
+  color: #334f6b;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 780;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.operative-shell .admin-secondary-action:hover,
+.operative-shell .confirm-modal .back-button:hover {
+  background: #f6fbfe;
+  border-color: rgba(2, 132, 199, 0.2);
+  color: #0284c7;
+}
+
 .operative-validation-feedback {
   --feedback-bg: #eaf6ff;
   --feedback-border: rgba(2, 132, 199, 0.16);

@@ -906,7 +906,6 @@ function EvaluationTrackingSection({
   goalEnabled,
   goalType = 'CANTIDAD_ASISTENTES',
   goalValue = '',
-  surveyCommentsEnabled,
   surveyEnabled,
 }) {
   const hasDefinedCapacity = capacityMode !== 'none';
@@ -1000,20 +999,6 @@ function EvaluationTrackingSection({
             <small>Prepara una encuesta de 1 a 5 estrellas para una futura automatización.</small>
           </span>
         </label>
-
-        {surveyEnabled && (
-          <label className="form-switch-field span-2 nested-switch">
-            <input
-              defaultChecked={surveyCommentsEnabled}
-              name="surveyCommentsEnabled"
-              type="checkbox"
-            />
-            <span>
-              <strong>Permitir comentario opcional</strong>
-              <small>El ciudadano podrá agregar una breve opinión junto a su calificación.</small>
-            </span>
-          </label>
-        )}
       </div>
     </article>
   );

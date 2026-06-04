@@ -780,7 +780,6 @@ function OperativoDashboard({ onLogout, user }) {
               <span className="section-kicker">Trazabilidad</span>
               <h2>Validaciones recientes</h2>
             </div>
-            <span className="directive-badge">{selectedEvent?.title}</span>
           </div>
 
           <div className="admin-table operative-validation-table">
