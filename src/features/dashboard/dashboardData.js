@@ -141,6 +141,7 @@ function calculateEventCompleteness(event) {
   const checklist = [
     hasData(event.title),
     hasData(event.category),
+    hasData(event.descripcion_breve),
     hasData(event.description),
     hasData(event.organizer),
     hasData(event.audience),

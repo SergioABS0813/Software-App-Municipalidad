@@ -21,6 +21,8 @@ export const events = [
     aforoMaximo: null,
     spots: 120,
     status: 'Inscripción abierta',
+    descripcion_breve:
+      'Música, danza y feria de emprendimientos locales para vecinos y visitantes.',
     summary:
       'Música, danza y feria de emprendimientos locales para vecinos y visitantes.',
     accent: 'coral',
@@ -34,6 +36,14 @@ export const events = [
     agenda: ['Recepción ciudadana', 'Presentaciones artísticas', 'Feria vecinal', 'Cierre musical'],
     accessibility: 'Ingreso accesible y zona preferencial para adultos mayores.',
     recursos: [
+      {
+        recurso_id: 6,
+        tipo_recurso: 'PORTADA',
+        url_recurso: eventReviewPlaceholder,
+        nombre_archivo: 'portada-festival-cultural-barrial.png',
+        fecha_subida: '2026-05-20T09:40:00',
+        evento_id: 1,
+      },
       {
         recurso_id: 1,
         tipo_recurso: 'AFICHE',
@@ -63,6 +73,8 @@ export const events = [
     aforoMaximo: 35,
     spots: 35,
     status: 'Cupos limitados',
+    descripcion_breve:
+      'Sesión introductoria para aprender pasos básicos y preparar una muestra vecinal.',
     summary:
       'Sesión introductoria para aprender pasos básicos y preparar una muestra vecinal.',
     accent: 'teal',
@@ -75,6 +87,16 @@ export const events = [
     requirements: ['Ropa cómoda', 'DNI o carnet escolar', 'Autorización del apoderado para menores'],
     agenda: ['Calentamiento', 'Pasos base', 'Práctica guiada', 'Ensayo final'],
     accessibility: 'Aula en primer piso con apoyo del personal municipal.',
+    recursos: [
+      {
+        recurso_id: 7,
+        tipo_recurso: 'PORTADA',
+        url_recurso: eventReviewPlaceholder,
+        nombre_archivo: 'portada-taller-marinera.png',
+        fecha_subida: '2026-05-22T11:00:00',
+        evento_id: 2,
+      },
+    ],
   },
   {
     id: 3,
@@ -87,6 +109,8 @@ export const events = [
     aforoMaximo: 200,
     spots: 200,
     status: 'Entrada libre',
+    descripcion_breve:
+      'Proyección nocturna con zona de descanso, orientación municipal y actividades previas.',
     summary:
       'Proyección nocturna con zona de descanso, orientación municipal y actividades previas.',
     accent: 'indigo',
@@ -99,6 +123,16 @@ export const events = [
     requirements: ['Ingreso por orden de llegada', 'Menores acompañados', 'Traer manta o silla plegable'],
     agenda: ['Apertura del parque', 'Dinámica familiar', 'Proyección', 'Salida asistida'],
     accessibility: 'Espacios delimitados para coches de bebé y movilidad reducida.',
+    recursos: [
+      {
+        recurso_id: 8,
+        tipo_recurso: 'PORTADA',
+        url_recurso: eventReviewPlaceholder,
+        nombre_archivo: 'portada-cine-familiar.png',
+        fecha_subida: '2026-05-24T15:00:00',
+        evento_id: 3,
+      },
+    ],
   },
   {
     id: 4,
@@ -111,6 +145,8 @@ export const events = [
     aforoMaximo: null,
     spots: 80,
     status: 'Inscripción abierta',
+    descripcion_breve:
+      'Ruta recreativa para promover vida saludable y participación ciudadana.',
     summary:
       'Ruta recreativa para promover vida saludable y participación ciudadana.',
     accent: 'lime',
@@ -123,6 +159,16 @@ export const events = [
     requirements: ['DNI vigente', 'Declaración de salud', 'Zapatillas deportivas'],
     agenda: ['Entrega de dorsales', 'Calentamiento', 'Partida 5K', 'Hidratación y cierre'],
     accessibility: 'Ruta señalizada con personal de apoyo en cada tramo.',
+    recursos: [
+      {
+        recurso_id: 9,
+        tipo_recurso: 'PORTADA',
+        url_recurso: eventReviewPlaceholder,
+        nombre_archivo: 'portada-carrera-vecinal.png',
+        fecha_subida: '2026-05-25T10:30:00',
+        evento_id: 4,
+      },
+    ],
   },
   {
     id: 5,
@@ -135,6 +181,8 @@ export const events = [
     aforoMaximo: 60,
     spots: 60,
     status: 'Registro requerido',
+    descripcion_breve:
+      'Encuentro para conectar iniciativas sociales con vecinos interesados en colaborar.',
     summary:
       'Encuentro para conectar iniciativas sociales con vecinos interesados en colaborar.',
     accent: 'gold',
@@ -147,5 +195,15 @@ export const events = [
     requirements: ['DNI vigente', 'Disponibilidad para futuras convocatorias', 'Correo de contacto'],
     agenda: ['Bienvenida institucional', 'Presentación de iniciativas', 'Registro de intereses', 'Cierre de acuerdos'],
     accessibility: 'Auditorio con ascensor y asientos reservados.',
+    recursos: [
+      {
+        recurso_id: 10,
+        tipo_recurso: 'PORTADA',
+        url_recurso: eventReviewPlaceholder,
+        nombre_archivo: 'portada-voluntariado-local.png',
+        fecha_subida: '2026-05-26T12:20:00',
+        evento_id: 5,
+      },
+    ],
   },
 ];

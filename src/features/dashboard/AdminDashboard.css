@@ -1234,6 +1234,13 @@
   opacity: 1;
 }
 
+.form-field small {
+  color: #6c8198;
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
 .form-choice-group {
   background: var(--brand-soft);
   border: 1px solid var(--color-border);

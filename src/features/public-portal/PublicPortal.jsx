@@ -184,6 +184,29 @@ function getResourceUrl(resource) {
   return resource?.url_recurso ?? resource?.url ?? '';
 }
 
+function getEventCoverResource(event) {
+  const resources = Array.isArray(event.recursos)
+    ? event.recursos
+    : Array.isArray(event.resources)
+      ? event.resources
+      : [];
+
+  return resources.find((resource) => {
+    const resourceType = resource.tipo_recurso?.toUpperCase();
+    return resourceType === 'PORTADA' || resourceType === 'IMAGEN_PORTADA';
+  });
+}
+
+function getEventCoverUrl(event) {
+  const coverResource = getEventCoverResource(event);
+
+  return getResourceUrl(coverResource) || event.imageUrl || '';
+}
+
+function getEventShortDescription(event) {
+  return event.descripcion_breve || event.descripcion || event.summary || event.description || '';
+}
+
 function getVideoEmbedUrl(url) {
   if (!url) {
     return null;
@@ -664,7 +687,7 @@ function PortalHome({
           <h1 id="portal-title">Encuentra actividades cerca de ti</h1>
           <p>
             Explora eventos culturales, deportivos y comunitarios organizados
-            por tu municipalidad. Revisa cupos, horarios y lugares en un solo
+            en San Miguel. Revisa cupos, horarios y lugares en un solo
             espacio.
           </p>
 
@@ -692,7 +715,7 @@ function PortalHome({
           <div className="featured-content">
             <span>{featuredEvent.status}</span>
             <h2>{featuredEvent.title}</h2>
-            <p>{featuredEvent.summary}</p>
+            <p>{getEventShortDescription(featuredEvent)}</p>
             <dl>
               <div>
                 <dt>Fecha</dt>
@@ -742,27 +765,30 @@ function PortalHome({
           </div>
 
           <div className="events-list">
-            {filteredEvents.map((event) => (
+            {filteredEvents.map((event) => {
+              const coverUrl = getEventCoverUrl(event);
+              const shortDescription = getEventShortDescription(event);
+
+              return (
               <article className="event-card" key={event.id}>
                 <div className={`event-card-media media-${event.accent}`}>
-                  <span>{event.category}</span>
+                  {coverUrl && <img alt="" src={coverUrl} />}
                 </div>
                 <div className="event-card-body">
-                  <div className="event-card-meta">
-                    <span>{event.date}</span>
-                    <span>{event.time}</span>
-                  </div>
+                  <time>{event.date}</time>
                   <h3>{event.title}</h3>
-                  <p>{event.summary}</p>
-                  <div className="event-card-footer">
-                    <span>{event.venue}</span>
-                    <button type="button" onClick={() => onEventSelect(event)}>
-                      Ver detalle
-                    </button>
-                  </div>
+                  <p>{shortDescription}</p>
+                  <span>{event.venue}</span>
+                </div>
+                <div className="event-card-action">
+                  <time>{event.time}</time>
+                  <button type="button" onClick={() => onEventSelect(event)}>
+                    Ver detalle
+                  </button>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -775,21 +801,6 @@ function PortalHome({
 function AgendaSidebar() {
   return (
     <aside className="sidebar" id="agenda" aria-label="Resumen de agenda">
-      <section className="summary-panel">
-        <span className="section-kicker">Resumen</span>
-        <h2>Participación activa</h2>
-        <div className="stats-grid">
-          <strong>
-            {events.length}
-            <span>Eventos</span>
-          </strong>
-          <strong>
-            495
-            <span>Cupos</span>
-          </strong>
-        </div>
-      </section>
-
       <section className="next-panel">
         <h2>Próximas fechas</h2>
         {events.slice(0, 3).map((event) => (
@@ -939,7 +950,7 @@ function EventDetail({
             </button>
 
             <h1 id="event-detail-title">{event.title}</h1>
-            <p>{event.description}</p>
+            <p>{getEventShortDescription(event)}</p>
             <div className="detail-quick-meta" aria-label="Datos rápidos del evento">
               <span>
                 <CalendarClockIcon />

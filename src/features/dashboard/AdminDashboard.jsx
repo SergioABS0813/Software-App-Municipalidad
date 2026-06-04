@@ -151,6 +151,7 @@ function getEventChecklist(event, options = {}) {
         hasValue(event.title) &&
         hasValue(event.category) &&
         hasValue(event.organizer) &&
+        hasValue(event.descripcion_breve) &&
         hasValue(event.description),
       completeLabel: 'Datos generales completos',
       pendingLabel: 'Faltan datos generales',
@@ -212,6 +213,7 @@ function getCreationEventChecklist(event) {
         hasValue(event.title) &&
         hasValue(event.category) &&
         hasValue(event.organizer) &&
+        hasValue(event.descripcion_breve) &&
         hasValue(event.description),
       completeLabel: 'Datos generales completos',
     },
@@ -260,6 +262,7 @@ function getChecklistEventFromForm(form, event) {
     address: getNamedFormValue(form, 'address'),
     category: getNamedFormValue(form, 'category'),
     date: getNamedFormValue(form, 'eventStart'),
+    descripcion_breve: getNamedFormValue(form, 'descripcion_breve'),
     description: getNamedFormValue(form, 'description'),
     district: getNamedFormValue(form, 'district'),
     organizer: getNamedFormValue(form, 'area'),
@@ -340,8 +343,9 @@ function getMissingReviewFields(form, existingEvent = null) {
   const requiredFields = [
     ['title', 'Título del evento'],
     ['category', 'Categoría'],
-    ['area', 'Area responsable'],
-    ['description', 'Descripcion'],
+    ['area', 'Área responsable'],
+    ['descripcion_breve', 'Descripción breve'],
+    ['description', 'Descripción'],
     ['eventStart', 'Inicio o fecha del evento'],
     ['eventEnd', 'Fin u hora del evento'],
     ['registrationStart', 'Inicio de inscripción'],
@@ -355,10 +359,15 @@ function getMissingReviewFields(form, existingEvent = null) {
   const missingFields = requiredFields
     .filter(([fieldName]) => !hasValue(getNamedFormValue(form, fieldName)))
     .map(([, label]) => label);
+  const shortDescription = getNamedFormValue(form, 'descripcion_breve');
   const capacityMode = getNamedFormValue(form, 'capacityMode');
   const attendanceGoalEnabled = isNamedChecked(form, 'attendanceGoalEnabled');
   const attendanceGoalType = getNamedFormValue(form, 'attendanceGoalType');
   const attendanceGoalValue = Number(getNamedFormValue(form, 'attendanceGoalValue'));
+
+  if (shortDescription.length > 255) {
+    missingFields.push('Descripción breve de máximo 255 caracteres');
+  }
 
   if (capacityMode !== 'none' && Number(getNamedFormValue(form, 'capacity')) <= 0) {
     missingFields.push('Aforo máximo');
@@ -1092,20 +1101,32 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
                 </select>
               </label>
               <label className="form-field">
-                Area responsable
+                Área responsable
                 <select defaultValue="" name="area">
-                  <option disabled value="">Seleccionar area</option>
+                  <option disabled value="">Seleccionar área</option>
                   <option>Cultura</option>
-                  <option>Participacion Vecinal</option>
+                  <option>Participación Vecinal</option>
                   <option>Deporte</option>
                   <option>Comunicaciones</option>
                 </select>
               </label>
               <label className="form-field span-2">
+                Descripción breve
+                <textarea
+                  maxLength={255}
+                  name="descripcion_breve"
+                  placeholder="Resumen corto para la agenda y cabecera del evento."
+                  rows={3}
+                />
+                <small>
+                  Resumen corto que se mostrará en la agenda y en la cabecera del evento. Máximo 255 caracteres.
+                </small>
+              </label>
+              <label className="form-field span-2">
                 Descripción
                 <textarea
                   name="description"
-                  placeholder="Describe el objetivo, publico y actividades principales del evento."
+                  placeholder="Describe el objetivo, público y actividades principales del evento."
                 />
               </label>
             </div>
@@ -1351,6 +1372,18 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
                   <option>Deporte</option>
                   <option>Comunicaciones</option>
                 </select>
+              </label>
+              <label className="form-field span-2">
+                Descripción breve
+                <textarea
+                  defaultValue={event.descripcion_breve ?? event.summary ?? ''}
+                  maxLength={255}
+                  name="descripcion_breve"
+                  rows={3}
+                />
+                <small>
+                  Resumen corto que se mostrará en la agenda y en la cabecera del evento. Máximo 255 caracteres.
+                </small>
               </label>
               <label className="form-field span-2">
                 Descripción
