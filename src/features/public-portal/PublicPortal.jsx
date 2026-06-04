@@ -477,7 +477,7 @@ function PortalHeader({ onHome, onLogin }) {
       </button>
 
       <nav className="portal-nav" aria-label="Navegacion principal">
-        <a href="#eventos">Eventos</a>
+        <a href="#eventos">Agenda</a>
         <button type="button" onClick={onLogin}>
           Ingresar
         </button>
@@ -679,19 +679,69 @@ function PortalHome({
   onEventSelect,
   onSearchChange,
 }) {
+  const featuredCoverUrl = getEventCoverUrl(featuredEvent);
+
   return (
     <>
       <section className="hero-section" aria-labelledby="portal-title">
         <div className="hero-copy">
           <span className="section-kicker">Agenda municipal</span>
-          <h1 id="portal-title">Encuentra actividades cerca de ti</h1>
+          <h1 id="portal-title">Encuentra actividades en San Miguel</h1>
           <p>
             Explora eventos culturales, deportivos y comunitarios organizados
             en San Miguel. Revisa cupos, horarios y lugares en un solo
             espacio.
           </p>
+          <a className="agenda-jump-link" href="#agenda-eventos">
+            Explorar agenda <span aria-hidden="true">↓</span>
+          </a>
+        </div>
 
-          <form className="search-panel" role="search">
+        <article className={`featured-event media-${featuredEvent.accent}`}>
+          <div className="event-visual" aria-hidden="true">
+            {featuredCoverUrl && <img alt="" src={featuredCoverUrl} />}
+            <span>{featuredEvent.category}</span>
+          </div>
+          <div className="featured-content">
+            <div className="featured-labels">
+              <span className="featured-kicker">Próximo evento</span>
+              <span className="featured-status">{featuredEvent.status}</span>
+            </div>
+            <h2>{featuredEvent.title}</h2>
+            <p>{getEventShortDescription(featuredEvent)}</p>
+            <div className="featured-event-meta" aria-label="Datos rápidos del próximo evento">
+              <span>
+                <CalendarClockIcon />
+                {featuredEvent.date} · {featuredEvent.time}
+              </span>
+              <span>
+                <UsersIcon />
+                {featuredEvent.spots} cupos disponibles
+              </span>
+            </div>
+            <button
+              className="primary-button featured-action"
+              type="button"
+              onClick={() => onEventSelect(featuredEvent)}
+            >
+              Ver detalle
+            </button>
+          </div>
+        </article>
+      </section>
+
+      <span className="section-anchor" id="eventos" aria-hidden="true" />
+      <section className="content-grid" id="agenda-eventos">
+        <div className="events-area">
+          <div className="section-heading">
+            <div>
+              <span className="section-kicker">Eventos disponibles</span>
+              <h2>Agenda para ciudadanos</h2>
+            </div>
+            <p>{filteredEvents.length} actividades encontradas</p>
+          </div>
+
+          <form className="search-panel agenda-search-panel" role="search">
             <label htmlFor="event-search">Buscar evento</label>
             <div className="search-control">
               <input
@@ -706,50 +756,6 @@ function PortalHome({
               </button>
             </div>
           </form>
-        </div>
-
-        <article className={`featured-event media-${featuredEvent.accent}`}>
-          <div className="event-visual" aria-hidden="true">
-            <span>{featuredEvent.category}</span>
-          </div>
-          <div className="featured-content">
-            <span>{featuredEvent.status}</span>
-            <h2>{featuredEvent.title}</h2>
-            <p>{getEventShortDescription(featuredEvent)}</p>
-            <dl>
-              <div>
-                <dt>Fecha</dt>
-                <dd>{featuredEvent.date}</dd>
-              </div>
-              <div>
-                <dt>Hora</dt>
-                <dd>{featuredEvent.time}</dd>
-              </div>
-              <div>
-                <dt>Cupos</dt>
-                <dd>{featuredEvent.spots}</dd>
-              </div>
-            </dl>
-            <button
-              className="primary-button featured-action"
-              type="button"
-              onClick={() => onEventSelect(featuredEvent)}
-            >
-              Ver detalle
-            </button>
-          </div>
-        </article>
-      </section>
-
-      <section className="content-grid" id="eventos">
-        <div className="events-area">
-          <div className="section-heading">
-            <div>
-              <span className="section-kicker">Eventos disponibles</span>
-              <h2>Agenda para ciudadanos</h2>
-            </div>
-            <p>{filteredEvents.length} actividades encontradas</p>
-          </div>
 
           <div className="category-tabs" aria-label="Filtrar por categoria">
             {eventCategories.map((category) => (
