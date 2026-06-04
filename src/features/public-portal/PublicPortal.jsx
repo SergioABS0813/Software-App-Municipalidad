@@ -35,6 +35,8 @@ const emptyRegistration = {
   acceptsTerms: false,
 };
 
+const eventsListPath = '/eventos';
+
 const eventMonthIndex = {
   abr: 3,
   ago: 7,
@@ -91,6 +93,38 @@ function parseEventDateTime(event) {
   return eventDate;
 }
 
+function parseEventDurationMinutes(duration) {
+  const hoursMatch = duration?.match(/(\d+(?:[.,]\d+)?)\s*hora/i);
+  const minutesMatch = duration?.match(/(\d+)\s*min/i);
+  const hours = hoursMatch ? Number(hoursMatch[1].replace(',', '.')) : 0;
+  const minutes = minutesMatch ? Number(minutesMatch[1]) : 0;
+  const totalMinutes = hours * 60 + minutes;
+
+  return totalMinutes > 0 ? totalMinutes : null;
+}
+
+function formatEventClock(date) {
+  const hours24 = date.getHours();
+  const minutes = date.getMinutes();
+  const period = hours24 >= 12 ? 'p.m.' : 'a.m.';
+  const hours12 = hours24 % 12 || 12;
+
+  return `${hours12}:${String(minutes).padStart(2, '0')} ${period}`;
+}
+
+function getEventScheduleLabel(event) {
+  const startDate = parseEventDateTime(event);
+  const durationMinutes = parseEventDurationMinutes(event.duration);
+
+  if (!startDate || !durationMinutes) {
+    return `${event.date} · ${event.time}`;
+  }
+
+  const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
+
+  return `${event.date} · ${formatEventClock(startDate)} - ${formatEventClock(endDate)}`;
+}
+
 function getClosestStartingEvent(eventList) {
   const now = new Date();
   const sortedEvents = [...eventList].sort((firstEvent, secondEvent) => {
@@ -111,6 +145,123 @@ function getClosestStartingEvent(eventList) {
   return sortedEvents[0] ?? null;
 }
 
+function getEventMapsUrl(event) {
+  const locationQuery = [event.address, event.venue].filter(Boolean).join(', ');
+
+  if (!locationQuery) {
+    return null;
+  }
+
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationQuery)}`;
+}
+
+const eventMaterialPriority = {
+  AFICHE: 0,
+  VIDEO: 1,
+};
+
+function getEventMaterialResources(event) {
+  const resources = Array.isArray(event.recursos)
+    ? event.recursos
+    : Array.isArray(event.resources)
+      ? event.resources
+      : [];
+
+  return resources
+    .map((resource) => ({
+      ...resource,
+      tipo_recurso: resource.tipo_recurso?.toUpperCase(),
+    }))
+    .filter((resource) => resource.tipo_recurso in eventMaterialPriority)
+    .sort(
+      (firstResource, secondResource) =>
+        eventMaterialPriority[firstResource.tipo_recurso] -
+        eventMaterialPriority[secondResource.tipo_recurso],
+    );
+}
+
+function getResourceUrl(resource) {
+  return resource?.url_recurso ?? resource?.url ?? '';
+}
+
+function getVideoEmbedUrl(url) {
+  if (!url) {
+    return null;
+  }
+
+  try {
+    const parsedUrl = new URL(url);
+    const host = parsedUrl.hostname.replace(/^www\./, '');
+
+    if (host === 'youtu.be') {
+      const videoId = parsedUrl.pathname.split('/').filter(Boolean)[0];
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+    }
+
+    if (host === 'youtube.com' || host === 'm.youtube.com') {
+      if (parsedUrl.pathname.startsWith('/embed/')) {
+        return url;
+      }
+
+      const videoId = parsedUrl.searchParams.get('v');
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+    }
+
+    if (host === 'vimeo.com') {
+      const videoId = parsedUrl.pathname.split('/').filter(Boolean)[0];
+      return videoId ? `https://player.vimeo.com/video/${videoId}` : null;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function isDirectVideoUrl(url) {
+  return /\.(mp4|webm|ogg)(?:\?.*)?$/i.test(url);
+}
+
+function getAvailabilityState(spots) {
+  const availableSpots = Number(spots) || 0;
+
+  if (availableSpots <= 0) {
+    return {
+      isAvailable: false,
+      label: 'Sin cupos disponibles',
+      tone: 'empty',
+    };
+  }
+
+  if (availableSpots <= 5) {
+    return {
+      isAvailable: true,
+      label: `Últimos ${availableSpots} cupos`,
+      tone: 'low',
+    };
+  }
+
+  return {
+    isAvailable: true,
+    label: `${availableSpots} cupos`,
+    tone: 'available',
+  };
+}
+
+function getCurrentInternalPath() {
+  return `${window.location.pathname}${window.location.search}` || eventsListPath;
+}
+
+function getSafeEventsOriginPath() {
+  const currentPath = getCurrentInternalPath();
+
+  if (currentPath === '/' || currentPath.startsWith('/eventos/')) {
+    return eventsListPath;
+  }
+
+  return currentPath;
+}
+
 function PublicPortal() {
   const [currentView, setCurrentView] = useState('portal');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
@@ -121,6 +272,7 @@ function PublicPortal() {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [receiptCode, setReceiptCode] = useState('');
   const [authenticatedUser, setAuthenticatedUser] = useState(null);
+  const [detailOriginPath, setDetailOriginPath] = useState(eventsListPath);
 
   const filteredEvents = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -145,6 +297,8 @@ function PublicPortal() {
   );
 
   function openEventDetail(event) {
+    const from = getSafeEventsOriginPath();
+
     setCurrentView('portal');
     setSelectedEvent(event);
     setRegistration(emptyRegistration);
@@ -152,10 +306,19 @@ function PublicPortal() {
     setIsConfirmOpen(false);
     setReceiptCode('');
     setAuthenticatedUser(null);
+    setDetailOriginPath(from);
+    window.history.pushState(
+      { from },
+      '',
+      `/eventos/${event.id}`,
+    );
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function closeEventDetail() {
+    const fallbackPath =
+      detailOriginPath || window.history.state?.from || eventsListPath;
+
     setCurrentView('portal');
     setSelectedEvent(null);
     setRegistration(emptyRegistration);
@@ -163,18 +326,14 @@ function PublicPortal() {
     setIsConfirmOpen(false);
     setReceiptCode('');
     setAuthenticatedUser(null);
+    window.history.pushState(null, '', fallbackPath);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  function updateRegistration(field, value) {
-    setRegistration((currentRegistration) => ({
-      ...currentRegistration,
-      [field]: value,
-    }));
   }
 
   function submitRegistration(event) {
     event.preventDefault();
+    // TODO: conectar con la sesión ciudadana: si no hay vecino autenticado,
+    // abrir login/modal; si ya inició sesión, confirmar con los datos de su perfil.
     setIsConfirmOpen(true);
   }
 
@@ -183,7 +342,9 @@ function PublicPortal() {
       return;
     }
 
-    const documentSuffix = registration.documentNumber.slice(-4).padStart(4, '0');
+    const documentSuffix = registration.documentNumber
+      ? registration.documentNumber.slice(-4).padStart(4, '0')
+      : 'PERFIL';
 
     setReceiptCode(`EC-${selectedEvent?.id ?? '000'}-${documentSuffix}`);
     setIsRegistered(true);
@@ -249,9 +410,7 @@ function PublicPortal() {
           ) : (
             <EventDetail
               event={selectedEvent}
-              registration={registration}
               onBack={closeEventDetail}
-              onFieldChange={updateRegistration}
               onSubmit={submitRegistration}
             />
           )}
@@ -296,8 +455,6 @@ function PortalHeader({ onHome, onLogin }) {
 
       <nav className="portal-nav" aria-label="Navegacion principal">
         <a href="#eventos">Eventos</a>
-        <a href="#agenda">Agenda</a>
-        <a href="#ayuda">Ayuda</a>
         <button type="button" onClick={onLogin}>
           Ingresar
         </button>
@@ -332,7 +489,7 @@ function LoginView({ onBack, onLoginSuccess }) {
     );
 
     if (!user) {
-      setLoginError('Credenciales incorrectas. Verifica el correo y la contrasena.');
+      setLoginError('Credenciales incorrectas. Verifica el correo y la contraseña.');
       return;
     }
 
@@ -357,7 +514,7 @@ function LoginView({ onBack, onLoginSuccess }) {
         >
           <div className="login-title">
             <span>Portal de eventos</span>
-            <h1 id="login-title">Iniciar sesion</h1>
+            <h1 id="login-title">Iniciar sesión</h1>
             <p>Accede con tus credenciales institucionales.</p>
           </div>
 
@@ -385,7 +542,7 @@ function LoginView({ onBack, onLoginSuccess }) {
               />
               <button
                 aria-label={
-                  isPasswordVisible ? 'Ocultar contrasena' : 'Mostrar contrasena'
+                  isPasswordVisible ? 'Ocultar contraseña' : 'Mostrar contraseña'
                 }
                 className="password-toggle"
                 type="button"
@@ -443,6 +600,49 @@ function EyeOffIcon() {
       <path d="M9.7 5.9A10.1 10.1 0 0 1 12 5.6c6 0 9.2 6.4 9.2 6.4a16.6 16.6 0 0 1-3 3.8" />
       <path d="M14.2 14.2A3 3 0 0 1 9.8 9.8" />
       <path d="M6.5 7.6A16.6 16.6 0 0 0 2.8 12s3.2 6.4 9.2 6.4c1.1 0 2.1-.2 3-.6" />
+    </svg>
+  );
+}
+
+function CalendarClockIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M7 3v3M17 3v3M4 9h18M6 5h12a2 2 0 0 1 2 2v10.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" />
+      <path d="M12 13v3l2 1" />
+    </svg>
+  );
+}
+
+function MapPinIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" />
+      <path d="M12 10.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />
+    </svg>
+  );
+}
+
+function UsersIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M16 19v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V19" />
+      <path d="M9.5 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM21 19v-1.2a3.5 3.5 0 0 0-2.7-3.4M16.5 4.4a3 3 0 0 1 0 5.8" />
+    </svg>
+  );
+}
+
+function BuildingIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M4 21h16M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2" />
+    </svg>
+  );
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg aria-hidden="true" className="reservation-external-icon" viewBox="0 0 24 24">
+      <path d="M14 4h6v6M10 14 20 4M20 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5" />
     </svg>
   );
 }
@@ -603,163 +803,271 @@ function AgendaSidebar() {
   );
 }
 
+function EventMaterialSection({ event }) {
+  const materialResources = getEventMaterialResources(event);
+  const [activeMaterialType, setActiveMaterialType] = useState('AFICHE');
+
+  if (materialResources.length === 0) {
+    return null;
+  }
+
+  const availableTypes = materialResources.map((resource) => resource.tipo_recurso);
+  const hasMultipleResources = materialResources.length > 1;
+  const selectedType = availableTypes.includes(activeMaterialType)
+    ? activeMaterialType
+    : availableTypes[0];
+  const selectedResource =
+    materialResources.find((resource) => resource.tipo_recurso === selectedType) ??
+    materialResources[0];
+
+  return (
+    <section className="detail-section event-material-section">
+      <div className="section-heading compact">
+        <div>
+          <span className="section-kicker">Material del evento</span>
+          <h2>Afiche y contenido informativo</h2>
+        </div>
+      </div>
+
+      {hasMultipleResources && (
+        <div className="event-material-tabs" aria-label="Seleccionar material del evento">
+          {materialResources.map((resource) => (
+            <button
+              className={selectedType === resource.tipo_recurso ? 'active' : ''}
+              key={resource.recurso_id ?? resource.tipo_recurso}
+              type="button"
+              onClick={() => setActiveMaterialType(resource.tipo_recurso)}
+            >
+              {resource.tipo_recurso === 'AFICHE' ? 'Afiche oficial' : 'Video'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <EventMaterialPreview resource={selectedResource} />
+    </section>
+  );
+}
+
+function EventMaterialPreview({ resource }) {
+  if (resource.tipo_recurso === 'AFICHE') {
+    return <EventPosterPreview resource={resource} />;
+  }
+
+  return <EventVideoPreview resource={resource} />;
+}
+
+function EventPosterPreview({ resource }) {
+  const posterUrl = getResourceUrl(resource);
+
+  return (
+    <div className="event-poster-preview">
+      <img alt={resource.nombre_archivo ?? 'Afiche oficial del evento'} src={posterUrl} />
+      <a href={posterUrl} rel="noopener noreferrer" target="_blank">
+        Ver afiche completo
+      </a>
+    </div>
+  );
+}
+
+function EventVideoPreview({ resource }) {
+  const videoUrl = getResourceUrl(resource);
+  const embedUrl = getVideoEmbedUrl(videoUrl);
+
+  if (embedUrl) {
+    return (
+      <div className="event-video-preview">
+        <iframe
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          src={embedUrl}
+          title={resource.nombre_archivo ?? 'Video del evento'}
+        />
+      </div>
+    );
+  }
+
+  if (isDirectVideoUrl(videoUrl)) {
+    return (
+      <div className="event-video-preview">
+        <video controls src={videoUrl}>
+          <a href={videoUrl} rel="noopener noreferrer" target="_blank">
+            Ver video
+          </a>
+        </video>
+      </div>
+    );
+  }
+
+  return (
+    <div className="event-video-link-card">
+      <strong>Video del evento</strong>
+      <p>Abre el contenido informativo en una nueva pestaña.</p>
+      <a href={videoUrl} rel="noopener noreferrer" target="_blank">
+        Ver video
+      </a>
+    </div>
+  );
+}
+
 function EventDetail({
   event,
-  registration,
   onBack,
-  onFieldChange,
   onSubmit,
 }) {
+  const mapsUrl = getEventMapsUrl(event);
+  const scheduleLabel = getEventScheduleLabel(event);
+  const availabilityState = getAvailabilityState(event.spots);
+
   return (
     <section className="detail-shell" aria-labelledby="event-detail-title">
-      <button className="back-button" type="button" onClick={onBack}>
-        Volver a eventos
-      </button>
-
       <div className="detail-hero">
-        <div className={`detail-media media-${event.accent}`} aria-hidden="true">
+        <div className={`detail-media media-${event.accent}`}>
+          {event.imageUrl ? (
+            <img alt="" src={event.imageUrl} />
+          ) : null}
           <span>{event.category}</span>
-        </div>
-        <div className="detail-heading">
-          <span className="section-kicker">{event.status}</span>
-          <h1 id="event-detail-title">{event.title}</h1>
-          <p>{event.description}</p>
         </div>
       </div>
 
       <div className="detail-layout">
-        <div className="detail-main">
-          <section className="detail-section">
-            <div className="section-heading compact">
-              <div>
-                <span className="section-kicker">Informacion del evento</span>
-                <h2>Datos principales</h2>
-              </div>
-            </div>
-            <dl className="detail-facts">
-              <div>
-                <dt>Fecha</dt>
-                <dd>{event.date}</dd>
-              </div>
-              <div>
-                <dt>Hora</dt>
-                <dd>{event.time}</dd>
-              </div>
-              <div>
-                <dt>Duracion</dt>
-                <dd>{event.duration}</dd>
-              </div>
-              <div>
-                <dt>Lugar</dt>
-                <dd>{event.venue}</dd>
-              </div>
-              <div>
-                <dt>Direccion</dt>
-                <dd>{event.address}</dd>
-              </div>
-              <div>
-                <dt>Dirigido a</dt>
-                <dd>{event.audience}</dd>
-              </div>
-            </dl>
-          </section>
+        <div className="detail-content">
+          <div className="detail-heading">
+            <button className="detail-back-link" type="button" onClick={onBack}>
+              <span aria-hidden="true">←</span>
+              Volver a eventos
+            </button>
 
-          <section className="detail-section two-columns">
-            <div>
-              <span className="section-kicker">Antes de asistir</span>
-              <h2>Requisitos</h2>
-              <ul className="check-list">
-                {event.requirements.map((requirement) => (
-                  <li key={requirement}>{requirement}</li>
-                ))}
-              </ul>
+            <h1 id="event-detail-title">{event.title}</h1>
+            <p>{event.description}</p>
+            <div className="detail-quick-meta" aria-label="Datos rápidos del evento">
+              <span>
+                <CalendarClockIcon />
+                {scheduleLabel}
+              </span>
+              {mapsUrl ? (
+                <a href={mapsUrl} rel="noopener noreferrer" target="_blank">
+                  <MapPinIcon />
+                  {event.venue}
+                </a>
+              ) : (
+                <span>
+                  <MapPinIcon />
+                  {event.venue}
+                </span>
+              )}
             </div>
-            <div>
-              <span className="section-kicker">Programa</span>
-              <h2>Agenda prevista</h2>
-              <ol className="timeline-list">
-                {event.agenda.map((agendaItem) => (
-                  <li key={agendaItem}>{agendaItem}</li>
-                ))}
-              </ol>
-            </div>
-          </section>
-
-          <section className="detail-section">
-            <span className="section-kicker">Accesibilidad</span>
-            <h2>Condiciones de atencion</h2>
-            <p className="detail-note">{event.accessibility}</p>
-          </section>
-        </div>
-
-        <aside className="registration-panel" aria-label="Registro al evento">
-          <div className="capacity-card">
-            <span>{event.spots}</span>
-            <strong>Cupos disponibles</strong>
-            <p>{event.organizer}</p>
           </div>
 
-          <form className="registration-form" onSubmit={onSubmit}>
-            <span className="section-kicker">Preinscripcion</span>
-            <h2>Reserva tu participacion</h2>
-            <label>
-              Nombre completo
-              <input
-                required
-                value={registration.fullName}
-                onChange={(inputEvent) =>
-                  onFieldChange('fullName', inputEvent.target.value)
-                }
-              />
-            </label>
-            <label>
-              DNI
-              <input
-                required
-                inputMode="numeric"
-                maxLength="8"
-                minLength="8"
-                value={registration.documentNumber}
-                onChange={(inputEvent) =>
-                  onFieldChange('documentNumber', inputEvent.target.value)
-                }
-              />
-            </label>
-            <label>
-              Correo
-              <input
-                required
-                type="email"
-                value={registration.email}
-                onChange={(inputEvent) =>
-                  onFieldChange('email', inputEvent.target.value)
-                }
-              />
-            </label>
-            <label>
-              Celular
-              <input
-                required
-                inputMode="tel"
-                value={registration.phone}
-                onChange={(inputEvent) =>
-                  onFieldChange('phone', inputEvent.target.value)
-                }
-              />
-            </label>
-            <label className="terms-control">
-              <input
-                required
-                type="checkbox"
-                checked={registration.acceptsTerms}
-                onChange={(inputEvent) =>
-                  onFieldChange('acceptsTerms', inputEvent.target.checked)
-                }
-              />
-              Acepto el uso de mis datos para gestionar mi participacion.
-            </label>
-            <button className="primary-button" type="submit">
-              Confirmar registro
+          <div className="detail-main">
+            <section className="detail-section two-columns">
+              <div>
+                <span className="section-kicker">Antes de asistir</span>
+                <h2>Requisitos</h2>
+                <ul className="check-list">
+                  {event.requirements.map((requirement) => (
+                    <li key={requirement}>{requirement}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <span className="section-kicker">Programa</span>
+                <h2>Agenda prevista</h2>
+                <ol className="timeline-list">
+                  {event.agenda.map((agendaItem) => (
+                    <li key={agendaItem}>{agendaItem}</li>
+                  ))}
+                </ol>
+              </div>
+            </section>
+
+            <EventMaterialSection event={event} />
+          </div>
+        </div>
+
+        <aside className="reservation-card" aria-label="Reserva al evento">
+          <div className="reservation-card-header">
+            <span className="section-kicker">PREINSCRIPCIÓN</span>
+            <h2>Reserva tu participación</h2>
+          </div>
+
+          <div className={`reservation-availability ${availabilityState.tone}`}>
+            <strong>{availabilityState.label}</strong>
+            <span>
+              {availabilityState.isAvailable
+                ? 'Disponibles para este evento'
+                : 'No hay disponibilidad por ahora'}
+            </span>
+          </div>
+
+          <div className="reservation-info-list">
+            <div className="reservation-info-row is-muted-value">
+              <span className="reservation-icon">
+                <CalendarClockIcon />
+              </span>
+              <div className="reservation-info-text">
+                <span>Fecha y hora</span>
+                <strong>{scheduleLabel}</strong>
+              </div>
+            </div>
+
+            {mapsUrl ? (
+              <a
+                className="reservation-info-row reservation-location-link"
+                href={mapsUrl}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                <span className="reservation-icon">
+                  <MapPinIcon />
+                </span>
+                <div className="reservation-info-text">
+                  <span>Ubicación</span>
+                  <strong>{event.venue}</strong>
+                  {event.address && <small>{event.address}</small>}
+                </div>
+                <ExternalLinkIcon />
+              </a>
+            ) : (
+              <div className="reservation-info-row">
+                <span className="reservation-icon">
+                  <MapPinIcon />
+                </span>
+                <div className="reservation-info-text">
+                  <span>Ubicación</span>
+                  <strong>{event.venue}</strong>
+                </div>
+              </div>
+            )}
+
+            <div className="reservation-info-row is-muted-value">
+              <span className="reservation-icon">
+                <UsersIcon />
+              </span>
+              <div className="reservation-info-text">
+                <span>Dirigido a</span>
+                <strong>{event.audience}</strong>
+              </div>
+            </div>
+
+            <div className="reservation-info-row is-muted-value">
+              <span className="reservation-icon">
+                <BuildingIcon />
+              </span>
+              <div className="reservation-info-text">
+                <span>Área responsable</span>
+                <strong>{event.organizer}</strong>
+              </div>
+            </div>
+          </div>
+
+          <form className="reservation-action" onSubmit={onSubmit}>
+            <button
+              className="primary-button reservation-button"
+              disabled={!availabilityState.isAvailable}
+              type="submit"
+            >
+              Reservar un lugar
             </button>
           </form>
         </aside>
@@ -777,20 +1085,20 @@ function ConfirmRegistrationModal({ eventTitle, onCancel, onConfirm }) {
         className="confirm-modal"
         role="dialog"
       >
-        <span className="section-kicker">Confirmar inscripcion</span>
+        <span className="section-kicker">Confirmar inscripción</span>
         <h2 id="confirm-registration-title">
-          Estas seguro de inscribirte al evento "{eventTitle}"?
+          ¿Estás seguro de inscribirte al evento "{eventTitle}"?
         </h2>
         <p>
-          Al confirmar se generara tu constancia de inscripcion y se enviara una
-          copia al correo registrado.
+          Al confirmar se generará tu constancia de inscripción usando los datos
+          de tu perfil ciudadano.
         </p>
         <div className="modal-actions">
           <button className="back-button" type="button" onClick={onCancel}>
-            Revisar datos
+            Volver al evento
           </button>
           <button className="primary-button" type="button" onClick={onConfirm}>
-            Si, inscribirme
+            Sí, inscribirme
           </button>
         </div>
       </section>
@@ -813,11 +1121,11 @@ function RegistrationReceipt({ event, receiptCode, registration, onBack, onPrint
       <article className="receipt-card">
         <header className="receipt-header">
           <div>
-            <span className="section-kicker">Constancia de inscripcion</span>
-            <h1 id="receipt-title">Inscripcion confirmada</h1>
+            <span className="section-kicker">Constancia de inscripción</span>
+            <h1 id="receipt-title">Inscripción confirmada</h1>
             <p>
-              Tu constancia fue generada correctamente. Tambien se enviara una
-              copia al correo {registration.email}.
+              Tu constancia fue generada correctamente. También se enviará una
+              copia al correo de tu perfil ciudadano.
             </p>
           </div>
           <HardcodedQrCode value={receiptCode} />
@@ -828,11 +1136,11 @@ function RegistrationReceipt({ event, receiptCode, registration, onBack, onPrint
         <dl className="receipt-details">
           <div>
             <dt>Participante</dt>
-            <dd>{registration.fullName}</dd>
+            <dd>{registration.fullName || 'Vecino autenticado'}</dd>
           </div>
           <div>
             <dt>DNI</dt>
-            <dd>{registration.documentNumber}</dd>
+            <dd>{registration.documentNumber || 'Desde perfil ciudadano'}</dd>
           </div>
           <div>
             <dt>Evento</dt>
@@ -849,14 +1157,14 @@ function RegistrationReceipt({ event, receiptCode, registration, onBack, onPrint
             <dd>{event.venue}</dd>
           </div>
           <div>
-            <dt>Direccion</dt>
+            <dt>Dirección</dt>
             <dd>{event.address}</dd>
           </div>
         </dl>
 
         <div className="receipt-note">
-          Presenta esta constancia o el codigo QR en el punto de control del
-          evento. El envio de correo requiere integracion con backend en la
+          Presenta esta constancia o el código QR en el punto de control del
+          evento. El envío de correo requiere integración con backend en la
           siguiente etapa.
         </div>
       </article>
