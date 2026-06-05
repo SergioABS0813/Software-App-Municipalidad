@@ -15,14 +15,18 @@ const eventOperationalData = [
     operativeStartAt: buildTodayDateTime(8, 0),
     pendingItems: [],
     referenceCost: 4200,
+    ubicacion_id: 2,
+    publico_tipo: 'GENERAL',
+    edad_minima: null,
+    edad_maxima: null,
     lastUpdatedAt: '2026-05-18T10:45:00',
     locationReference: 'Ingreso por la puerta principal de la plaza.',
     registrationEnd: '2026-06-07T18:00',
     registrationStart: '2026-05-20T09:00',
     resources: {
       AFICHE: true,
-      DOCUMENTO: true,
       IMAGEN_PORTADA: true,
+      VIDEO: true,
     },
   },
   {
@@ -43,14 +47,18 @@ const eventOperationalData = [
       role: 'Directivo',
     },
     referenceCost: 1800,
+    ubicacion_id: 1,
+    publico_tipo: 'OBJETIVO',
+    edad_minima: 13,
+    edad_maxima: 25,
     lastUpdatedAt: '2026-06-05T10:40:00',
     locationReference: 'Aula 2, primer piso.',
     registrationEnd: '2026-06-10T12:00',
     registrationStart: '2026-05-22T09:00',
     resources: {
       AFICHE: false,
-      DOCUMENTO: true,
       IMAGEN_PORTADA: true,
+      VIDEO: false,
     },
   },
   {
@@ -60,14 +68,18 @@ const eventOperationalData = [
     operativeStartAt: buildTodayDateTime(18, 0),
     pendingItems: [],
     referenceCost: 6800,
+    ubicacion_id: 3,
+    publico_tipo: 'GENERAL',
+    edad_minima: null,
+    edad_maxima: null,
     lastUpdatedAt: '2026-05-14T11:45:00',
     locationReference: 'Zona central del parque, modulo municipal.',
     registrationEnd: '2026-06-14T16:00',
     registrationStart: '2026-05-24T09:00',
     resources: {
       AFICHE: true,
-      DOCUMENTO: true,
       IMAGEN_PORTADA: true,
+      VIDEO: true,
     },
   },
   {
@@ -79,14 +91,18 @@ const eventOperationalData = [
       'Definir fechas de inscripción.',
     ],
     referenceCost: 3600,
+    ubicacion_id: '',
+    publico_tipo: 'OBJETIVO',
+    edad_minima: 15,
+    edad_maxima: 60,
     lastUpdatedAt: '2026-06-07T16:15:00',
     locationReference: '',
     registrationEnd: '',
     registrationStart: '',
     resources: {
       AFICHE: false,
-      DOCUMENTO: false,
       IMAGEN_PORTADA: true,
+      VIDEO: false,
     },
   },
   {
@@ -96,14 +112,18 @@ const eventOperationalData = [
     operativeStartAt: buildTodayDateTime(6, 0),
     pendingItems: [],
     referenceCost: 2500,
+    ubicacion_id: 4,
+    publico_tipo: 'OBJETIVO',
+    edad_minima: 18,
+    edad_maxima: 120,
     lastUpdatedAt: '2026-06-06T08:45:00',
     locationReference: '',
     registrationEnd: '2026-06-18T18:00',
     registrationStart: '2026-05-28T09:00',
     resources: {
       AFICHE: true,
-      DOCUMENTO: false,
       IMAGEN_PORTADA: true,
+      VIDEO: false,
     },
   },
 ];
@@ -137,6 +157,25 @@ function hasCapacity(event) {
   return Number(event.aforoMaximo ?? event.spots) > 0;
 }
 
+function hasAudienceConfig(event) {
+  const audienceType = event.publico_tipo ?? 'GENERAL';
+
+  if (audienceType === 'GENERAL') {
+    return true;
+  }
+
+  const minAge = Number(event.edad_minima);
+  const maxAge = Number(event.edad_maxima);
+
+  return (
+    Number.isFinite(minAge) &&
+    Number.isFinite(maxAge) &&
+    minAge >= 0 &&
+    maxAge > minAge &&
+    maxAge <= 120
+  );
+}
+
 function calculateEventCompleteness(event) {
   const checklist = [
     hasData(event.title),
@@ -149,17 +188,16 @@ function calculateEventCompleteness(event) {
     hasData(event.time),
     hasData(event.duration),
     hasCapacity(event),
+    hasData(event.publico_tipo),
+    hasAudienceConfig(event),
     hasData(event.registrationStart),
     hasData(event.registrationEnd),
-    hasData(event.venue),
-    hasData(event.district),
-    hasData(event.address),
-    hasData(event.locationReference),
+    hasData(event.ubicacion_id),
     hasData(event.requirements),
     hasData(event.agenda),
     hasData(event.accessibility),
     Boolean(event.resources?.IMAGEN_PORTADA),
-    Boolean(event.resources?.AFICHE || event.resources?.DOCUMENTO),
+    Boolean(event.resources?.AFICHE),
   ];
   const completedItems = checklist.filter(Boolean).length;
 

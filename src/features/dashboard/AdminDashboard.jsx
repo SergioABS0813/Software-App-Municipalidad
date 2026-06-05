@@ -82,6 +82,201 @@ const adminNotifications = [
 
 const stateOptions = ['Todos', ...new Set(adminEvents.map((event) => event.state))];
 const categoryOptions = ['Todas', ...new Set(adminEvents.map((event) => event.category))];
+const eventFormSections = [
+  { id: 'datos-generales', label: 'Datos generales' },
+  { id: 'programacion', label: 'Programación' },
+  { id: 'evaluacion', label: 'Evaluación' },
+  { id: 'contenido-evento', label: 'Contenido' },
+  { id: 'ubicacion', label: 'Ubicación' },
+  { id: 'recursos', label: 'Recursos' },
+];
+
+// TODO: reemplazar este mock por el catálogo de áreas municipales desde Spring Boot.
+const areasMunicipales = [
+  {
+    area_municipal_id: 1,
+    nombre: 'Gerencia de Desarrollo Social',
+    tipo_area: 'GERENCIA',
+    organizar_eventos: true,
+  },
+  {
+    area_municipal_id: 2,
+    nombre: 'Subgerencia de Bienestar Social y DEMUNA',
+    tipo_area: 'SUBGERENCIA',
+    organizar_eventos: true,
+  },
+  {
+    area_municipal_id: 3,
+    nombre: 'Subgerencia de Educación y Cultura',
+    tipo_area: 'SUBGERENCIA',
+    organizar_eventos: true,
+  },
+  {
+    area_municipal_id: 4,
+    nombre: 'Subgerencia de Deporte y Recreación',
+    tipo_area: 'SUBGERENCIA',
+    organizar_eventos: true,
+  },
+  {
+    area_municipal_id: 5,
+    nombre: 'Oficina de Participación Vecinal',
+    tipo_area: 'OFICINA',
+    organizar_eventos: true,
+  },
+  {
+    area_municipal_id: 6,
+    nombre: 'Gerencia de Salud',
+    tipo_area: 'GERENCIA',
+    organizar_eventos: true,
+  },
+  {
+    area_municipal_id: 7,
+    nombre: 'Subgerencia de Vigilancia Sanitaria y Zoonosis',
+    tipo_area: 'SUBGERENCIA',
+    organizar_eventos: true,
+  },
+  {
+    area_municipal_id: 8,
+    nombre: 'Subgerencia de Programas Alimentarios',
+    tipo_area: 'SUBGERENCIA',
+    organizar_eventos: true,
+  },
+  {
+    area_municipal_id: 9,
+    nombre: 'Gerencia de Desarrollo Económico y Cooperación',
+    tipo_area: 'GERENCIA',
+    organizar_eventos: true,
+  },
+  {
+    area_municipal_id: 10,
+    nombre: 'Subgerencia de Licencias y Comercio',
+    tipo_area: 'SUBGERENCIA',
+    organizar_eventos: true,
+  },
+  {
+    area_municipal_id: 11,
+    nombre: 'Subgerencia de Innovación',
+    tipo_area: 'SUBGERENCIA',
+    organizar_eventos: true,
+  },
+];
+
+const eventOrganizerAreas = areasMunicipales.filter((area) => area.organizar_eventos === true);
+
+const initialNeighborAccounts = [
+  {
+    id: 1,
+    dni: '12345678',
+    nombres: 'Sergio André',
+    apellidos: 'Bustamante Villanueva',
+    nombreCompleto: 'Sergio André Bustamante Villanueva',
+    correo: 'vecino@gmail.com',
+    celular: '987654321',
+    fechaNacimiento: '1998-04-16',
+    estado: 'ACTIVO',
+    fechaRegistro: '2026-06-01',
+    fechaConfirmacionCorreo: '2026-06-01',
+    inscripciones: [
+      {
+        asistencia: 'Pendiente',
+        codigoInscripcion: 'EC-1-PERFIL',
+        estadoInscripcion: 'Confirmada',
+        evento: 'Festival Cultural Barrial',
+        fechaEvento: 'Sáb, 08 jun',
+      },
+      {
+        asistencia: 'Validada',
+        codigoInscripcion: 'EC-2-5678',
+        estadoInscripcion: 'Confirmada',
+        evento: 'Taller de Marinera',
+        fechaEvento: 'Mié, 12 jun',
+      },
+      {
+        asistencia: 'Pendiente',
+        codigoInscripcion: 'EC-5-5678',
+        estadoInscripcion: 'Confirmada',
+        evento: 'Voluntariado Local',
+        fechaEvento: 'Vie, 21 jun',
+      },
+    ],
+  },
+  {
+    id: 2,
+    dni: '87654321',
+    nombres: 'María Fernanda',
+    apellidos: 'López Ramos',
+    nombreCompleto: 'María Fernanda López Ramos',
+    correo: 'maria@gmail.com',
+    celular: '999888777',
+    fechaNacimiento: '2001-09-20',
+    estado: 'PENDIENTE_CONFIRMACION',
+    fechaRegistro: '2026-06-02',
+    fechaConfirmacionCorreo: '',
+    inscripciones: [],
+  },
+  {
+    id: 3,
+    dni: '11223344',
+    nombres: 'Carlos Alberto',
+    apellidos: 'Ruiz Medina',
+    nombreCompleto: 'Carlos Alberto Ruiz Medina',
+    correo: 'carlos@gmail.com',
+    celular: '988776655',
+    fechaNacimiento: '1985-02-10',
+    estado: 'BLOQUEADO',
+    fechaRegistro: '2026-05-28',
+    fechaConfirmacionCorreo: '2026-05-28',
+    motivoBloqueo: 'Uso indebido de reservas',
+    inscripciones: [],
+  },
+];
+
+const neighborStatusOptions = [
+  { label: 'Todos', value: 'TODOS' },
+  { label: 'Activo', value: 'ACTIVO' },
+  { label: 'Pendiente de confirmación', value: 'PENDIENTE_CONFIRMACION' },
+  { label: 'Bloqueado', value: 'BLOQUEADO' },
+  { label: 'Inactivo', value: 'INACTIVO' },
+];
+// TODO: cargar este catálogo desde el CRUD real de ubicaciones en Spring Boot.
+const registeredLocations = [
+  {
+    ubicacion_id: 1,
+    nombre_lugar: 'Casa de la Juventud',
+    distrito: 'San Miguel',
+    direccion: 'Av. Universitaria 1801',
+    referencia: 'Frente al parque, ingreso por puerta principal',
+    latitud: -12.0765,
+    longitud: -77.0831,
+  },
+  {
+    ubicacion_id: 2,
+    nombre_lugar: 'Plaza principal',
+    distrito: 'San Miguel',
+    direccion: 'Av. La Marina 2000',
+    referencia: 'Zona central de la plaza',
+    latitud: -12.0782,
+    longitud: -77.0851,
+  },
+  {
+    ubicacion_id: 3,
+    nombre_lugar: 'Parque Media Luna',
+    distrito: 'San Miguel',
+    direccion: 'Malecón Bertolotto 610',
+    referencia: 'Módulo municipal junto al ingreso peatonal',
+    latitud: -12.0876,
+    longitud: -77.0936,
+  },
+  {
+    ubicacion_id: 4,
+    nombre_lugar: 'Complejo Deportivo Municipal',
+    distrito: 'San Miguel',
+    direccion: 'Av. Costanera 1250',
+    referencia: 'Ingreso por la puerta norte',
+    latitud: -12.0899,
+    longitud: -77.0812,
+  },
+];
 const fallbackAdminUser = {
   email: 'admin@munisanmiguel.gob.pe',
   fullName: 'Sergio Bustamante',
@@ -121,6 +316,108 @@ function getUserInitials(name) {
   return `${nameParts[0][0] ?? ''}${nameParts.at(-1)?.[0] ?? ''}`.toUpperCase();
 }
 
+function getNeighborStateLabel(state) {
+  const labels = {
+    ACTIVO: 'Activo',
+    BLOQUEADO: 'Bloqueado',
+    INACTIVO: 'Inactivo',
+    PENDIENTE_CONFIRMACION: 'Pendiente',
+  };
+
+  return labels[state] ?? state;
+}
+
+function getNeighborStateTone(state) {
+  const tones = {
+    ACTIVO: 'neighbor-active',
+    BLOQUEADO: 'neighbor-blocked',
+    INACTIVO: 'neighbor-inactive',
+    PENDIENTE_CONFIRMACION: 'neighbor-pending',
+  };
+
+  return tones[state] ?? 'neighbor-inactive';
+}
+
+function getRegisteredLocationById(locationId) {
+  return registeredLocations.find(
+    (location) => String(location.ubicacion_id) === String(locationId),
+  );
+}
+
+function getLocationMapEmbedUrl(location) {
+  if (!location?.latitud || !location?.longitud) {
+    return '';
+  }
+
+  // TODO: reemplazar por URL oficial/clave configurada si el backend provee mapas reales.
+  return `https://maps.google.com/maps?q=${location.latitud},${location.longitud}&z=16&output=embed`;
+}
+
+function getVideoPreviewEmbedUrl(url) {
+  if (!url) {
+    return '';
+  }
+
+  try {
+    const parsedUrl = new URL(url);
+    const host = parsedUrl.hostname.replace(/^www\./, '');
+
+    if (host === 'youtu.be') {
+      const videoId = parsedUrl.pathname.split('/').filter(Boolean)[0];
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : '';
+    }
+
+    if (host === 'youtube.com' || host === 'm.youtube.com') {
+      if (parsedUrl.pathname.startsWith('/embed/')) {
+        return url;
+      }
+
+      const videoId = parsedUrl.searchParams.get('v');
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : '';
+    }
+  } catch {
+    return '';
+  }
+
+  return '';
+}
+
+function normalizeOrderedEventItems(items = []) {
+  return items
+    .map((item, index) => {
+      const descripcion =
+        typeof item === 'string' ? item : item?.descripcion ?? item?.description ?? '';
+
+      return {
+        descripcion: String(descripcion).trim(),
+        orden: Number(item?.orden ?? index + 1),
+      };
+    })
+    .filter((item) => item.descripcion.length > 0)
+    .sort((firstItem, secondItem) => firstItem.orden - secondItem.orden)
+    .map((item, index) => ({
+      ...item,
+      orden: index + 1,
+    }));
+}
+
+function parseOrderedEventItems(value) {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsedItems = JSON.parse(value);
+    return Array.isArray(parsedItems) ? normalizeOrderedEventItems(parsedItems) : [];
+  } catch {
+    return [];
+  }
+}
+
+function hasValidOrderedItems(items) {
+  return normalizeOrderedEventItems(items).length > 0;
+}
+
 function formatUserRole(role) {
   const roleLabels = {
     ADMINISTRADOR: 'Administrador',
@@ -143,14 +440,185 @@ function hasValidAforo(event) {
   return Number(event.aforoMaximo ?? event.spots) > 0;
 }
 
+function hasValidAudienceConfig(event) {
+  const audienceType = event.publico_tipo ?? 'GENERAL';
+
+  if (audienceType === 'GENERAL') {
+    return true;
+  }
+
+  const minAge = Number(event.edad_minima);
+  const maxAge = Number(event.edad_maxima);
+
+  return (
+    Number.isFinite(minAge) &&
+    Number.isFinite(maxAge) &&
+    minAge >= 0 &&
+    maxAge > minAge &&
+    maxAge <= 120
+  );
+}
+
+function getAudienceLabel(event) {
+  const audienceType = event.publico_tipo ?? (event.edad_minima || event.edad_maxima ? 'OBJETIVO' : 'GENERAL');
+
+  if (audienceType === 'OBJETIVO' && hasValidAudienceConfig({ ...event, publico_tipo: 'OBJETIVO' })) {
+    return `${event.edad_minima}-${event.edad_maxima} años`;
+  }
+
+  return 'Público general';
+}
+
+function normalizeSearchText(value = '') {
+  return value
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function getMunicipalAreaById(areaId) {
+  return eventOrganizerAreas.find(
+    (area) => String(area.area_municipal_id) === String(areaId),
+  );
+}
+
+function getMunicipalAreaByEvent(event) {
+  if (event?.area_municipal_id) {
+    return getMunicipalAreaById(event.area_municipal_id);
+  }
+
+  const organizerText = normalizeSearchText(event?.organizer ?? '');
+
+  if (!organizerText) {
+    return null;
+  }
+
+  return (
+    eventOrganizerAreas.find((area) => normalizeSearchText(area.nombre) === organizerText) ??
+    eventOrganizerAreas.find((area) => normalizeSearchText(area.nombre).includes(organizerText)) ??
+    eventOrganizerAreas.find((area) => organizerText.includes(normalizeSearchText(area.nombre))) ??
+    eventOrganizerAreas.find((area) => {
+      const areaText = normalizeSearchText(area.nombre);
+
+      return ['cultura', 'deporte', 'participacion', 'salud', 'comercio', 'innovacion'].some(
+        (keyword) => organizerText.includes(keyword) && areaText.includes(keyword),
+      );
+    }) ??
+    null
+  );
+}
+
+function getDateTimeLocalValue(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value) ? value.slice(0, 16) : '';
+}
+
+function formatDateToDateTimeLocal(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function parsePublicEventDateTime(dateLabel = '', timeLabel = '') {
+  const directValue = getDateTimeLocalValue(dateLabel);
+
+  if (directValue) {
+    return directValue;
+  }
+
+  const monthMap = {
+    abr: 3,
+    ago: 7,
+    dic: 11,
+    ene: 0,
+    feb: 1,
+    jul: 6,
+    jun: 5,
+    mar: 2,
+    may: 4,
+    nov: 10,
+    oct: 9,
+    sep: 8,
+  };
+  const normalizedDate = normalizeSearchText(dateLabel);
+  const normalizedTime = normalizeSearchText(timeLabel);
+  const dateMatch = normalizedDate.match(/(\d{1,2})\s+([a-z]{3})/);
+  const timeMatch = normalizedTime.match(/(\d{1,2}):(\d{2})\s*([ap])\.?m/);
+
+  if (!dateMatch || !timeMatch) {
+    return '';
+  }
+
+  const day = Number(dateMatch[1]);
+  const month = monthMap[dateMatch[2]];
+  let hours = Number(timeMatch[1]);
+  const minutes = Number(timeMatch[2]);
+  const meridiem = timeMatch[3];
+
+  if (meridiem === 'p' && hours < 12) {
+    hours += 12;
+  }
+
+  if (meridiem === 'a' && hours === 12) {
+    hours = 0;
+  }
+
+  if (!Number.isFinite(day) || month === undefined) {
+    return '';
+  }
+
+  return formatDateToDateTimeLocal(new Date(new Date().getFullYear(), month, day, hours, minutes));
+}
+
+function parseDurationMinutes(durationLabel = '') {
+  const normalizedDuration = normalizeSearchText(durationLabel);
+  const hourMatch = normalizedDuration.match(/(\d+)\s*hora/);
+  const minuteMatch = normalizedDuration.match(/(\d+)\s*min/);
+
+  return (Number(hourMatch?.[1] ?? 0) * 60) + Number(minuteMatch?.[1] ?? 0);
+}
+
+function getEventStartDateTimeValue(event) {
+  return getDateTimeLocalValue(event.date) || parsePublicEventDateTime(event.date, event.time);
+}
+
+function getEventEndDateTimeValue(event) {
+  const directEndValue = getDateTimeLocalValue(event.time);
+
+  if (directEndValue) {
+    return directEndValue;
+  }
+
+  const startValue = getEventStartDateTimeValue(event);
+  const durationMinutes = parseDurationMinutes(event.duration);
+
+  if (!startValue || durationMinutes <= 0) {
+    return startValue;
+  }
+
+  const endDate = new Date(startValue);
+  endDate.setMinutes(endDate.getMinutes() + durationMinutes);
+
+  return formatDateToDateTimeLocal(endDate);
+}
+
 function getEventChecklist(event, options = {}) {
   const observationAddressed = options.observationAddressed ?? false;
+  const resolvedAreaId = event.area_municipal_id ?? getMunicipalAreaByEvent(event)?.area_municipal_id;
   const checks = [
     {
       complete:
         hasValue(event.title) &&
         hasValue(event.category) &&
-        hasValue(event.organizer) &&
+        hasValue(resolvedAreaId) &&
         hasValue(event.descripcion_breve) &&
         hasValue(event.description),
       completeLabel: 'Datos generales completos',
@@ -162,17 +630,26 @@ function getEventChecklist(event, options = {}) {
         hasValue(event.time) &&
         hasValue(event.registrationStart) &&
         hasValue(event.registrationEnd) &&
+        hasValue(event.publico_tipo) &&
+        hasValidAudienceConfig(event) &&
         hasValidAforo(event),
       completeLabel: 'Fechas e inscripción completas',
       pendingLabel: 'Falta programación o aforo',
     },
     {
-      complete:
-        hasValue(event.venue) &&
-        hasValue(event.district) &&
-        hasValue(event.address),
+      complete: hasValue(event.ubicacion_id),
       completeLabel: 'Ubicación registrada',
       pendingLabel: 'Falta completar ubicación',
+    },
+    {
+      complete: hasValidOrderedItems(event.agenda_evento ?? event.agenda),
+      completeLabel: 'Agenda del evento registrada',
+      pendingLabel: 'Falta agenda del evento',
+    },
+    {
+      complete: hasValidOrderedItems(event.requisitos_evento ?? event.requirements),
+      completeLabel: 'Requisitos registrados',
+      pendingLabel: 'Faltan requisitos del evento',
     },
     {
       complete: Boolean(event.resources?.IMAGEN_PORTADA || event.resources?.AFICHE),
@@ -207,12 +684,13 @@ function getEventChecklist(event, options = {}) {
 }
 
 function getCreationEventChecklist(event) {
+  const resolvedAreaId = event.area_municipal_id ?? getMunicipalAreaByEvent(event)?.area_municipal_id;
   const checks = [
     {
       complete:
         hasValue(event.title) &&
         hasValue(event.category) &&
-        hasValue(event.organizer) &&
+        hasValue(resolvedAreaId) &&
         hasValue(event.descripcion_breve) &&
         hasValue(event.description),
       completeLabel: 'Datos generales completos',
@@ -224,16 +702,22 @@ function getCreationEventChecklist(event) {
         hasValue(event.registrationStart) &&
         hasValue(event.registrationEnd) &&
         hasValidAforo(event) &&
-        hasValue(event.referenceCost),
+        hasValue(event.referenceCost) &&
+        hasValue(event.publico_tipo) &&
+        hasValidAudienceConfig(event),
       completeLabel: 'Programación e inscripción completas',
     },
     {
-      complete:
-        hasValue(event.venue) &&
-        hasValue(event.district) &&
-        hasValue(event.address) &&
-        hasValue(event.locationReference),
+      complete: hasValue(event.ubicacion_id),
       completeLabel: 'Ubicación registrada',
+    },
+    {
+      complete: hasValidOrderedItems(event.agenda_evento ?? event.agenda),
+      completeLabel: 'Agenda del evento registrada',
+    },
+    {
+      complete: hasValidOrderedItems(event.requisitos_evento ?? event.requirements),
+      completeLabel: 'Requisitos registrados',
     },
     {
       complete: Boolean(event.resources?.IMAGEN_PORTADA || event.resources?.AFICHE),
@@ -257,15 +741,38 @@ function getChecklistEventFromForm(form, event) {
     return event;
   }
 
+  const selectedLocationId = getNamedFormValue(form, 'ubicacion_id');
+  const selectedLocation = getRegisteredLocationById(selectedLocationId);
+  const agendaItems = parseOrderedEventItems(getNamedFormValue(form, 'agenda_evento_json'));
+  const requirementItems = parseOrderedEventItems(
+    getNamedFormValue(form, 'requisitos_evento_json'),
+  );
+  const audienceType = getNamedFormValue(form, 'publico_tipo') || 'GENERAL';
+  const ageMin = audienceType === 'OBJETIVO' ? getNamedFormValue(form, 'edad_minima') : '';
+  const ageMax = audienceType === 'OBJETIVO' ? getNamedFormValue(form, 'edad_maxima') : '';
+  const selectedAreaId = getNamedFormValue(form, 'area_municipal_id');
+  const selectedArea = getMunicipalAreaById(selectedAreaId);
+
   return {
     ...event,
-    address: getNamedFormValue(form, 'address'),
+    address: selectedLocation?.direccion ?? '',
+    agenda: agendaItems.map((item) => item.descripcion),
+    agenda_evento: agendaItems,
+    audience: getAudienceLabel({
+      edad_maxima: ageMax,
+      edad_minima: ageMin,
+      publico_tipo: audienceType,
+    }),
     category: getNamedFormValue(form, 'category'),
     date: getNamedFormValue(form, 'eventStart'),
     descripcion_breve: getNamedFormValue(form, 'descripcion_breve'),
     description: getNamedFormValue(form, 'description'),
-    district: getNamedFormValue(form, 'district'),
-    organizer: getNamedFormValue(form, 'area'),
+    district: selectedLocation?.distrito ?? '',
+    edad_maxima: ageMax || null,
+    edad_minima: ageMin || null,
+    area_municipal_id: selectedAreaId,
+    organizer: selectedArea?.nombre ?? '',
+    publico_tipo: audienceType,
     referenceCost: getNamedFormValue(form, 'referenceCost'),
     registrationEnd: getNamedFormValue(form, 'registrationEnd'),
     registrationStart: getNamedFormValue(form, 'registrationStart'),
@@ -275,6 +782,7 @@ function getChecklistEventFromForm(form, event) {
       IMAGEN_PORTADA: Boolean(
         event.resources?.IMAGEN_PORTADA || hasNamedFile(form, 'coverImage'),
       ),
+      VIDEO: Boolean(event.resources?.VIDEO || getNamedFormValue(form, 'videoUrl')),
     },
     aforoMaximo:
       getNamedFormValue(form, 'capacityMode') === 'none'
@@ -296,8 +804,11 @@ function getChecklistEventFromForm(form, event) {
         : getNamedFormValue(form, 'capacity'),
     time: getNamedFormValue(form, 'eventEnd'),
     title: getNamedFormValue(form, 'title'),
-    venue: getNamedFormValue(form, 'venue'),
-    locationReference: getNamedFormValue(form, 'reference'),
+    ubicacion_id: selectedLocationId,
+    venue: selectedLocation?.nombre_lugar ?? '',
+    locationReference: selectedLocation?.referencia ?? '',
+    requirements: requirementItems.map((item) => item.descripcion),
+    requisitos_evento: requirementItems,
   };
 }
 
@@ -343,7 +854,7 @@ function getMissingReviewFields(form, existingEvent = null) {
   const requiredFields = [
     ['title', 'Título del evento'],
     ['category', 'Categoría'],
-    ['area', 'Área responsable'],
+    ['area_municipal_id', 'Área responsable'],
     ['descripcion_breve', 'Descripción breve'],
     ['description', 'Descripción'],
     ['eventStart', 'Inicio o fecha del evento'],
@@ -351,10 +862,9 @@ function getMissingReviewFields(form, existingEvent = null) {
     ['registrationStart', 'Inicio de inscripción'],
     ['registrationEnd', 'Fin de inscripción'],
     ['referenceCost', 'Costo referencial'],
-    ['venue', 'Lugar del evento'],
-    ['district', 'Distrito'],
-    ['address', 'Dirección'],
-    ['reference', 'Referencia de ubicación'],
+    ['ubicacion_id', 'Ubicación del evento'],
+    ['agenda_evento_json', 'Agenda del evento'],
+    ['requisitos_evento_json', 'Requisitos del evento'],
   ];
   const missingFields = requiredFields
     .filter(([fieldName]) => !hasValue(getNamedFormValue(form, fieldName)))
@@ -364,13 +874,36 @@ function getMissingReviewFields(form, existingEvent = null) {
   const attendanceGoalEnabled = isNamedChecked(form, 'attendanceGoalEnabled');
   const attendanceGoalType = getNamedFormValue(form, 'attendanceGoalType');
   const attendanceGoalValue = Number(getNamedFormValue(form, 'attendanceGoalValue'));
+  const audienceType = getNamedFormValue(form, 'publico_tipo') || 'GENERAL';
+  const minAge = Number(getNamedFormValue(form, 'edad_minima'));
+  const maxAge = Number(getNamedFormValue(form, 'edad_maxima'));
 
   if (shortDescription.length > 255) {
     missingFields.push('Descripción breve de máximo 255 caracteres');
   }
 
+  if (!hasValidOrderedItems(parseOrderedEventItems(getNamedFormValue(form, 'agenda_evento_json')))) {
+    missingFields.push('Agenda del evento');
+  }
+
+  if (
+    !hasValidOrderedItems(parseOrderedEventItems(getNamedFormValue(form, 'requisitos_evento_json')))
+  ) {
+    missingFields.push('Requisitos del evento');
+  }
+
   if (capacityMode !== 'none' && Number(getNamedFormValue(form, 'capacity')) <= 0) {
     missingFields.push('Aforo máximo');
+  }
+
+  if (audienceType === 'OBJETIVO') {
+    if (!Number.isFinite(minAge) || minAge < 0) {
+      missingFields.push('Edad mínima válida');
+    }
+
+    if (!Number.isFinite(maxAge) || maxAge <= minAge || maxAge > 120) {
+      missingFields.push('Edad máxima válida');
+    }
   }
 
   if (attendanceGoalEnabled) {
@@ -401,7 +934,9 @@ function getMissingReviewFields(form, existingEvent = null) {
 }
 
 function AdminDashboard({ onLogout, user }) {
-  const [currentAdminView, setCurrentAdminView] = useState('dashboard');
+  const [currentAdminView, setCurrentAdminView] = useState(() =>
+    window.location.pathname === '/admin/vecinos' ? 'neighbors' : 'dashboard',
+  );
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [pendingEventAction, setPendingEventAction] = useState(null);
   const [validationIssue, setValidationIssue] = useState(null);
@@ -410,6 +945,7 @@ function AdminDashboard({ onLogout, user }) {
   const [stateFilter, setStateFilter] = useState('Todos');
   const [categoryFilter, setCategoryFilter] = useState('Todas');
   const [activePendingPopover, setActivePendingPopover] = useState(null);
+  const [activeFormSection, setActiveFormSection] = useState(eventFormSections[0].id);
   const pendingPopoverRef = useRef(null);
   const isEventFormView =
     currentAdminView === 'new-event' || currentAdminView === 'edit-event';
@@ -433,6 +969,54 @@ function AdminDashboard({ onLogout, user }) {
       document.removeEventListener('mousedown', closePendingPopoverOnOutsideClick);
     };
   }, [activePendingPopover]);
+
+  useEffect(() => {
+    //Gagaga
+    if (!isEventFormView) {
+      return undefined;
+    }
+
+    const sectionElements = eventFormSections
+      .map((section) => document.getElementById(section.id))
+      .filter(Boolean);
+
+    if (sectionElements.length === 0) {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntry = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort(
+            (firstEntry, secondEntry) =>
+              secondEntry.intersectionRatio - firstEntry.intersectionRatio,
+          )[0];
+
+        if (visibleEntry?.target?.id) {
+          setActiveFormSection(visibleEntry.target.id);
+        }
+      },
+      {
+        rootMargin: '-18% 0px -58% 0px',
+        threshold: [0.15, 0.35, 0.6],
+      },
+    );
+
+    sectionElements.forEach((sectionElement) => observer.observe(sectionElement));
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [isEventFormView, currentAdminView]);
+
+  function navigateToFormSection(sectionId) {
+    setActiveFormSection(sectionId);
+    document.getElementById(sectionId)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  }
 
   const filteredAdminEvents = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -499,11 +1083,20 @@ function AdminDashboard({ onLogout, user }) {
                 : 'Secciones de edicion de evento'
             }
           >
-            <a className="active" href="#datos-generales">Datos generales</a>
-            <a href="#programacion">Programación</a>
-            <a href="#evaluacion">Evaluación</a>
-            <a href="#ubicacion">Ubicación</a>
-            <a href="#recursos">Recursos</a>
+            {eventFormSections.map((section) => (
+              <button
+                className={
+                  activeFormSection === section.id
+                    ? 'admin-nav-link active'
+                    : 'admin-nav-link'
+                }
+                key={section.id}
+                type="button"
+                onClick={() => navigateToFormSection(section.id)}
+              >
+                {section.label}
+              </button>
+            ))}
             <button
               className="admin-nav-logout"
               type="button"
@@ -517,7 +1110,27 @@ function AdminDashboard({ onLogout, user }) {
           </nav>
         ) : (
           <nav className="admin-nav" aria-label="Navegacion administrativa">
-            <a className="active" href="#resumen">Resumen</a>
+            <button
+              className={
+                currentAdminView === 'dashboard' ? 'admin-nav-link active' : 'admin-nav-link'
+              }
+              type="button"
+              onClick={() => setCurrentAdminView('dashboard')}
+            >
+              Resumen
+            </button>
+            <button
+              className={
+                currentAdminView === 'neighbors' ? 'admin-nav-link active' : 'admin-nav-link'
+              }
+              type="button"
+              onClick={() => {
+                window.history.pushState(null, '', '/admin/vecinos');
+                setCurrentAdminView('neighbors');
+              }}
+            >
+              Cuentas vecinales
+            </button>
             <button className="admin-nav-logout" type="button" onClick={onLogout}>
               Salir del panel
             </button>
@@ -550,6 +1163,8 @@ function AdminDashboard({ onLogout, user }) {
             }
             onValidationIssue={setValidationIssue}
           />
+        ) : currentAdminView === 'neighbors' ? (
+          <NeighborAccountsPage adminUserName={adminUserName} />
         ) : (
           <>
             <header className="admin-topbar">
@@ -876,6 +1491,236 @@ function ResourceUploadCard({ accept, label, name, resourceType, showPreview = f
   );
 }
 
+function VideoResourceCard({ defaultValue = '' }) {
+  const [videoUrl, setVideoUrl] = useState(defaultValue);
+  const embedUrl = getVideoPreviewEmbedUrl(videoUrl);
+
+  return (
+    <label className="resource-upload video-resource-card">
+      <span className="resource-upload-heading">
+        <strong>Video del evento</strong>
+        <em>VIDEO</em>
+      </span>
+      <span className="video-resource-preview">
+        {videoUrl ? (
+          embedUrl ? (
+            <iframe
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              src={embedUrl}
+              title="Vista previa del video del evento"
+            />
+          ) : (
+            <span>
+              <strong>Video registrado</strong>
+              <a href={videoUrl} rel="noopener noreferrer" target="_blank">
+                Ver video
+              </a>
+            </span>
+          )
+        ) : (
+          <small>Agrega un enlace de video para mostrarlo en el portal ciudadano.</small>
+        )}
+      </span>
+      <span className="video-resource-field">
+        URL del video
+        <input
+          name="videoUrl"
+          placeholder="Pega el enlace del video del evento"
+          type="url"
+          value={videoUrl}
+          onChange={(event) => setVideoUrl(event.target.value)}
+        />
+        <small>
+          Puedes usar un enlace de YouTube, Facebook o una URL de video compatible.
+          TODO: permitir carga directa de video si el backend lo soporta.
+        </small>
+      </span>
+    </label>
+  );
+}
+
+function LocationCatalogSelector({ defaultLocationId = '' }) {
+  const [selectedLocationId, setSelectedLocationId] = useState(defaultLocationId);
+  const selectedLocation = getRegisteredLocationById(selectedLocationId);
+  const mapUrl = getLocationMapEmbedUrl(selectedLocation);
+
+  return (
+    <div className="location-catalog-layout">
+      <div className="location-catalog-form">
+        <label className="form-field">
+          Ubicación del evento
+          <select
+            name="ubicacion_id"
+            value={selectedLocationId}
+            onChange={(event) => setSelectedLocationId(event.target.value)}
+          >
+            <option value="">Seleccionar ubicación</option>
+            {registeredLocations.map((location) => (
+              <option key={location.ubicacion_id} value={location.ubicacion_id}>
+                {location.nombre_lugar}
+              </option>
+            ))}
+          </select>
+          <small>
+            TODO: consumir ubicaciones desde el CRUD administrador cuando el backend esté listo.
+          </small>
+        </label>
+
+        {selectedLocation ? (
+          <div className="location-summary-card" aria-live="polite">
+            <strong>{selectedLocation.nombre_lugar}</strong>
+            <span>
+              {selectedLocation.direccion}, {selectedLocation.distrito}
+            </span>
+            {selectedLocation.referencia && <small>{selectedLocation.referencia}</small>}
+          </div>
+        ) : (
+          <div className="location-summary-placeholder">
+            Selecciona una ubicación registrada para ver el detalle.
+          </div>
+        )}
+      </div>
+
+      <div className="location-map-preview">
+        {mapUrl ? (
+          <iframe
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            src={mapUrl}
+            title={`Mapa de ${selectedLocation.nombre_lugar}`}
+          />
+        ) : (
+          <span>Selecciona una ubicación para visualizar el mapa.</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function OrderedEventListEditor({
+  addLabel,
+  description,
+  hiddenInputName,
+  initialItems = [],
+  itemPlaceholder,
+  kicker,
+  onListChange,
+  title,
+}) {
+  const [items, setItems] = useState(() => {
+    const normalizedItems = normalizeOrderedEventItems(initialItems);
+    return normalizedItems.length > 0 ? normalizedItems : [{ descripcion: '', orden: 1 }];
+  });
+  const onListChangeRef = useRef(onListChange);
+  const validItems = normalizeOrderedEventItems(items);
+
+  useEffect(() => {
+    onListChangeRef.current = onListChange;
+  }, [onListChange]);
+
+  useEffect(() => {
+    onListChangeRef.current?.();
+  }, [items]);
+
+  function updateItems(updater) {
+    setItems((currentItems) =>
+      updater(currentItems).map((item, index) => ({
+        ...item,
+        orden: index + 1,
+      })),
+    );
+  }
+
+  function updateItem(index, descripcion) {
+    updateItems((currentItems) =>
+      currentItems.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, descripcion } : item,
+      ),
+    );
+  }
+
+  function addItem() {
+    updateItems((currentItems) => [
+      ...currentItems,
+      { descripcion: '', orden: currentItems.length + 1 },
+    ]);
+  }
+
+  function removeItem(index) {
+    updateItems((currentItems) => {
+      const nextItems = currentItems.filter((_, itemIndex) => itemIndex !== index);
+      return nextItems.length > 0 ? nextItems : [{ descripcion: '', orden: 1 }];
+    });
+  }
+
+  function moveItem(index, direction) {
+    updateItems((currentItems) => {
+      const targetIndex = index + direction;
+
+      if (targetIndex < 0 || targetIndex >= currentItems.length) {
+        return currentItems;
+      }
+
+      const nextItems = [...currentItems];
+      [nextItems[index], nextItems[targetIndex]] = [nextItems[targetIndex], nextItems[index]];
+      return nextItems;
+    });
+  }
+
+  return (
+    <section className="ordered-list-editor">
+      <input
+        name={hiddenInputName}
+        type="hidden"
+        value={JSON.stringify(validItems)}
+        readOnly
+      />
+      <div className="ordered-list-heading">
+        <span className="section-kicker">{kicker}</span>
+        <h3>{title}</h3>
+        <p>{description}</p>
+      </div>
+      <div className="ordered-list-items">
+        {items.map((item, index) => (
+          <div className="ordered-list-row" key={`${hiddenInputName}-${index}`}>
+            <span className="ordered-list-number">{index + 1}</span>
+            <input
+              aria-label={`${title} ${index + 1}`}
+              placeholder={itemPlaceholder}
+              type="text"
+              value={item.descripcion}
+              onChange={(event) => updateItem(index, event.target.value)}
+            />
+            <div className="ordered-list-actions">
+              <button
+                disabled={index === 0}
+                type="button"
+                onClick={() => moveItem(index, -1)}
+              >
+                ↑
+              </button>
+              <button
+                disabled={index === items.length - 1}
+                type="button"
+                onClick={() => moveItem(index, 1)}
+              >
+                ↓
+              </button>
+              <button type="button" onClick={() => removeItem(index)}>
+                Eliminar
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <button className="ordered-list-add-button" type="button" onClick={addItem}>
+        + {addLabel}
+      </button>
+    </section>
+  );
+}
+
 function getStateSummaryText(state) {
   const stateMessages = {
     BORRADOR: 'Completa la ficha para enviarla a revisión.',
@@ -906,6 +1751,458 @@ function EditIcon() {
       <path d="m14.7 5.3 4 4" />
       <path d="M4 20h4.2L19.5 8.7a2.8 2.8 0 0 0-4-4L4.2 16H4v4Z" />
     </svg>
+  );
+}
+
+function MunicipalAreaCombobox({ defaultAreaId = '', defaultAreaName = '', onAreaChange }) {
+  const initialArea =
+    getMunicipalAreaById(defaultAreaId) ??
+    getMunicipalAreaByEvent({ organizer: defaultAreaName }) ??
+    null;
+  const [selectedArea, setSelectedArea] = useState(initialArea);
+  const [searchValue, setSearchValue] = useState(initialArea?.nombre ?? defaultAreaName ?? '');
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const comboboxRef = useRef(null);
+  const normalizedSearch = normalizeSearchText(searchValue.trim());
+  const filteredAreas = eventOrganizerAreas.filter((area) => {
+    if (!normalizedSearch) {
+      return true;
+    }
+
+    return [area.nombre, area.tipo_area].some((value) =>
+      normalizeSearchText(value).includes(normalizedSearch),
+    );
+  });
+
+  useEffect(() => {
+    function closeOnOutsideClick(event) {
+      if (!comboboxRef.current?.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', closeOnOutsideClick);
+
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick);
+    };
+  }, []);
+
+  function selectArea(area) {
+    setSelectedArea(area);
+    setSearchValue(area.nombre);
+    setIsOpen(false);
+    setHighlightedIndex(0);
+    window.setTimeout(() => onAreaChange?.(), 0);
+  }
+
+  function handleSearchChange(event) {
+    setSearchValue(event.target.value);
+    setSelectedArea(null);
+    setIsOpen(true);
+    setHighlightedIndex(0);
+    window.setTimeout(() => onAreaChange?.(), 0);
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setIsOpen(true);
+      setHighlightedIndex((currentIndex) =>
+        Math.min(currentIndex + 1, Math.max(filteredAreas.length - 1, 0)),
+      );
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setHighlightedIndex((currentIndex) => Math.max(currentIndex - 1, 0));
+      return;
+    }
+
+    if (event.key === 'Enter' && isOpen && filteredAreas[highlightedIndex]) {
+      event.preventDefault();
+      selectArea(filteredAreas[highlightedIndex]);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      setIsOpen(false);
+    }
+  }
+
+  return (
+    <span className="area-combobox" ref={comboboxRef}>
+      <input name="area" readOnly type="hidden" value={selectedArea?.nombre ?? ''} />
+      <input
+        name="area_municipal_id"
+        readOnly
+        type="hidden"
+        value={selectedArea?.area_municipal_id ?? ''}
+      />
+      <input
+        aria-autocomplete="list"
+        aria-expanded={isOpen}
+        className="area-combobox-input"
+        placeholder="Buscar o seleccionar área"
+        role="combobox"
+        type="text"
+        value={searchValue}
+        onChange={handleSearchChange}
+        onClick={() => setIsOpen(true)}
+        onFocus={() => setIsOpen(true)}
+        onKeyDown={handleKeyDown}
+      />
+      {isOpen && (
+        <span className="area-combobox-menu" role="listbox">
+          {filteredAreas.length > 0 ? (
+            filteredAreas.map((area, index) => (
+              <button
+                aria-selected={selectedArea?.area_municipal_id === area.area_municipal_id}
+                className={index === highlightedIndex ? 'is-highlighted' : ''}
+                key={area.area_municipal_id}
+                role="option"
+                type="button"
+                onClick={() => selectArea(area)}
+                onMouseEnter={() => setHighlightedIndex(index)}
+              >
+                <span>{area.nombre}</span>
+                <small>{area.tipo_area}</small>
+              </button>
+            ))
+          ) : (
+            <span className="area-combobox-empty">No se encontraron áreas</span>
+          )}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function NeighborAccountsPage({ adminUserName }) {
+  const [neighbors, setNeighbors] = useState(initialNeighborAccounts);
+  const [searchValue, setSearchValue] = useState('');
+  const [stateFilterValue, setStateFilterValue] = useState('TODOS');
+  const [selectedNeighborId, setSelectedNeighborId] = useState(initialNeighborAccounts[0]?.id ?? null);
+  const [editingContact, setEditingContact] = useState(false);
+  const [contactDraft, setContactDraft] = useState({ celular: '', correo: '' });
+  const [actionModal, setActionModal] = useState(null);
+  const [actionReason, setActionReason] = useState('');
+  const [notice, setNotice] = useState('');
+  const selectedNeighbor = neighbors.find((neighbor) => neighbor.id === selectedNeighborId) ?? neighbors[0];
+  const filteredNeighbors = useMemo(() => {
+    const normalizedSearch = searchValue.trim().toLowerCase();
+
+    return neighbors.filter((neighbor) => {
+      const matchesState = stateFilterValue === 'TODOS' || neighbor.estado === stateFilterValue;
+      const matchesSearch =
+        normalizedSearch.length === 0 ||
+        [neighbor.dni, neighbor.nombreCompleto, neighbor.correo]
+          .join(' ')
+          .toLowerCase()
+          .includes(normalizedSearch);
+
+      return matchesState && matchesSearch;
+    });
+  }, [neighbors, searchValue, stateFilterValue]);
+  const summary = {
+    active: neighbors.filter((neighbor) => neighbor.estado === 'ACTIVO').length,
+    blocked: neighbors.filter((neighbor) => neighbor.estado === 'BLOQUEADO').length,
+    pending: neighbors.filter((neighbor) => neighbor.estado === 'PENDIENTE_CONFIRMACION').length,
+    total: neighbors.length,
+  };
+
+  function startContactEdit() {
+    setContactDraft({
+      celular: selectedNeighbor.celular,
+      correo: selectedNeighbor.correo,
+    });
+    setEditingContact(true);
+    setNotice('');
+  }
+
+  function saveContactEdit() {
+    if (!contactDraft.correo.trim() || !contactDraft.celular.trim()) {
+      setNotice('Completa correo y celular antes de guardar.');
+      return;
+    }
+
+    setNeighbors((currentNeighbors) =>
+      currentNeighbors.map((neighbor) =>
+        neighbor.id === selectedNeighbor.id
+          ? { ...neighbor, celular: contactDraft.celular.trim(), correo: contactDraft.correo.trim() }
+          : neighbor,
+      ),
+    );
+    // TODO: registrar acción en bitácora_accion y persistir contacto en Spring Boot.
+    setEditingContact(false);
+    setNotice('Contacto actualizado correctamente.');
+  }
+
+  function confirmAccountAction() {
+    if (actionModal === 'block' && !actionReason.trim()) {
+      setNotice('Indica el motivo del bloqueo.');
+      return;
+    }
+
+    if (actionModal === 'resend') {
+      // TODO: conectar reenvío de correo de confirmación con Spring Boot.
+      setNotice('Correo de confirmación reenviado correctamente.');
+      setActionModal(null);
+      return;
+    }
+
+    setNeighbors((currentNeighbors) =>
+      currentNeighbors.map((neighbor) => {
+        if (neighbor.id !== selectedNeighbor.id) {
+          return neighbor;
+        }
+
+        if (actionModal === 'block') {
+          return {
+            ...neighbor,
+            estado: 'BLOQUEADO',
+            fechaBloqueo: new Date().toISOString(),
+            motivoBloqueo: actionReason.trim(),
+            usuarioAdminBloqueo: adminUserName,
+          };
+        }
+
+        if (actionModal === 'reactivate') {
+          return {
+            ...neighbor,
+            estado: 'ACTIVO',
+            fechaReactivacion: new Date().toISOString(),
+            motivoReactivacion: actionReason.trim(),
+            usuarioAdminReactivacion: adminUserName,
+          };
+        }
+
+        return neighbor;
+      }),
+    );
+    // TODO: registrar acción en bitácora_accion.
+    setNotice(actionModal === 'block' ? 'Cuenta bloqueada correctamente.' : 'Cuenta reactivada correctamente.');
+    setActionModal(null);
+  }
+
+  return (
+    <section className="neighbor-admin-view" aria-labelledby="neighbor-admin-title">
+      <header className="admin-topbar">
+        <div>
+          <span className="section-kicker">Gestión ciudadana</span>
+          <h1 id="neighbor-admin-title">Cuentas vecinales</h1>
+          <p>Consulta y administra el estado de las cuentas registradas por los vecinos.</p>
+        </div>
+      </header>
+
+      <section className="admin-stats neighbor-stats" aria-label="Resumen de cuentas vecinales">
+        <NeighborStatCard label="Activas" value={summary.active} />
+        <NeighborStatCard label="Pendientes" value={summary.pending} />
+        <NeighborStatCard label="Bloqueadas" value={summary.blocked} />
+        <NeighborStatCard label="Total de vecinos" value={summary.total} />
+      </section>
+
+      <section className="neighbor-admin-layout">
+        <article className="admin-table-panel admin-table-featured">
+          <div className="admin-panel-heading">
+            <div>
+              <span className="section-kicker">Directorio</span>
+              <h2>Vecinos registrados</h2>
+            </div>
+          </div>
+          <div className="admin-filters neighbor-filters">
+            <label>
+              Buscar
+              <input
+                placeholder="DNI, nombre o correo"
+                value={searchValue}
+                onChange={(event) => setSearchValue(event.target.value)}
+              />
+            </label>
+            <label>
+              Estado
+              <select value={stateFilterValue} onChange={(event) => setStateFilterValue(event.target.value)}>
+                {neighborStatusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="admin-table neighbor-table">
+            <div className="admin-table-row admin-table-head">
+              <span>Vecino</span><span>DNI</span><span>Correo</span><span>Celular</span><span>Estado</span><span>Inscripciones</span><span>Acción</span>
+            </div>
+            {filteredNeighbors.map((neighbor) => (
+              <div className="admin-table-row" key={neighbor.id}>
+                <span><strong>{neighbor.nombreCompleto}</strong><small>{neighbor.fechaRegistro}</small></span>
+                <span>{neighbor.dni}</span>
+                <span>{neighbor.correo}</span>
+                <span>{neighbor.celular}</span>
+                <span className={`neighbor-state-badge ${getNeighborStateTone(neighbor.estado)}`}>{getNeighborStateLabel(neighbor.estado)}</span>
+                <span>{neighbor.inscripciones.length}</span>
+                <button
+                  className="table-icon-action is-detail neighbor-detail-action"
+                  type="button"
+                  onClick={() => {
+                    setSelectedNeighborId(neighbor.id);
+                    setEditingContact(false);
+                    setNotice('');
+                  }}
+                >
+                  Ver detalle
+                </button>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        {selectedNeighbor && (
+          <NeighborDetailPanel
+            actionNotice={notice}
+            contactDraft={contactDraft}
+            editingContact={editingContact}
+            neighbor={selectedNeighbor}
+            onCancelEdit={() => setEditingContact(false)}
+            onContactChange={setContactDraft}
+            onOpenAction={(action) => {
+              setActionReason('');
+              setNotice('');
+              setActionModal(action);
+            }}
+            onSaveContact={saveContactEdit}
+            onStartEdit={startContactEdit}
+          />
+        )}
+      </section>
+
+      {actionModal && (
+        <NeighborAccountActionModal
+          action={actionModal}
+          reason={actionReason}
+          onCancel={() => setActionModal(null)}
+          onConfirm={confirmAccountAction}
+          onReasonChange={setActionReason}
+        />
+      )}
+    </section>
+  );
+}
+
+function NeighborStatCard({ label, value }) {
+  return (
+    <article className="admin-panel admin-stat-card management-stat-card neighbor-stat-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>cuentas</small>
+    </article>
+  );
+}
+
+function NeighborDetailPanel({
+  actionNotice,
+  contactDraft,
+  editingContact,
+  neighbor,
+  onCancelEdit,
+  onContactChange,
+  onOpenAction,
+  onSaveContact,
+  onStartEdit,
+}) {
+  return (
+    <aside className="admin-panel neighbor-detail-panel">
+      <div className="neighbor-detail-heading">
+        <span className="section-kicker">Detalle vecinal</span>
+        <h2>{neighbor.nombreCompleto}</h2>
+        <span className={`neighbor-state-badge ${getNeighborStateTone(neighbor.estado)}`}>
+          {getNeighborStateLabel(neighbor.estado)}
+        </span>
+      </div>
+      {actionNotice && <p className="neighbor-action-notice">{actionNotice}</p>}
+      <dl className="neighbor-detail-list">
+        <div><dt>DNI</dt><dd>{neighbor.dni}</dd></div>
+        <div><dt>Fecha de nacimiento</dt><dd>{neighbor.fechaNacimiento}</dd></div>
+        <div><dt>Fecha de registro</dt><dd>{neighbor.fechaRegistro}</dd></div>
+        <div><dt>Confirmación de correo</dt><dd>{neighbor.fechaConfirmacionCorreo || 'Pendiente'}</dd></div>
+      </dl>
+      <section className="neighbor-contact-section">
+        <div className="neighbor-section-heading">
+          <h3>Contacto</h3>
+          {!editingContact && <button type="button" onClick={onStartEdit}>Editar contacto</button>}
+        </div>
+        {editingContact ? (
+          <div className="neighbor-contact-form">
+            <label>Correo electrónico<input value={contactDraft.correo} onChange={(event) => onContactChange((current) => ({ ...current, correo: event.target.value }))} /></label>
+            <label>Celular<input value={contactDraft.celular} onChange={(event) => onContactChange((current) => ({ ...current, celular: event.target.value }))} /></label>
+            <div className="neighbor-inline-actions">
+              <button type="button" onClick={onCancelEdit}>Cancelar</button>
+              <button type="button" onClick={onSaveContact}>Guardar cambios</button>
+            </div>
+          </div>
+        ) : (
+          <dl className="neighbor-detail-list compact">
+            <div><dt>Correo</dt><dd>{neighbor.correo}</dd></div>
+            <div><dt>Celular</dt><dd>{neighbor.celular}</dd></div>
+          </dl>
+        )}
+      </section>
+      <section className="neighbor-admin-actions">
+        {neighbor.estado === 'PENDIENTE_CONFIRMACION' && <button type="button" onClick={() => onOpenAction('resend')}>Reenviar correo de confirmación</button>}
+        {neighbor.estado === 'ACTIVO' && <button type="button" onClick={() => onOpenAction('block')}>Bloquear cuenta</button>}
+        {neighbor.estado === 'BLOQUEADO' && <button type="button" onClick={() => onOpenAction('reactivate')}>Reactivar cuenta</button>}
+      </section>
+      <section className="neighbor-registrations">
+        <h3>Inscripciones</h3>
+        {neighbor.inscripciones.length > 0 ? (
+          <div className="neighbor-registration-list">
+            {neighbor.inscripciones.map((registration) => (
+              <div key={registration.codigoInscripcion}>
+                <strong>{registration.evento}</strong>
+                <span>{registration.fechaEvento}</span>
+                <small>{registration.estadoInscripcion} · {registration.codigoInscripcion} · {registration.asistencia}</small>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p>Este vecino aún no registra inscripciones.</p>
+        )}
+      </section>
+    </aside>
+  );
+}
+
+function NeighborAccountActionModal({ action, reason, onCancel, onConfirm, onReasonChange }) {
+  const isBlock = action === 'block';
+  const isReactivate = action === 'reactivate';
+  const title = isBlock
+    ? 'Bloquear cuenta vecinal'
+    : isReactivate
+      ? 'Reactivar cuenta vecinal'
+      : 'Reenviar correo de confirmación';
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="confirm-modal neighbor-action-modal" role="dialog" aria-modal="true">
+        <span className="section-kicker">Acción administrativa</span>
+        <h2>{title}</h2>
+        {action === 'resend' ? (
+          <p>Se reenviará el correo de confirmación al vecino.</p>
+        ) : (
+          <label className="neighbor-action-reason">
+            {isBlock ? 'Indica el motivo del bloqueo de la cuenta vecinal.' : 'Indica el motivo de la reactivación de la cuenta vecinal.'}
+            <textarea rows={4} value={reason} onChange={(event) => onReasonChange(event.target.value)} />
+          </label>
+        )}
+        <div className="modal-actions">
+          <button className="back-button" type="button" onClick={onCancel}>Cancelar</button>
+          <button className="primary-button" type="button" onClick={onConfirm}>
+            {isBlock ? 'Bloquear cuenta' : isReactivate ? 'Reactivar cuenta' : 'Reenviar correo'}
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -1016,6 +2313,7 @@ function EvaluationTrackingSection({
 function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
   const formRef = useRef(null);
   const [capacityMode, setCapacityMode] = useState('defined');
+  const [audienceType, setAudienceType] = useState('GENERAL');
   const [goalEnabled, setGoalEnabled] = useState(false);
   const [goalType, setGoalType] = useState('CANTIDAD_ASISTENTES');
   const [surveyEnabled, setSurveyEnabled] = useState(false);
@@ -1034,6 +2332,7 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
     const form = formRef.current;
 
     setCapacityMode(getNamedFormValue(form, 'capacityMode') || 'defined');
+    setAudienceType(getNamedFormValue(form, 'publico_tipo') || 'GENERAL');
     setGoalEnabled(isNamedChecked(form, 'attendanceGoalEnabled'));
     setGoalType(getNamedFormValue(form, 'attendanceGoalType') || 'CANTIDAD_ASISTENTES');
     setSurveyEnabled(isNamedChecked(form, 'surveyEnabled'));
@@ -1102,13 +2401,7 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
               </label>
               <label className="form-field">
                 Área responsable
-                <select defaultValue="" name="area">
-                  <option disabled value="">Seleccionar área</option>
-                  <option>Cultura</option>
-                  <option>Participación Vecinal</option>
-                  <option>Deporte</option>
-                  <option>Comunicaciones</option>
-                </select>
+                <MunicipalAreaCombobox onAreaChange={syncChecklistFromForm} />
               </label>
               <label className="form-field span-2">
                 Descripción breve
@@ -1165,9 +2458,24 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
                 />
               </label>
               <label className="form-field">
-                Estado inicial
-                <input disabled value="BORRADOR" />
+                Dirigido a
+                <select defaultValue="GENERAL" name="publico_tipo">
+                  <option value="GENERAL">Público general</option>
+                  <option value="OBJETIVO">Público objetivo</option>
+                </select>
               </label>
+              {audienceType === 'OBJETIVO' && (
+                <>
+                  <label className="form-field">
+                    Edad mínima
+                    <input min="0" name="edad_minima" placeholder="13" type="number" />
+                  </label>
+                  <label className="form-field">
+                    Edad máxima
+                    <input max="120" min="1" name="edad_maxima" placeholder="25" type="number" />
+                  </label>
+                </>
+              )}
             </div>
           </article>
 
@@ -1179,32 +2487,39 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
             surveyEnabled={surveyEnabled}
           />
 
+          <article className="event-form-section event-content-section" id="contenido-evento">
+            <div className="form-section-heading">
+              <span className="section-kicker">Contenido del evento</span>
+              <h2>Agenda y requisitos</h2>
+            </div>
+            <div className="event-content-grid">
+              <OrderedEventListEditor
+                addLabel="Agregar actividad"
+                description="Define las actividades principales en el orden en que se realizarán."
+                hiddenInputName="agenda_evento_json"
+                itemPlaceholder="Recepción ciudadana"
+                kicker="Programa"
+                title="Agenda del evento"
+                onListChange={syncChecklistFromForm}
+              />
+              <OrderedEventListEditor
+                addLabel="Agregar requisito"
+                description="Indica las condiciones o documentos que el vecino debe considerar."
+                hiddenInputName="requisitos_evento_json"
+                itemPlaceholder="DNI vigente"
+                kicker="Antes de asistir"
+                title="Requisitos del evento"
+                onListChange={syncChecklistFromForm}
+              />
+            </div>
+          </article>
+
           <article className="event-form-section" id="ubicacion">
             <div className="form-section-heading">
               <span className="section-kicker">Ubicación</span>
               <h2>Lugar del evento</h2>
             </div>
-            <div className="form-grid">
-              <label className="form-field">
-                Nombre del lugar
-                <input name="venue" placeholder="Plaza principal" />
-              </label>
-              <label className="form-field">
-                Distrito
-                <input name="district" value="San Miguel" readOnly />
-              </label>
-              <label className="form-field span-2">
-                Dirección
-                <input name="address" placeholder="Av. Universitaria 1801" />
-              </label>
-              <label className="form-field span-2">
-                Referencia
-                <input
-                  name="reference"
-                  placeholder="Frente al parque, ingreso por puerta principal"
-                />
-              </label>
-            </div>
+            <LocationCatalogSelector />
           </article>
 
           <article className="event-form-section" id="recursos">
@@ -1227,12 +2542,7 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
                 resourceType="AFICHE"
                 showPreview
               />
-              <ResourceUploadCard
-                accept=".pdf,.doc,.docx"
-                label="Documento"
-                name="document"
-                resourceType="DOCUMENTO"
-              />
+              <VideoResourceCard />
             </div>
           </article>
         </section>
@@ -1287,12 +2597,21 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
 function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
   const formRef = useRef(null);
   const initialCapacityMode = event.aforoMaximo === null ? 'none' : 'defined';
+  const initialAudienceType =
+    event.publico_tipo ?? (event.edad_minima || event.edad_maxima ? 'OBJETIVO' : 'GENERAL');
+  const initialMunicipalArea = getMunicipalAreaByEvent(event);
+  const eventWithMunicipalArea = {
+    ...event,
+    area_municipal_id: event.area_municipal_id ?? initialMunicipalArea?.area_municipal_id ?? '',
+    organizer: initialMunicipalArea?.nombre ?? event.organizer,
+  };
   const [capacityMode, setCapacityMode] = useState(initialCapacityMode);
+  const [audienceType, setAudienceType] = useState(initialAudienceType);
   const [goalEnabled, setGoalEnabled] = useState(Boolean(event.metaTipo));
   const [goalType, setGoalType] = useState(event.metaTipo ?? 'CANTIDAD_ASISTENTES');
   const [surveyEnabled, setSurveyEnabled] = useState(Boolean(event.encuestaSatisfaccionHabilitada));
   const [surveyCommentsEnabled, setSurveyCommentsEnabled] = useState(Boolean(event.encuestaComentarioHabilitado));
-  const [checklistEvent, setChecklistEvent] = useState(() => event);
+  const [checklistEvent, setChecklistEvent] = useState(() => eventWithMunicipalArea);
   const [hasFormChanges, setHasFormChanges] = useState(false);
   const checklist = getEventChecklist(checklistEvent, {
     observationAddressed: hasFormChanges,
@@ -1304,11 +2623,12 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
   function syncChecklistFromForm() {
     setHasFormChanges(true);
     setCapacityMode(getNamedFormValue(formRef.current, 'capacityMode') || 'defined');
+    setAudienceType(getNamedFormValue(formRef.current, 'publico_tipo') || 'GENERAL');
     setGoalEnabled(isNamedChecked(formRef.current, 'attendanceGoalEnabled'));
     setGoalType(getNamedFormValue(formRef.current, 'attendanceGoalType') || 'CANTIDAD_ASISTENTES');
     setSurveyEnabled(isNamedChecked(formRef.current, 'surveyEnabled'));
     setSurveyCommentsEnabled(isNamedChecked(formRef.current, 'surveyCommentsEnabled'));
-    setChecklistEvent(getChecklistEventFromForm(formRef.current, event));
+    setChecklistEvent(getChecklistEventFromForm(formRef.current, eventWithMunicipalArea));
   }
 
   function requestReview() {
@@ -1365,13 +2685,11 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
               </label>
               <label className="form-field">
                 Área responsable
-                <select defaultValue={event.organizer} name="area">
-                  <option>{event.organizer}</option>
-                  <option>Cultura</option>
-                  <option>Participación Vecinal</option>
-                  <option>Deporte</option>
-                  <option>Comunicaciones</option>
-                </select>
+                <MunicipalAreaCombobox
+                  defaultAreaId={eventWithMunicipalArea.area_municipal_id}
+                  defaultAreaName={eventWithMunicipalArea.organizer}
+                  onAreaChange={syncChecklistFromForm}
+                />
               </label>
               <label className="form-field span-2">
                 Descripción breve
@@ -1399,12 +2717,20 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
             </div>
             <div className="form-grid">
               <label className="form-field">
-                Fecha visible
-                <input defaultValue={event.date} name="eventStart" />
+                Inicio del evento
+                <input
+                  defaultValue={getEventStartDateTimeValue(event)}
+                  name="eventStart"
+                  type="datetime-local"
+                />
               </label>
               <label className="form-field">
-                Hora visible
-                <input defaultValue={event.time} name="eventEnd" />
+                Fin del evento
+                <input
+                  defaultValue={getEventEndDateTimeValue(event)}
+                  name="eventEnd"
+                  type="datetime-local"
+                />
               </label>
               <label className="form-field">
                 Inicio de inscripción
@@ -1433,9 +2759,37 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
                 />
               </label>
               <label className="form-field">
-                Estado actual
-                <input disabled value={event.state} />
+                Dirigido a
+                <select defaultValue={initialAudienceType} name="publico_tipo">
+                  <option value="GENERAL">Público general</option>
+                  <option value="OBJETIVO">Público objetivo</option>
+                </select>
               </label>
+              {audienceType === 'OBJETIVO' && (
+                <>
+                  <label className="form-field">
+                    Edad mínima
+                    <input
+                      defaultValue={event.edad_minima ?? ''}
+                      min="0"
+                      name="edad_minima"
+                      placeholder="13"
+                      type="number"
+                    />
+                  </label>
+                  <label className="form-field">
+                    Edad máxima
+                    <input
+                      defaultValue={event.edad_maxima ?? ''}
+                      max="120"
+                      min="1"
+                      name="edad_maxima"
+                      placeholder="25"
+                      type="number"
+                    />
+                  </label>
+                </>
+              )}
             </div>
           </article>
 
@@ -1449,33 +2803,41 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
             surveyEnabled={surveyEnabled}
           />
 
+          <article className="event-form-section event-content-section" id="contenido-evento">
+            <div className="form-section-heading">
+              <span className="section-kicker">Contenido del evento</span>
+              <h2>Agenda y requisitos</h2>
+            </div>
+            <div className="event-content-grid">
+              <OrderedEventListEditor
+                addLabel="Agregar actividad"
+                description="Define las actividades principales en el orden en que se realizarán."
+                hiddenInputName="agenda_evento_json"
+                initialItems={event.agenda_evento ?? event.agenda}
+                itemPlaceholder="Recepción ciudadana"
+                kicker="Programa"
+                title="Agenda del evento"
+                onListChange={syncChecklistFromForm}
+              />
+              <OrderedEventListEditor
+                addLabel="Agregar requisito"
+                description="Indica las condiciones o documentos que el vecino debe considerar."
+                hiddenInputName="requisitos_evento_json"
+                initialItems={event.requisitos_evento ?? event.requirements}
+                itemPlaceholder="DNI vigente"
+                kicker="Antes de asistir"
+                title="Requisitos del evento"
+                onListChange={syncChecklistFromForm}
+              />
+            </div>
+          </article>
+
           <article className="event-form-section" id="ubicacion">
             <div className="form-section-heading">
               <span className="section-kicker">Ubicación</span>
               <h2>Lugar del evento</h2>
             </div>
-            <div className="form-grid">
-              <label className="form-field">
-                Nombre del lugar
-                <input defaultValue={event.venue} name="venue" />
-              </label>
-              <label className="form-field">
-                Distrito
-                <input defaultValue={event.district} name="district" />
-              </label>
-              <label className="form-field span-2">
-                Dirección
-                <input defaultValue={event.address} name="address" />
-              </label>
-              <label className="form-field span-2">
-                Referencia
-                <input
-                  defaultValue={event.locationReference}
-                  name="reference"
-                  placeholder="Referencia para orientar al ciudadano"
-                />
-              </label>
-            </div>
+            <LocationCatalogSelector defaultLocationId={event.ubicacion_id} />
           </article>
 
           <article className="event-form-section" id="recursos">
@@ -1498,12 +2860,7 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
                 resourceType="AFICHE"
                 showPreview
               />
-              <ResourceUploadCard
-                accept=".pdf,.doc,.docx"
-                label="Adjuntar documento"
-                name="document"
-                resourceType="DOCUMENTO"
-              />
+              <VideoResourceCard defaultValue={event.videoUrl ?? ''} />
             </div>
           </article>
 

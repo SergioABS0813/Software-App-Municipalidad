@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import municipalLogo from '../../assets/images/municipalidad-logo.png';
 import AdminDashboard from '../dashboard/AdminDashboard';
 import DirectivoDashboard from '../dashboard/DirectivoDashboard';
@@ -25,6 +25,20 @@ const institutionalUsers = [
     password: 'operativo123',
     role: 'OPERATIVO',
   },
+  {
+    apellidos: 'Bustamante Villanueva',
+    acceptsDataUse: true,
+    celular: '987654321',
+    correo: 'vecino@gmail.com',
+    dni: '12345678',
+    email: 'vecino@gmail.com',
+    fechaNacimiento: '1998-04-16',
+    fullName: 'Sergio André Bustamante Villanueva',
+    nombreCompleto: 'Sergio André Bustamante Villanueva',
+    nombres: 'Sergio André',
+    password: 'vecino123',
+    role: 'VECINO',
+  },
 ];
 
 const emptyRegistration = {
@@ -35,7 +49,19 @@ const emptyRegistration = {
   acceptsTerms: false,
 };
 
+const emptyCitizenRegister = {
+  dni: '',
+  fechaNacimiento: '',
+  correo: '',
+  celular: '',
+  password: '',
+  confirmPassword: '',
+  acceptsDataUse: false,
+};
+
 const eventsListPath = '/eventos';
+const citizenAuthStorageKey = 'citizenAuthUser';
+const citizenAuthTokenKey = 'token';
 
 const eventMonthIndex = {
   abr: 3,
@@ -207,6 +233,29 @@ function getEventShortDescription(event) {
   return event.descripcion_breve || event.descripcion || event.summary || event.description || '';
 }
 
+function getOrderedTextItems(items = []) {
+  return items
+    .map((item, index) => ({
+      descripcion:
+        typeof item === 'string' ? item : item?.descripcion ?? item?.description ?? '',
+      orden: Number(item?.orden ?? index + 1),
+    }))
+    .filter((item) => item.descripcion.trim().length > 0)
+    .sort((firstItem, secondItem) => firstItem.orden - secondItem.orden)
+    .map((item) => item.descripcion);
+}
+
+function getEventAudienceLabel(event) {
+  const audienceType =
+    event.publico_tipo ?? (event.edad_minima || event.edad_maxima ? 'OBJETIVO' : 'GENERAL');
+
+  if (audienceType === 'OBJETIVO' && event.edad_minima !== null && event.edad_maxima !== null) {
+    return `${event.edad_minima}-${event.edad_maxima} años`;
+  }
+
+  return event.audience || 'Público general';
+}
+
 function getVideoEmbedUrl(url) {
   if (!url) {
     return null;
@@ -275,6 +324,89 @@ function getCurrentInternalPath() {
   return `${window.location.pathname}${window.location.search}` || eventsListPath;
 }
 
+function readStoredCitizenUser() {
+  try {
+    const storedUser = localStorage.getItem(citizenAuthStorageKey);
+
+    return storedUser ? JSON.parse(storedUser) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveCitizenSession(user) {
+  const citizenUser = {
+    acceptsDataUse: user.acceptsDataUse ?? true,
+    apellidos: user.apellidos,
+    celular: user.celular ?? '',
+    correo: user.correo ?? user.email,
+    dni: user.dni ?? '',
+    fechaNacimiento: user.fechaNacimiento ?? '',
+    nombreCompleto: user.nombreCompleto ?? user.fullName,
+    nombres: user.nombres,
+    rol: 'VECINO',
+    role: 'VECINO',
+  };
+
+  try {
+    localStorage.setItem(citizenAuthTokenKey, `mock-vecino-${Date.now()}`);
+    localStorage.setItem(citizenAuthStorageKey, JSON.stringify(citizenUser));
+  } catch {
+    return citizenUser;
+  }
+
+  return citizenUser;
+}
+
+function clearCitizenSession() {
+  try {
+    localStorage.removeItem(citizenAuthTokenKey);
+    localStorage.removeItem(citizenAuthStorageKey);
+  } catch {
+    // La sesion mock solo mejora la experiencia visual del frontend.
+  }
+}
+
+function buscarIdentidadPorDni(dni) {
+  // TODO: reemplazar por endpoint Spring Boot que consulte RENIEC o el servicio oficial.
+  const mockIdentities = {
+    12345678: {
+      apellidos: 'Bustamante Villanueva',
+      dni: '12345678',
+      nombreCompleto: 'Sergio André Bustamante Villanueva',
+      nombres: 'Sergio André',
+    },
+    87654321: {
+      apellidos: 'Rojas Mendoza',
+      dni: '87654321',
+      nombreCompleto: 'María Fernanda Rojas Mendoza',
+      nombres: 'María Fernanda',
+    },
+  };
+
+  return new Promise((resolve) => {
+    window.setTimeout(() => {
+      resolve(mockIdentities[dni] ?? null);
+    }, 650);
+  });
+}
+
+function hasActiveCitizenSession(authenticatedUser) {
+  if (authenticatedUser?.role === 'VECINO' || authenticatedUser?.rol === 'VECINO') {
+    return true;
+  }
+
+  // TODO: reemplazar por el contexto real de autenticacion ciudadana.
+  // La proteccion definitiva debe vivir tambien en el backend con JWT.
+  try {
+    return ['token', 'authToken', 'accessToken', 'jwt'].some((storageKey) =>
+      Boolean(localStorage.getItem(storageKey)),
+    );
+  } catch {
+    return false;
+  }
+}
+
 function getSafeEventsOriginPath() {
   const currentPath = getCurrentInternalPath();
 
@@ -285,17 +417,39 @@ function getSafeEventsOriginPath() {
   return currentPath;
 }
 
+function getInitialPortalView() {
+  if (window.location.pathname === '/login') {
+    return 'login';
+  }
+
+  if (window.location.pathname === '/registro') {
+    return 'register';
+  }
+
+  if (window.location.pathname === '/recuperar-contrasena') {
+    return 'recoverPassword';
+  }
+
+  if (window.location.pathname === '/cuenta') {
+    return 'account';
+  }
+
+  return 'portal';
+}
+
 function PublicPortal() {
-  const [currentView, setCurrentView] = useState('portal');
+  const [currentView, setCurrentView] = useState(getInitialPortalView);
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [registration, setRegistration] = useState(emptyRegistration);
   const [isRegistered, setIsRegistered] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isLoginRequiredOpen, setIsLoginRequiredOpen] = useState(false);
   const [receiptCode, setReceiptCode] = useState('');
-  const [authenticatedUser, setAuthenticatedUser] = useState(null);
+  const [authenticatedUser, setAuthenticatedUser] = useState(readStoredCitizenUser);
   const [detailOriginPath, setDetailOriginPath] = useState(eventsListPath);
+  const [loginNotice, setLoginNotice] = useState('');
 
   const filteredEvents = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -327,8 +481,9 @@ function PublicPortal() {
     setRegistration(emptyRegistration);
     setIsRegistered(false);
     setIsConfirmOpen(false);
+    setIsLoginRequiredOpen(false);
     setReceiptCode('');
-    setAuthenticatedUser(null);
+    setLoginNotice('');
     setDetailOriginPath(from);
     window.history.pushState(
       { from },
@@ -347,16 +502,21 @@ function PublicPortal() {
     setRegistration(emptyRegistration);
     setIsRegistered(false);
     setIsConfirmOpen(false);
+    setIsLoginRequiredOpen(false);
     setReceiptCode('');
-    setAuthenticatedUser(null);
+    setLoginNotice('');
     window.history.pushState(null, '', fallbackPath);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function submitRegistration(event) {
     event.preventDefault();
-    // TODO: conectar con la sesión ciudadana: si no hay vecino autenticado,
-    // abrir login/modal; si ya inició sesión, confirmar con los datos de su perfil.
+
+    if (!hasActiveCitizenSession(authenticatedUser)) {
+      setIsLoginRequiredOpen(true);
+      return;
+    }
+
     setIsConfirmOpen(true);
   }
 
@@ -379,15 +539,104 @@ function PublicPortal() {
     setIsConfirmOpen(false);
   }
 
-  function openLogin() {
+  function closeLoginRequiredModal() {
+    setIsLoginRequiredOpen(false);
+  }
+
+  function continueToLoginFromReservation() {
+    if (!selectedEvent) {
+      return;
+    }
+
+    const redirectTo = `/eventos/${selectedEvent.id}`;
+
+    setIsLoginRequiredOpen(false);
+    setLoginNotice('');
+    setCurrentView('login');
+    setIsConfirmOpen(false);
+    window.history.pushState(
+      {
+        action: 'reservar',
+        redirectTo,
+      },
+      '',
+      '/login',
+    );
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function openLogin(notice = '') {
+    setLoginNotice(typeof notice === 'string' ? notice : '');
     setCurrentView('login');
     setSelectedEvent(null);
     setIsConfirmOpen(false);
+    setIsLoginRequiredOpen(false);
+    window.history.pushState(null, '', '/login');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function openRegister() {
+    setLoginNotice('');
+    setCurrentView('register');
+    setSelectedEvent(null);
+    setIsConfirmOpen(false);
+    setIsLoginRequiredOpen(false);
+    window.history.pushState(null, '', '/registro');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function openRecoverPassword() {
+    setLoginNotice('');
+    setCurrentView('recoverPassword');
+    setSelectedEvent(null);
+    setIsConfirmOpen(false);
+    setIsLoginRequiredOpen(false);
+    window.history.pushState(null, '', '/recuperar-contrasena');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function openAccountSettings() {
+    setCurrentView('account');
+    setSelectedEvent(null);
+    setIsConfirmOpen(false);
+    setIsLoginRequiredOpen(false);
+    window.history.pushState(null, '', '/cuenta');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function logoutUser() {
+    clearCitizenSession();
+    setAuthenticatedUser(null);
+    setCurrentView('portal');
+    setSelectedEvent(null);
+    setIsConfirmOpen(false);
+    setIsLoginRequiredOpen(false);
+    setLoginNotice('');
+    window.history.pushState(null, '', eventsListPath);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function openInstitutionalDashboard(user) {
+    if (user.role === 'VECINO') {
+      const citizenUser = saveCitizenSession(user);
+      const redirectTo = window.history.state?.redirectTo ?? eventsListPath;
+      const redirectEventId = redirectTo.match(/^\/eventos\/(.+)$/)?.[1];
+      const redirectEvent = events.find((event) => String(event.id) === redirectEventId);
+
+      setAuthenticatedUser(citizenUser);
+      setLoginNotice('');
+      setCurrentView('portal');
+      setSelectedEvent(redirectEvent ?? null);
+      setIsConfirmOpen(false);
+      setIsLoginRequiredOpen(false);
+      window.history.pushState(null, '', redirectTo);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     setAuthenticatedUser(user);
+    clearCitizenSession();
+    setLoginNotice('');
     const viewByRole = {
       ADMINISTRADOR: 'admin',
       DIRECTIVO: 'directivo',
@@ -403,23 +652,50 @@ function PublicPortal() {
   return (
     <main className="citizen-portal">
       {currentView !== 'login' &&
+        currentView !== 'register' &&
+        currentView !== 'recoverPassword' &&
         currentView !== 'admin' &&
         currentView !== 'directivo' &&
         currentView !== 'operativo' && (
-        <PortalHeader onHome={closeEventDetail} onLogin={openLogin} />
+        <PortalHeader
+          user={authenticatedUser}
+          onAccount={openAccountSettings}
+          onHome={closeEventDetail}
+          onLogin={openLogin}
+          onLogout={logoutUser}
+        />
       )}
 
       {currentView === 'login' ? (
         <LoginView
+          notice={loginNotice}
           onBack={closeEventDetail}
           onLoginSuccess={openInstitutionalDashboard}
+          onRecoverPassword={openRecoverPassword}
+          onRegister={openRegister}
+        />
+      ) : currentView === 'register' ? (
+        <VecinoRegisterPage
+          onBack={closeEventDetail}
+          onLogin={openLogin}
+        />
+      ) : currentView === 'recoverPassword' ? (
+        <RecoverPasswordPage
+          onBack={closeEventDetail}
+          onLogin={openLogin}
         />
       ) : currentView === 'admin' ? (
-        <AdminDashboard user={authenticatedUser} onLogout={closeEventDetail} />
+        <AdminDashboard user={authenticatedUser} onLogout={logoutUser} />
       ) : currentView === 'directivo' ? (
-        <DirectivoDashboard user={authenticatedUser} onLogout={closeEventDetail} />
+        <DirectivoDashboard user={authenticatedUser} onLogout={logoutUser} />
       ) : currentView === 'operativo' ? (
-        <OperativoDashboard user={authenticatedUser} onLogout={closeEventDetail} />
+        <OperativoDashboard user={authenticatedUser} onLogout={logoutUser} />
+      ) : currentView === 'account' ? (
+        <AccountSettingsPage
+          user={authenticatedUser}
+          onBack={closeEventDetail}
+          onUserUpdate={setAuthenticatedUser}
+        />
       ) : selectedEvent ? (
         <>
           {isRegistered ? (
@@ -427,6 +703,7 @@ function PublicPortal() {
               event={selectedEvent}
               receiptCode={receiptCode}
               registration={registration}
+              user={authenticatedUser}
               onBack={closeEventDetail}
               onPrint={() => window.print()}
             />
@@ -445,6 +722,14 @@ function PublicPortal() {
               onConfirm={confirmRegistration}
             />
           )}
+
+          {isLoginRequiredOpen && (
+            <LoginRequiredModal
+              onCancel={closeLoginRequiredModal}
+              onLogin={continueToLoginFromReservation}
+              onRegister={openRegister}
+            />
+          )}
         </>
       ) : (
         <PortalHome
@@ -461,7 +746,36 @@ function PublicPortal() {
   );
 }
 
-function PortalHeader({ onHome, onLogin }) {
+function PortalHeader({ user, onAccount, onHome, onLogin, onLogout }) {
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  const isNeighbor = user?.role === 'VECINO' || user?.rol === 'VECINO';
+  const userDisplayName = [user?.nombres, user?.apellidos].filter(Boolean).join(' ');
+
+  useEffect(() => {
+    function closeMenuOnOutsideClick(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsUserMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', closeMenuOnOutsideClick);
+
+    return () => {
+      document.removeEventListener('mousedown', closeMenuOnOutsideClick);
+    };
+  }, []);
+
+  function selectAccountSettings() {
+    setIsUserMenuOpen(false);
+    onAccount();
+  }
+
+  function selectLogout() {
+    setIsUserMenuOpen(false);
+    onLogout();
+  }
+
   return (
     <header className="portal-header">
       <button className="brand brand-button" type="button" onClick={onHome}>
@@ -477,16 +791,286 @@ function PortalHeader({ onHome, onLogin }) {
       </button>
 
       <nav className="portal-nav" aria-label="Navegacion principal">
-        <a href="#eventos">Agenda</a>
-        <button type="button" onClick={onLogin}>
-          Ingresar
-        </button>
+        {isNeighbor ? (
+          <div className="portal-user-menu" ref={menuRef}>
+            <button
+              aria-expanded={isUserMenuOpen}
+              className="portal-user-button"
+              type="button"
+              onClick={() => setIsUserMenuOpen((currentValue) => !currentValue)}
+            >
+              <span>{userDisplayName}</span>
+              <span aria-hidden="true">▾</span>
+            </button>
+            {isUserMenuOpen && (
+              <div className="portal-user-dropdown" role="menu">
+                <button type="button" role="menuitem" onClick={selectAccountSettings}>
+                  Configuración de cuenta
+                </button>
+                <button
+                  className="portal-user-logout"
+                  type="button"
+                  role="menuitem"
+                  onClick={selectLogout}
+                >
+                  Cerrar sesión
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <button type="button" onClick={onLogin}>
+            Ingresar
+          </button>
+        )}
       </nav>
     </header>
   );
 }
 
-function LoginView({ onBack, onLoginSuccess }) {
+function AccountSettingsPage({ user, onBack, onUserUpdate }) {
+  const initialFormData = {
+    acceptsDataUse: user?.acceptsDataUse ?? true,
+    celular: user?.celular ?? '',
+    confirmNewPassword: '',
+    correo: user?.correo ?? '',
+    fechaNacimiento: user?.fechaNacimiento ?? '',
+    newPassword: '',
+  };
+  const displayName =
+    user?.nombreCompleto || [user?.nombres, user?.apellidos].filter(Boolean).join(' ');
+  const [formData, setFormData] = useState(initialFormData);
+  const [formError, setFormError] = useState('');
+  const [formSuccess, setFormSuccess] = useState('');
+  const [isNewPasswordVisible, setIsNewPasswordVisible] = useState(false);
+  const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
+
+  function updateField(field, value) {
+    setFormData((currentData) => ({
+      ...currentData,
+      [field]: value,
+    }));
+    setFormError('');
+    setFormSuccess('');
+  }
+
+  function submitAccountSettings(event) {
+    event.preventDefault();
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailPattern.test(formData.correo.trim())) {
+      setFormError('Ingresa un correo electrónico válido.');
+      return;
+    }
+
+    if (!formData.celular.trim()) {
+      setFormError('Ingresa tu número de celular.');
+      return;
+    }
+
+    if (
+      (formData.newPassword || formData.confirmNewPassword) &&
+      formData.newPassword !== formData.confirmNewPassword
+    ) {
+      setFormError('Las contraseñas deben coincidir.');
+      return;
+    }
+
+    const payload = {
+      fechaNacimiento: formData.fechaNacimiento,
+      correo: formData.correo.trim(),
+      celular: formData.celular.trim(),
+      acceptsDataUse: formData.acceptsDataUse,
+      nuevaPassword: formData.newPassword || null,
+    };
+
+    // TODO: conectar este payload con el endpoint de actualizacion de cuenta en Spring Boot.
+    void payload;
+
+    const updatedUser = {
+      ...user,
+      acceptsDataUse: formData.acceptsDataUse,
+      celular: formData.celular.trim(),
+      correo: formData.correo.trim(),
+      fechaNacimiento: formData.fechaNacimiento,
+    };
+
+    try {
+      localStorage.setItem(citizenAuthStorageKey, JSON.stringify(updatedUser));
+    } catch {
+      // La persistencia local es temporal mientras no exista backend.
+    }
+
+    onUserUpdate(updatedUser);
+    setFormData((currentData) => ({
+      ...currentData,
+      confirmNewPassword: '',
+      newPassword: '',
+    }));
+    setFormSuccess('Datos actualizados correctamente.');
+  }
+
+  function cancelAccountSettings() {
+    setFormData(initialFormData);
+    setFormError('');
+    setFormSuccess('');
+    onBack();
+  }
+
+  return (
+    <section className="account-settings-shell" aria-labelledby="account-settings-title">
+      <form className="account-settings-panel" onSubmit={submitAccountSettings}>
+        <button className="detail-back-link register-back-link" type="button" onClick={onBack}>
+          <span aria-hidden="true">←</span>
+          Volver a eventos
+        </button>
+
+        <div className="account-settings-heading">
+          <span className="section-kicker">Cuenta vecinal</span>
+          <h1 id="account-settings-title">Configuración de cuenta</h1>
+          <p>Revisa y actualiza los datos asociados a tu cuenta vecinal.</p>
+        </div>
+
+        <div className="register-fields-grid account-fields-grid">
+          <label>
+            DNI
+            <input
+              disabled
+              type="text"
+              value={user?.dni ?? ''}
+              readOnly
+            />
+            <span className="account-field-help">
+              No editable. Documento validado para tu cuenta.
+            </span>
+          </label>
+          <label>
+            Nombres y apellidos
+            <input
+              disabled
+              type="text"
+              value={displayName}
+              readOnly
+            />
+            <span className="account-field-help">
+              No editable. Información validada con fuente oficial.
+            </span>
+          </label>
+          <label>
+            Fecha de nacimiento
+            <input
+              autoComplete="bday"
+              type="date"
+              value={formData.fechaNacimiento}
+              onChange={(event) => updateField('fechaNacimiento', event.target.value)}
+            />
+          </label>
+          <label>
+            Correo electrónico
+            <input
+              autoComplete="email"
+              type="email"
+              value={formData.correo}
+              onChange={(event) => updateField('correo', event.target.value)}
+            />
+          </label>
+          <label>
+            Celular
+            <input
+              autoComplete="tel"
+              inputMode="tel"
+              type="tel"
+              value={formData.celular}
+              onChange={(event) => updateField('celular', event.target.value)}
+            />
+          </label>
+        </div>
+
+        <label className="data-consent-control account-consent-control">
+          <input
+            type="checkbox"
+            checked={formData.acceptsDataUse}
+            onChange={(event) => updateField('acceptsDataUse', event.target.checked)}
+          />
+          <span>
+            Acepto el uso de mis datos para gestionar mi participación en eventos
+            municipales.
+          </span>
+        </label>
+
+        <section className="account-security-section" aria-labelledby="account-security-title">
+          <div>
+            <h2 id="account-security-title">Seguridad</h2>
+            <p>Puedes actualizar tu contraseña cuando lo necesites.</p>
+          </div>
+          <div className="register-fields-grid account-fields-grid">
+            <label>
+              Nueva contraseña
+              <span className="password-control">
+                <input
+                  autoComplete="new-password"
+                  type={isNewPasswordVisible ? 'text' : 'password'}
+                  value={formData.newPassword}
+                  onChange={(event) => updateField('newPassword', event.target.value)}
+                />
+                <button
+                  aria-label={
+                    isNewPasswordVisible ? 'Ocultar nueva contraseña' : 'Mostrar nueva contraseña'
+                  }
+                  className="password-toggle"
+                  type="button"
+                  onClick={() => setIsNewPasswordVisible((currentValue) => !currentValue)}
+                >
+                  {isNewPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              </span>
+            </label>
+            <label>
+              Confirmar nueva contraseña
+              <span className="password-control">
+                <input
+                  autoComplete="new-password"
+                  type={isConfirmPasswordVisible ? 'text' : 'password'}
+                  value={formData.confirmNewPassword}
+                  onChange={(event) => updateField('confirmNewPassword', event.target.value)}
+                />
+                <button
+                  aria-label={
+                    isConfirmPasswordVisible
+                      ? 'Ocultar confirmación de contraseña'
+                      : 'Mostrar confirmación de contraseña'
+                  }
+                  className="password-toggle"
+                  type="button"
+                  onClick={() =>
+                    setIsConfirmPasswordVisible((currentValue) => !currentValue)
+                  }
+                >
+                  {isConfirmPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              </span>
+            </label>
+          </div>
+        </section>
+
+        {formError && <p className="login-error">{formError}</p>}
+        {formSuccess && <p className="login-success">{formSuccess}</p>}
+
+        <div className="account-form-actions">
+          <button className="back-button" type="button" onClick={cancelAccountSettings}>
+            Cancelar
+          </button>
+          <button className="primary-button register-primary-button" type="submit">
+            Guardar cambios
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+function LoginView({ notice, onBack, onLoginSuccess, onRecoverPassword, onRegister }) {
   const [credentials, setCredentials] = useState({
     email: '',
     password: '',
@@ -538,11 +1122,11 @@ function LoginView({ onBack, onLoginSuccess }) {
           <div className="login-title">
             <span>Portal de eventos</span>
             <h1 id="login-title">Iniciar sesión</h1>
-            <p>Accede con tus credenciales institucionales.</p>
+            <p>Accede a tu cuenta para continuar.</p>
           </div>
 
           <label>
-            Correo institucional
+            Correo electrónico
             <input
               autoComplete="email"
               placeholder="Ingrese su correo electrónico"
@@ -582,16 +1166,26 @@ function LoginView({ onBack, onLoginSuccess }) {
               <input type="checkbox" />
               Recordarme
             </label>
-            <button type="button">Recuperar contraseña</button>
+            <button type="button" onClick={onRecoverPassword}>
+              Recuperar contraseña
+            </button>
           </div>
           <button className="primary-button" type="submit">
             Ingresar
           </button>
+          <p className="login-register-link">
+            <span>¿Aún no tienes cuenta vecinal?</span>
+            <button type="button" onClick={onRegister}>
+              Crear cuenta
+            </button>
+          </p>
+          {notice && <p className="login-success">{notice}</p>}
           {loginError && <p className="login-error">{loginError}</p>}
           <div className="login-test-users" aria-label="Credenciales de prueba">
             <span>Admin: admin@munisanmiguel.gob.pe / admin123</span>
             <span>Directivo: directivo@munisanmiguel.gob.pe / directivo123</span>
             <span>Operativo: operativo@munisanmiguel.gob.pe / operativo123</span>
+            <span>Vecino: vecino@gmail.com / vecino123</span>
           </div>
         </form>
 
@@ -600,6 +1194,542 @@ function LoginView({ onBack, onLoginSuccess }) {
             Volver a eventos
           </button>
         </p>
+      </div>
+
+      <div className="login-art-side" aria-hidden="true" />
+    </section>
+  );
+}
+
+function RecoverPasswordPage({ onBack, onLogin }) {
+  const [verificationData, setVerificationData] = useState({
+    correo: '',
+    dni: '',
+  });
+  const [passwordData, setPasswordData] = useState({
+    confirmPassword: '',
+    newPassword: '',
+  });
+  const [verifiedUser, setVerifiedUser] = useState(null);
+  const [formError, setFormError] = useState('');
+  const [formSuccess, setFormSuccess] = useState('');
+  const [isNewPasswordVisible, setIsNewPasswordVisible] = useState(false);
+  const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
+
+  function updateVerificationField(field, value) {
+    const nextValue = field === 'dni' ? value.replace(/\D/g, '').slice(0, 8) : value;
+
+    setVerificationData((currentData) => ({
+      ...currentData,
+      [field]: nextValue,
+    }));
+    setVerifiedUser(null);
+    setFormError('');
+    setFormSuccess('');
+  }
+
+  function updatePasswordField(field, value) {
+    setPasswordData((currentData) => ({
+      ...currentData,
+      [field]: value,
+    }));
+    setFormError('');
+    setFormSuccess('');
+  }
+
+  function verifyAccount(event) {
+    event.preventDefault();
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const correo = verificationData.correo.trim().toLowerCase();
+    const dni = verificationData.dni.trim();
+
+    if (!correo) {
+      setFormError('Ingresa tu correo electrónico.');
+      return;
+    }
+
+    if (!emailPattern.test(correo)) {
+      setFormError('Ingresa un correo electrónico válido.');
+      return;
+    }
+
+    if (!dni) {
+      setFormError('Ingresa tu DNI.');
+      return;
+    }
+
+    if (!/^\d{8}$/.test(dni)) {
+      setFormError('Ingrese un DNI válido de 8 dígitos.');
+      return;
+    }
+
+    // TODO: en produccion este flujo debe enviar un codigo o enlace al correo
+    // antes de permitir cambiar la contrasena desde Spring Boot.
+    const user = institutionalUsers.find(
+      (mockUser) =>
+        (mockUser.correo ?? mockUser.email)?.toLowerCase() === correo &&
+        mockUser.dni === dni,
+    );
+
+    if (!user) {
+      setVerifiedUser(null);
+      setFormError('No encontramos una cuenta con el correo y DNI ingresados.');
+      return;
+    }
+
+    setVerifiedUser(user);
+    setPasswordData({
+      confirmPassword: '',
+      newPassword: '',
+    });
+    setFormError('');
+    setFormSuccess('');
+  }
+
+  function updatePassword(event) {
+    event.preventDefault();
+
+    if (!passwordData.newPassword) {
+      setFormError('Ingresa una nueva contraseña.');
+      return;
+    }
+
+    if (!passwordData.confirmPassword) {
+      setFormError('Confirma tu nueva contraseña.');
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setFormError('Las contraseñas no coinciden.');
+      return;
+    }
+
+    // TODO: conectar con Spring Boot para registrar el cambio de contrasena.
+    setFormError('');
+    setFormSuccess('Contraseña actualizada correctamente. Ahora puedes iniciar sesión.');
+  }
+
+  return (
+    <section className="login-shell" aria-labelledby="recover-password-title">
+      <div className="login-form-side">
+        <button className="login-brand" type="button" onClick={onBack}>
+          <img
+            alt="Logo Municipalidad de San Miguel"
+            className="municipality-logo brand-logo"
+            src={municipalLogo}
+          />
+          <strong>Municipalidad de San Miguel</strong>
+        </button>
+
+        <form className="login-card recover-password-card" onSubmit={verifyAccount}>
+          <div className="login-title">
+            <span>Portal de eventos</span>
+            <h1 id="recover-password-title">Recuperar contraseña</h1>
+            <p>Ingresa tu correo electrónico y DNI para verificar tu cuenta.</p>
+          </div>
+
+          <label>
+            Correo electrónico
+            <input
+              autoComplete="email"
+              placeholder="Ingrese su correo electrónico"
+              type="email"
+              value={verificationData.correo}
+              onChange={(event) => updateVerificationField('correo', event.target.value)}
+            />
+          </label>
+          <label>
+            DNI
+            <input
+              autoComplete="off"
+              inputMode="numeric"
+              maxLength={8}
+              placeholder="Ingrese su DNI"
+              type="text"
+              value={verificationData.dni}
+              onChange={(event) => updateVerificationField('dni', event.target.value)}
+            />
+          </label>
+
+          <button className="primary-button" type="submit">
+            Verificar datos
+          </button>
+
+          {verifiedUser && !formSuccess && (
+            <section className="recover-password-step" aria-label="Actualizar contraseña">
+              <span className="identity-verified-message">
+                Cuenta verificada: {verifiedUser.nombreCompleto ?? verifiedUser.fullName}
+              </span>
+              <label>
+                Nueva contraseña
+                <span className="password-control">
+                  <input
+                    autoComplete="new-password"
+                    placeholder="Ingrese su nueva contraseña"
+                    type={isNewPasswordVisible ? 'text' : 'password'}
+                    value={passwordData.newPassword}
+                    onChange={(event) => updatePasswordField('newPassword', event.target.value)}
+                  />
+                  <button
+                    aria-label={
+                      isNewPasswordVisible ? 'Ocultar nueva contraseña' : 'Mostrar nueva contraseña'
+                    }
+                    className="password-toggle"
+                    type="button"
+                    onClick={() => setIsNewPasswordVisible((currentValue) => !currentValue)}
+                  >
+                    {isNewPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
+                  </button>
+                </span>
+              </label>
+              <label>
+                Confirmar nueva contraseña
+                <span className="password-control">
+                  <input
+                    autoComplete="new-password"
+                    placeholder="Repita su nueva contraseña"
+                    type={isConfirmPasswordVisible ? 'text' : 'password'}
+                    value={passwordData.confirmPassword}
+                    onChange={(event) =>
+                      updatePasswordField('confirmPassword', event.target.value)
+                    }
+                  />
+                  <button
+                    aria-label={
+                      isConfirmPasswordVisible
+                        ? 'Ocultar confirmación de contraseña'
+                        : 'Mostrar confirmación de contraseña'
+                    }
+                    className="password-toggle"
+                    type="button"
+                    onClick={() =>
+                      setIsConfirmPasswordVisible((currentValue) => !currentValue)
+                    }
+                  >
+                    {isConfirmPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
+                  </button>
+                </span>
+              </label>
+              <button
+                className="primary-button register-primary-button"
+                type="button"
+                onClick={updatePassword}
+              >
+                Actualizar contraseña
+              </button>
+            </section>
+          )}
+
+          {formError && <p className="login-error">{formError}</p>}
+          {formSuccess && (
+            <>
+              <p className="login-success">{formSuccess}</p>
+              <button className="primary-button" type="button" onClick={() => onLogin()}>
+                Ir a iniciar sesión
+              </button>
+            </>
+          )}
+        </form>
+
+        <p className="login-footer">
+          <button type="button" onClick={() => onLogin()}>
+            Volver a iniciar sesión
+          </button>
+        </p>
+      </div>
+
+      <div className="login-art-side" aria-hidden="true" />
+    </section>
+  );
+}
+
+function VecinoRegisterPage({ onBack, onLogin }) {
+  const [formData, setFormData] = useState(emptyCitizenRegister);
+  const [formError, setFormError] = useState('');
+  const [identityResult, setIdentityResult] = useState(null);
+  const [identityMessage, setIdentityMessage] = useState('');
+  const [isSearchingIdentity, setIsSearchingIdentity] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
+
+  function updateField(field, value) {
+    const nextValue = field === 'dni' ? value.replace(/\D/g, '').slice(0, 8) : value;
+
+    setFormData((currentData) => ({
+      ...currentData,
+      [field]: nextValue,
+    }));
+    setFormError('');
+
+    if (field === 'dni') {
+      setIdentityResult(null);
+      setIdentityMessage('');
+    }
+  }
+
+  async function searchIdentity() {
+    const dni = formData.dni.trim();
+
+    if (!/^\d{8}$/.test(dni)) {
+      setFormError('Ingresa un DNI válido de 8 dígitos.');
+      return;
+    }
+
+    setFormError('');
+    setIdentityMessage('');
+    setIsSearchingIdentity(true);
+
+    const identity = await buscarIdentidadPorDni(dni);
+
+    setIsSearchingIdentity(false);
+
+    if (!identity) {
+      setIdentityResult(null);
+      setIdentityMessage('No se encontraron datos para el DNI ingresado.');
+      return;
+    }
+
+    setIdentityResult(identity);
+    setIdentityMessage('');
+  }
+
+  function validateRegisterForm() {
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!formData.dni.trim()) {
+      return 'Ingresa tu DNI.';
+    }
+
+    if (!/^\d{8}$/.test(formData.dni.trim())) {
+      return 'Ingresa un DNI válido de 8 dígitos.';
+    }
+
+    if (!identityResult) {
+      return 'Busca y valida tu identidad antes de crear la cuenta.';
+    }
+
+    if (!formData.fechaNacimiento) {
+      return 'Selecciona tu fecha de nacimiento.';
+    }
+
+    if (!formData.correo.trim()) {
+      return 'Ingresa tu correo electrónico.';
+    }
+
+    if (!emailPattern.test(formData.correo.trim())) {
+      return 'Ingresa un correo electrónico válido.';
+    }
+
+    if (!formData.celular.trim()) {
+      return 'Ingresa tu número de celular.';
+    }
+
+    if (!formData.password) {
+      return 'Crea una contraseña.';
+    }
+
+    if (!formData.confirmPassword) {
+      return 'Confirma tu contraseña.';
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      return 'Las contraseñas deben coincidir.';
+    }
+
+    if (!formData.acceptsDataUse) {
+      return 'Debes aceptar el uso de tus datos para crear la cuenta.';
+    }
+
+    return '';
+  }
+
+  function submitRegister(event) {
+    event.preventDefault();
+
+    const validationMessage = validateRegisterForm();
+
+    if (validationMessage) {
+      setFormError(validationMessage);
+      return;
+    }
+
+    const payload = {
+      dni: formData.dni.trim(),
+      nombres: identityResult.nombres,
+      apellidos: identityResult.apellidos,
+      nombreCompleto: identityResult.nombreCompleto,
+      fechaNacimiento: formData.fechaNacimiento,
+      correo: formData.correo.trim(),
+      celular: formData.celular.trim(),
+      password: formData.password,
+    };
+
+    // TODO: conectar este payload con el endpoint de registro vecinal en Spring Boot.
+    void payload;
+    onLogin('¡Cuenta creada! Te enviamos un correo de confirmación. Revisa tu bandeja de entrada para activar tu cuenta e iniciar sesión.');
+  }
+
+  return (
+    <section className="login-shell register-shell" aria-labelledby="register-title">
+      <div className="login-form-side register-form-side">
+        <button className="login-brand" type="button" onClick={onBack}>
+          <img
+            alt="Logo Municipalidad de San Miguel"
+            className="municipality-logo brand-logo"
+            src={municipalLogo}
+          />
+          <strong>Municipalidad de San Miguel</strong>
+        </button>
+
+        <form className="login-card register-card" onSubmit={submitRegister}>
+          <button className="detail-back-link register-back-link" type="button" onClick={onBack}>
+            <span aria-hidden="true">←</span>
+            Volver a eventos
+          </button>
+
+          <div className="login-title">
+            <span>Portal de eventos</span>
+            <h1 id="register-title">Crear cuenta vecinal</h1>
+            <p>Regístrate para reservar tu lugar en las actividades municipales.</p>
+          </div>
+
+          <div className="register-fields-grid">
+            <label className="register-dni-field">
+              DNI
+              <span className="dni-search-control">
+                <input
+                  autoComplete="off"
+                  inputMode="numeric"
+                  maxLength={8}
+                  placeholder="Ingrese su DNI"
+                  type="text"
+                  value={formData.dni}
+                  onChange={(event) => updateField('dni', event.target.value)}
+                />
+                <button
+                  disabled={!/^\d{8}$/.test(formData.dni) || isSearchingIdentity}
+                  type="button"
+                  onClick={searchIdentity}
+                >
+                  {isSearchingIdentity ? 'Buscando...' : 'Buscar'}
+                </button>
+              </span>
+              {identityResult && (
+                <span className="identity-verified-message">
+                  Identidad verificada: {identityResult.nombreCompleto}
+                </span>
+              )}
+              {!identityResult && identityMessage && (
+                <span className="identity-error-message">{identityMessage}</span>
+              )}
+            </label>
+            <label>
+              Fecha de nacimiento
+              <input
+                autoComplete="bday"
+                placeholder="Seleccione su fecha de nacimiento"
+                type="date"
+                value={formData.fechaNacimiento}
+                onChange={(event) => updateField('fechaNacimiento', event.target.value)}
+              />
+            </label>
+            <label>
+              Correo electrónico
+              <input
+                autoComplete="email"
+                placeholder="Ingrese su correo electrónico"
+                type="email"
+                value={formData.correo}
+                onChange={(event) => updateField('correo', event.target.value)}
+              />
+            </label>
+            <label>
+              Celular
+              <input
+                autoComplete="tel"
+                inputMode="tel"
+                placeholder="Ingrese su número de celular"
+                type="tel"
+                value={formData.celular}
+                onChange={(event) => updateField('celular', event.target.value)}
+              />
+            </label>
+            <label>
+              Contraseña
+              <span className="password-control">
+                <input
+                  autoComplete="new-password"
+                  placeholder="Cree una contraseña"
+                  type={isPasswordVisible ? 'text' : 'password'}
+                  value={formData.password}
+                  onChange={(event) => updateField('password', event.target.value)}
+                />
+                <button
+                  aria-label={
+                    isPasswordVisible ? 'Ocultar contraseña' : 'Mostrar contraseña'
+                  }
+                  className="password-toggle"
+                  type="button"
+                  onClick={() => setIsPasswordVisible((currentValue) => !currentValue)}
+                >
+                  {isPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              </span>
+            </label>
+            <label>
+              Confirmar contraseña
+              <span className="password-control">
+                <input
+                  autoComplete="new-password"
+                  placeholder="Repita su contraseña"
+                  type={isConfirmPasswordVisible ? 'text' : 'password'}
+                  value={formData.confirmPassword}
+                  onChange={(event) => updateField('confirmPassword', event.target.value)}
+                />
+                <button
+                  aria-label={
+                    isConfirmPasswordVisible
+                      ? 'Ocultar confirmación de contraseña'
+                      : 'Mostrar confirmación de contraseña'
+                  }
+                  className="password-toggle"
+                  type="button"
+                  onClick={() =>
+                    setIsConfirmPasswordVisible((currentValue) => !currentValue)
+                  }
+                >
+                  {isConfirmPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              </span>
+            </label>
+          </div>
+
+          <label className="data-consent-control">
+            <input
+              type="checkbox"
+              checked={formData.acceptsDataUse}
+              onChange={(event) => updateField('acceptsDataUse', event.target.checked)}
+            />
+            <span>
+              Acepto el uso de mis datos para gestionar mi participación en eventos
+              municipales.
+            </span>
+          </label>
+
+          {formError && <p className="login-error">{formError}</p>}
+
+          <button className="primary-button register-primary-button" type="submit">
+            Crear cuenta
+          </button>
+
+          <p className="register-login-link">
+            ¿Ya tienes cuenta?{' '}
+            <button type="button" onClick={onLogin}>
+              Inicia sesión
+            </button>
+          </p>
+        </form>
       </div>
 
       <div className="login-art-side" aria-hidden="true" />
@@ -935,6 +2065,9 @@ function EventDetail({
   const mapsUrl = getEventMapsUrl(event);
   const scheduleLabel = getEventScheduleLabel(event);
   const availabilityState = getAvailabilityState(event.spots);
+  const requirementItems = getOrderedTextItems(event.requisitos_evento ?? event.requirements);
+  const agendaItems = getOrderedTextItems(event.agenda_evento ?? event.agenda);
+  const audienceLabel = getEventAudienceLabel(event);
 
   return (
     <section className="detail-shell" aria-labelledby="event-detail-title">
@@ -982,7 +2115,7 @@ function EventDetail({
                 <span className="section-kicker">Antes de asistir</span>
                 <h2>Requisitos</h2>
                 <ul className="check-list">
-                  {event.requirements.map((requirement) => (
+                  {requirementItems.map((requirement) => (
                     <li key={requirement}>{requirement}</li>
                   ))}
                 </ul>
@@ -991,7 +2124,7 @@ function EventDetail({
                 <span className="section-kicker">Programa</span>
                 <h2>Agenda prevista</h2>
                 <ol className="timeline-list">
-                  {event.agenda.map((agendaItem) => (
+                  {agendaItems.map((agendaItem) => (
                     <li key={agendaItem}>{agendaItem}</li>
                   ))}
                 </ol>
@@ -1063,7 +2196,7 @@ function EventDetail({
               </span>
               <div className="reservation-info-text">
                 <span>Dirigido a</span>
-                <strong>{event.audience}</strong>
+                <strong>{audienceLabel}</strong>
               </div>
             </div>
 
@@ -1123,41 +2256,96 @@ function ConfirmRegistrationModal({ eventTitle, onCancel, onConfirm }) {
   );
 }
 
-function RegistrationReceipt({ event, receiptCode, registration, onBack, onPrint }) {
+function LoginRequiredModal({ onCancel, onLogin, onRegister }) {
+  useEffect(() => {
+    function closeOnEscape(event) {
+      if (event.key === 'Escape') {
+        onCancel();
+      }
+    }
+
+    window.addEventListener('keydown', closeOnEscape);
+
+    return () => {
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [onCancel]);
+
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onCancel}>
+      <section
+        aria-labelledby="login-required-title"
+        aria-modal="true"
+        className="confirm-modal login-required-modal"
+        role="dialog"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <span className="section-kicker">Acceso requerido</span>
+        <h2 id="login-required-title">Inicia sesi&oacute;n y reserva tu lugar</h2>
+        <p>
+          Accede con tu cuenta vecinal para confirmar tu participaci&oacute;n y
+          guardar tus reservas de eventos municipales.
+        </p>
+        <div className="modal-actions">
+          <button className="back-button" type="button" onClick={onCancel}>
+            Cancelar
+          </button>
+          <button className="primary-button" type="button" onClick={onLogin}>
+            Iniciar sesi&oacute;n
+          </button>
+        </div>
+        <p className="login-required-register-link">
+          ¿Aún no tienes cuenta?{' '}
+          <button type="button" onClick={onRegister}>
+            Crear cuenta vecinal
+          </button>
+        </p>
+      </section>
+    </div>
+  );
+}
+
+function RegistrationReceipt({ event, receiptCode, registration, user, onBack, onPrint }) {
+  const participantName =
+    registration.fullName ||
+    user?.nombreCompleto ||
+    [user?.nombres, user?.apellidos].filter(Boolean).join(' ') ||
+    'Sergio André Bustamante Villanueva';
+  const participantDni = registration.documentNumber || user?.dni || '12345678';
+
+  function downloadReceipt() {
+    // TODO: conectar con endpoint de descarga de constancia cuando exista backend.
+    onPrint();
+  }
+
   return (
     <section className="receipt-shell" aria-labelledby="receipt-title">
-      <div className="receipt-actions no-print">
-        <button className="back-button" type="button" onClick={onBack}>
-          Volver a eventos
-        </button>
-        <button className="primary-button" type="button" onClick={onPrint}>
-          Descargar PDF
-        </button>
-      </div>
-
       <article className="receipt-card">
         <header className="receipt-header">
           <div>
             <span className="section-kicker">Constancia de inscripción</span>
             <h1 id="receipt-title">Inscripción confirmada</h1>
             <p>
-              Tu constancia fue generada correctamente. También se enviará una
-              copia al correo de tu perfil ciudadano.
+              Tu reserva fue registrada correctamente. Presenta el código QR el
+              día del evento.
             </p>
           </div>
           <HardcodedQrCode value={receiptCode} />
         </header>
 
-        <div className="receipt-code">{receiptCode}</div>
+        <div className="receipt-code">
+          <span>Código de inscripción:</span>
+          <strong>{receiptCode}</strong>
+        </div>
 
         <dl className="receipt-details">
           <div>
             <dt>Participante</dt>
-            <dd>{registration.fullName || 'Vecino autenticado'}</dd>
+            <dd>{participantName}</dd>
           </div>
           <div>
             <dt>DNI</dt>
-            <dd>{registration.documentNumber || 'Desde perfil ciudadano'}</dd>
+            <dd>{participantDni}</dd>
           </div>
           <div>
             <dt>Evento</dt>
@@ -1180,12 +2368,35 @@ function RegistrationReceipt({ event, receiptCode, registration, onBack, onPrint
         </dl>
 
         <div className="receipt-note">
-          Presenta esta constancia o el código QR en el punto de control del
-          evento. El envío de correo requiere integración con backend en la
-          siguiente etapa.
+          <p>Se envió una constancia a tu correo electrónico.</p>
+        </div>
+
+        <div className="receipt-actions no-print">
+          <button className="detail-back-link receipt-back-link" type="button" onClick={onBack}>
+            <span aria-hidden="true">←</span>
+            Volver a eventos
+          </button>
+          <button
+            className="receipt-download-link"
+            type="button"
+            onClick={downloadReceipt}
+          >
+            <DownloadIcon />
+            Descargar constancia
+          </button>
         </div>
       </article>
     </section>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M12 3v11" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M5 20h14" />
+    </svg>
   );
 }
 

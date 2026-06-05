@@ -531,16 +531,6 @@ function OperativoDashboard({ onLogout, user }) {
                 Control de acceso
               </a>
               <a
-                className={activeOperativeSection === 'validacion-manual' ? 'active' : ''}
-                href="#validacion-manual"
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigateOperativeSection('validacion-manual');
-                }}
-              >
-                Validación manual
-              </a>
-              <a
                 className={activeOperativeSection === 'inscripcion-manual' ? 'active' : ''}
                 href="#inscripcion-manual"
                 onClick={(event) => {
