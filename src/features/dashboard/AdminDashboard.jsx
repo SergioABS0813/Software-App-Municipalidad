@@ -238,6 +238,79 @@ const neighborStatusOptions = [
   { label: 'Bloqueado', value: 'BLOQUEADO' },
   { label: 'Inactivo', value: 'INACTIVO' },
 ];
+
+const settingsUsers = [
+  { id: 1, nombre: 'Administrador municipal', correo: 'admin@munisanmiguel.gob.pe', rol: 'Administrador', area: 'Gerencia Municipal', estado: 'ACTIVO' },
+  { id: 2, nombre: 'Directivo de Cultura', correo: 'directivo@munisanmiguel.gob.pe', rol: 'Directivo', area: 'Subgerencia de Educación y Cultura', estado: 'ACTIVO' },
+  { id: 3, nombre: 'Operativo de asistencia', correo: 'operativo@munisanmiguel.gob.pe', rol: 'Operativo', area: 'Oficina de Participación Vecinal', estado: 'INACTIVO' },
+];
+
+const settingsCategories = [
+  { id: 1, nombre: 'Cultura', descripcion: 'Actividades culturales, artísticas y comunitarias.', eventosAsociados: 8, estado: 'ACTIVO' },
+  { id: 2, nombre: 'Deporte', descripcion: 'Eventos deportivos, recreativos y competencias vecinales.', eventosAsociados: 5, estado: 'ACTIVO' },
+  { id: 3, nombre: 'Participación vecinal', descripcion: 'Encuentros ciudadanos y acciones de integración barrial.', eventosAsociados: 4, estado: 'ACTIVO' },
+  { id: 4, nombre: 'Salud', descripcion: 'Campañas preventivas y servicios de salud municipal.', eventosAsociados: 3, estado: 'ACTIVO' },
+  { id: 5, nombre: 'Educación', descripcion: 'Talleres, charlas y actividades formativas.', eventosAsociados: 0, estado: 'INACTIVO' },
+];
+
+const settingsLocations = [
+  {
+    id: 1,
+    nombre: 'Casa de la Cultura',
+    direccion: 'Av. Federico Gallese 420',
+    referencia: 'Ingreso principal por la avenida',
+    tipo: 'Auditorio',
+    aforoReferencial: 180,
+    latitud: '-12.0763',
+    longitud: '-77.0821',
+    estado: 'ACTIVO',
+  },
+  {
+    id: 2,
+    nombre: 'Parque Media Luna',
+    direccion: 'Circuito de playas, San Miguel',
+    referencia: 'Zona central frente al malecon',
+    tipo: 'Parque',
+    aforoReferencial: 400,
+    latitud: '-12.0876',
+    longitud: '-77.0936',
+    estado: 'ACTIVO',
+  },
+  {
+    id: 3,
+    nombre: 'Complejo Deportivo Municipal',
+    direccion: 'Av. La Paz 1450',
+    referencia: 'Ingreso por puerta norte',
+    tipo: 'Complejo deportivo',
+    aforoReferencial: 320,
+    latitud: '-12.0899',
+    longitud: '-77.0812',
+    estado: 'ACTIVO',
+  },
+  {
+    id: 4,
+    nombre: 'Plaza principal',
+    direccion: 'Centro civico de San Miguel',
+    referencia: 'Explanada central junto al modulo municipal',
+    tipo: 'Plaza',
+    aforoReferencial: 600,
+    latitud: '-12.0782',
+    longitud: '-77.0851',
+    estado: 'ACTIVO',
+  },
+  {
+    id: 5,
+    nombre: 'Auditorio municipal',
+    direccion: 'Palacio Municipal',
+    referencia: 'Segundo piso, acceso por recepcion',
+    tipo: 'Auditorio',
+    aforoReferencial: 120,
+    latitud: '-12.0774',
+    longitud: '-77.0837',
+    estado: 'INACTIVO',
+  },
+];
+
 // TODO: cargar este catálogo desde el CRUD real de ubicaciones en Spring Boot.
 const registeredLocations = [
   {
@@ -351,6 +424,22 @@ function getLocationMapEmbedUrl(location) {
 
   // TODO: reemplazar por URL oficial/clave configurada si el backend provee mapas reales.
   return `https://maps.google.com/maps?q=${location.latitud},${location.longitud}&z=16&output=embed`;
+}
+
+function getSettingsLocationMapEmbedUrl(location) {
+  if (!location?.latitud || !location?.longitud) {
+    return '';
+  }
+
+  return `https://maps.google.com/maps?q=${location.latitud},${location.longitud}&z=16&output=embed`;
+}
+
+function getSettingsLocationMapsUrl(location) {
+  if (!location?.latitud || !location?.longitud) {
+    return '';
+  }
+
+  return `https://www.google.com/maps/search/?api=1&query=${location.latitud},${location.longitud}`;
 }
 
 function getVideoPreviewEmbedUrl(url) {
@@ -610,6 +699,21 @@ function getEventEndDateTimeValue(event) {
   return formatDateToDateTimeLocal(endDate);
 }
 
+function canCompareDateTimeValues(startValue, endValue) {
+  return hasValue(startValue) &&
+    hasValue(endValue) &&
+    !Number.isNaN(new Date(startValue).getTime()) &&
+    !Number.isNaN(new Date(endValue).getTime());
+}
+
+function isDateTimeAfter(startValue, endValue) {
+  if (!canCompareDateTimeValues(startValue, endValue)) {
+    return true;
+  }
+
+  return new Date(endValue).getTime() > new Date(startValue).getTime();
+}
+
 function getEventChecklist(event, options = {}) {
   const observationAddressed = options.observationAddressed ?? false;
   const resolvedAreaId = event.area_municipal_id ?? getMunicipalAreaByEvent(event)?.area_municipal_id;
@@ -628,8 +732,10 @@ function getEventChecklist(event, options = {}) {
       complete:
         hasValue(event.date) &&
         hasValue(event.time) &&
+        isDateTimeAfter(event.date, event.time) &&
         hasValue(event.registrationStart) &&
         hasValue(event.registrationEnd) &&
+        isDateTimeAfter(event.registrationStart, event.registrationEnd) &&
         hasValue(event.publico_tipo) &&
         hasValidAudienceConfig(event) &&
         hasValidAforo(event),
@@ -699,8 +805,10 @@ function getCreationEventChecklist(event) {
       complete:
         hasValue(event.date) &&
         hasValue(event.time) &&
+        isDateTimeAfter(event.date, event.time) &&
         hasValue(event.registrationStart) &&
         hasValue(event.registrationEnd) &&
+        isDateTimeAfter(event.registrationStart, event.registrationEnd) &&
         hasValidAforo(event) &&
         hasValue(event.referenceCost) &&
         hasValue(event.publico_tipo) &&
@@ -877,9 +985,25 @@ function getMissingReviewFields(form, existingEvent = null) {
   const audienceType = getNamedFormValue(form, 'publico_tipo') || 'GENERAL';
   const minAge = Number(getNamedFormValue(form, 'edad_minima'));
   const maxAge = Number(getNamedFormValue(form, 'edad_maxima'));
+  const eventStart = getNamedFormValue(form, 'eventStart');
+  const eventEnd = getNamedFormValue(form, 'eventEnd');
+  const registrationStart = getNamedFormValue(form, 'registrationStart');
+  const registrationEnd = getNamedFormValue(form, 'registrationEnd');
 
   if (shortDescription.length > 255) {
     missingFields.push('Descripción breve de máximo 255 caracteres');
+  }
+
+  if (hasValue(eventStart) && hasValue(eventEnd) && !isDateTimeAfter(eventStart, eventEnd)) {
+    missingFields.push('Fin del evento posterior al inicio del evento');
+  }
+
+  if (
+    hasValue(registrationStart) &&
+    hasValue(registrationEnd) &&
+    !isDateTimeAfter(registrationStart, registrationEnd)
+  ) {
+    missingFields.push('Fin de inscripción posterior al inicio de inscripción');
   }
 
   if (!hasValidOrderedItems(parseOrderedEventItems(getNamedFormValue(form, 'agenda_evento_json')))) {
@@ -935,7 +1059,18 @@ function getMissingReviewFields(form, existingEvent = null) {
 
 function AdminDashboard({ onLogout, user }) {
   const [currentAdminView, setCurrentAdminView] = useState(() =>
-    window.location.pathname === '/admin/vecinos' ? 'neighbors' : 'dashboard',
+    window.location.pathname === '/admin/vecinos'
+      ? 'neighbors'
+      : window.location.pathname === '/admin/configuracion/usuarios'
+        ? 'settings-users'
+        : window.location.pathname === '/admin/configuracion/categorias'
+          ? 'settings-categories'
+          : window.location.pathname === '/admin/configuracion/ubicaciones'
+            ? 'settings-locations'
+            : 'dashboard',
+  );
+  const [isSettingsNavOpen, setIsSettingsNavOpen] = useState(() =>
+    window.location.pathname.startsWith('/admin/configuracion'),
   );
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [pendingEventAction, setPendingEventAction] = useState(null);
@@ -949,6 +1084,7 @@ function AdminDashboard({ onLogout, user }) {
   const pendingPopoverRef = useRef(null);
   const isEventFormView =
     currentAdminView === 'new-event' || currentAdminView === 'edit-event';
+  const isSettingsView = currentAdminView.startsWith('settings-');
   const adminUser = user ?? fallbackAdminUser;
   const adminUserName = getUserDisplayName(adminUser);
 
@@ -1115,9 +1251,12 @@ function AdminDashboard({ onLogout, user }) {
                 currentAdminView === 'dashboard' ? 'admin-nav-link active' : 'admin-nav-link'
               }
               type="button"
-              onClick={() => setCurrentAdminView('dashboard')}
+              onClick={() => {
+                window.history.pushState(null, '', '/admin');
+                setCurrentAdminView('dashboard');
+              }}
             >
-              Resumen
+              Eventos
             </button>
             <button
               className={
@@ -1131,6 +1270,43 @@ function AdminDashboard({ onLogout, user }) {
             >
               Cuentas vecinales
             </button>
+            <div className={`admin-nav-group${isSettingsNavOpen || isSettingsView ? ' is-open' : ''}`}>
+              <button
+                className={isSettingsView ? 'admin-nav-link active' : 'admin-nav-link'}
+                type="button"
+                aria-expanded={isSettingsNavOpen || isSettingsView}
+                onClick={() => setIsSettingsNavOpen((isOpen) => !isOpen)}
+              >
+                Configuración
+                <span className="admin-nav-chevron" aria-hidden="true">⌄</span>
+              </button>
+              {(isSettingsNavOpen || isSettingsView) && (
+                <div className="admin-nav-submenu">
+                  {[
+                    { label: 'Usuarios', path: '/admin/configuracion/usuarios', view: 'settings-users' },
+                    { label: 'Categorías', path: '/admin/configuracion/categorias', view: 'settings-categories' },
+                    { label: 'Ubicaciones', path: '/admin/configuracion/ubicaciones', view: 'settings-locations' },
+                  ].map((item) => (
+                    <button
+                      className={
+                        currentAdminView === item.view
+                          ? 'admin-nav-sublink active'
+                          : 'admin-nav-sublink'
+                      }
+                      key={item.view}
+                      type="button"
+                      onClick={() => {
+                        window.history.pushState(null, '', item.path);
+                        setCurrentAdminView(item.view);
+                        setIsSettingsNavOpen(true);
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <button className="admin-nav-logout" type="button" onClick={onLogout}>
               Salir del panel
             </button>
@@ -1165,6 +1341,12 @@ function AdminDashboard({ onLogout, user }) {
           />
         ) : currentAdminView === 'neighbors' ? (
           <NeighborAccountsPage adminUserName={adminUserName} />
+        ) : currentAdminView === 'settings-users' ? (
+          <SettingsUsersPage />
+        ) : currentAdminView === 'settings-categories' ? (
+          <SettingsCategoriesPage />
+        ) : currentAdminView === 'settings-locations' ? (
+          <SettingsLocationsPage />
         ) : (
           <>
             <header className="admin-topbar">
@@ -1884,13 +2066,15 @@ function NeighborAccountsPage({ adminUserName }) {
   const [neighbors, setNeighbors] = useState(initialNeighborAccounts);
   const [searchValue, setSearchValue] = useState('');
   const [stateFilterValue, setStateFilterValue] = useState('TODOS');
-  const [selectedNeighborId, setSelectedNeighborId] = useState(initialNeighborAccounts[0]?.id ?? null);
+  const [selectedNeighbor, setSelectedNeighbor] = useState(null);
   const [editingContact, setEditingContact] = useState(false);
   const [contactDraft, setContactDraft] = useState({ celular: '', correo: '' });
   const [actionModal, setActionModal] = useState(null);
   const [actionReason, setActionReason] = useState('');
   const [notice, setNotice] = useState('');
-  const selectedNeighbor = neighbors.find((neighbor) => neighbor.id === selectedNeighborId) ?? neighbors[0];
+  const modalNeighbor = selectedNeighbor
+    ? neighbors.find((neighbor) => neighbor.id === selectedNeighbor.id) ?? selectedNeighbor
+    : null;
   const filteredNeighbors = useMemo(() => {
     const normalizedSearch = searchValue.trim().toLowerCase();
 
@@ -1913,16 +2097,58 @@ function NeighborAccountsPage({ adminUserName }) {
     total: neighbors.length,
   };
 
+  useEffect(() => {
+    if (!modalNeighbor) {
+      return undefined;
+    }
+
+    function closeNeighborModalOnEscape(event) {
+      if (event.key === 'Escape') {
+        closeNeighborDetailModal();
+      }
+    }
+
+    document.addEventListener('keydown', closeNeighborModalOnEscape);
+
+    return () => {
+      document.removeEventListener('keydown', closeNeighborModalOnEscape);
+    };
+  }, [modalNeighbor, actionModal]);
+
+  function openNeighborDetailModal(neighbor) {
+    setSelectedNeighbor(neighbor);
+    setEditingContact(false);
+    setNotice('');
+  }
+
+  function closeNeighborDetailModal() {
+    if (actionModal) {
+      return;
+    }
+
+    setSelectedNeighbor(null);
+    setEditingContact(false);
+    setNotice('');
+  }
+
   function startContactEdit() {
+    if (!modalNeighbor) {
+      return;
+    }
+
     setContactDraft({
-      celular: selectedNeighbor.celular,
-      correo: selectedNeighbor.correo,
+      celular: modalNeighbor.celular,
+      correo: modalNeighbor.correo,
     });
     setEditingContact(true);
     setNotice('');
   }
 
   function saveContactEdit() {
+    if (!modalNeighbor) {
+      return;
+    }
+
     if (!contactDraft.correo.trim() || !contactDraft.celular.trim()) {
       setNotice('Completa correo y celular antes de guardar.');
       return;
@@ -1930,7 +2156,7 @@ function NeighborAccountsPage({ adminUserName }) {
 
     setNeighbors((currentNeighbors) =>
       currentNeighbors.map((neighbor) =>
-        neighbor.id === selectedNeighbor.id
+        neighbor.id === modalNeighbor.id
           ? { ...neighbor, celular: contactDraft.celular.trim(), correo: contactDraft.correo.trim() }
           : neighbor,
       ),
@@ -1941,6 +2167,10 @@ function NeighborAccountsPage({ adminUserName }) {
   }
 
   function confirmAccountAction() {
+    if (!modalNeighbor) {
+      return;
+    }
+
     if (actionModal === 'block' && !actionReason.trim()) {
       setNotice('Indica el motivo del bloqueo.');
       return;
@@ -1955,7 +2185,7 @@ function NeighborAccountsPage({ adminUserName }) {
 
     setNeighbors((currentNeighbors) =>
       currentNeighbors.map((neighbor) => {
-        if (neighbor.id !== selectedNeighbor.id) {
+        if (neighbor.id !== modalNeighbor.id) {
           return neighbor;
         }
 
@@ -1997,15 +2227,8 @@ function NeighborAccountsPage({ adminUserName }) {
         </div>
       </header>
 
-      <section className="admin-stats neighbor-stats" aria-label="Resumen de cuentas vecinales">
-        <NeighborStatCard label="Activas" value={summary.active} />
-        <NeighborStatCard label="Pendientes" value={summary.pending} />
-        <NeighborStatCard label="Bloqueadas" value={summary.blocked} />
-        <NeighborStatCard label="Total de vecinos" value={summary.total} />
-      </section>
-
       <section className="neighbor-admin-layout">
-        <article className="admin-table-panel admin-table-featured">
+        <article className="admin-table-panel admin-table-featured neighbor-table-panel">
           <div className="admin-panel-heading">
             <div>
               <span className="section-kicker">Directorio</span>
@@ -2032,39 +2255,40 @@ function NeighborAccountsPage({ adminUserName }) {
           </div>
           <div className="admin-table neighbor-table">
             <div className="admin-table-row admin-table-head">
-              <span>Vecino</span><span>DNI</span><span>Correo</span><span>Celular</span><span>Estado</span><span>Inscripciones</span><span>Acción</span>
+              <span>Vecino</span><span>Estado</span><span>Acción</span>
             </div>
             {filteredNeighbors.map((neighbor) => (
               <div className="admin-table-row" key={neighbor.id}>
-                <span><strong>{neighbor.nombreCompleto}</strong><small>{neighbor.fechaRegistro}</small></span>
-                <span>{neighbor.dni}</span>
-                <span>{neighbor.correo}</span>
-                <span>{neighbor.celular}</span>
-                <span className={`neighbor-state-badge ${getNeighborStateTone(neighbor.estado)}`}>{getNeighborStateLabel(neighbor.estado)}</span>
-                <span>{neighbor.inscripciones.length}</span>
+                <span className="neighbor-person-cell">
+                  <strong>{neighbor.nombreCompleto}</strong>
+                  <small>DNI: {neighbor.dni}</small>
+                  <small>Correo: {neighbor.correo}</small>
+                </span>
+                <span className={`neighbor-state-text ${getNeighborStateTone(neighbor.estado)}`}>
+                  {getNeighborStateLabel(neighbor.estado)}
+                </span>
                 <button
+                  aria-label={`Ver o editar información de ${neighbor.nombreCompleto}`}
                   className="table-icon-action is-detail neighbor-detail-action"
+                  data-tooltip="Ver/editar información"
                   type="button"
-                  onClick={() => {
-                    setSelectedNeighborId(neighbor.id);
-                    setEditingContact(false);
-                    setNotice('');
-                  }}
+                  onClick={() => openNeighborDetailModal(neighbor)}
                 >
-                  Ver detalle
+                  <ViewIcon />
                 </button>
               </div>
             ))}
           </div>
         </article>
 
-        {selectedNeighbor && (
-          <NeighborDetailPanel
+        {modalNeighbor && (
+          <NeighborDetailModal
             actionNotice={notice}
             contactDraft={contactDraft}
             editingContact={editingContact}
-            neighbor={selectedNeighbor}
+            neighbor={modalNeighbor}
             onCancelEdit={() => setEditingContact(false)}
+            onClose={closeNeighborDetailModal}
             onContactChange={setContactDraft}
             onOpenAction={(action) => {
               setActionReason('');
@@ -2100,76 +2324,143 @@ function NeighborStatCard({ label, value }) {
   );
 }
 
-function NeighborDetailPanel({
+function NeighborDetailModal({
   actionNotice,
   contactDraft,
   editingContact,
   neighbor,
   onCancelEdit,
+  onClose,
   onContactChange,
   onOpenAction,
   onSaveContact,
   onStartEdit,
 }) {
+  const cleanPhone = neighbor.celular.replace(/\D/g, '') || neighbor.celular;
+  const contextualAction =
+    neighbor.estado === 'PENDIENTE_CONFIRMACION'
+      ? { action: 'resend', label: 'Reenviar confirmación' }
+      : neighbor.estado === 'ACTIVO'
+        ? { action: 'block', label: 'Bloquear cuenta' }
+        : neighbor.estado === 'BLOQUEADO'
+          ? { action: 'reactivate', label: 'Reactivar cuenta' }
+          : null;
+
   return (
-    <aside className="admin-panel neighbor-detail-panel">
-      <div className="neighbor-detail-heading">
-        <span className="section-kicker">Detalle vecinal</span>
-        <h2>{neighbor.nombreCompleto}</h2>
-        <span className={`neighbor-state-badge ${getNeighborStateTone(neighbor.estado)}`}>
-          {getNeighborStateLabel(neighbor.estado)}
-        </span>
-      </div>
-      {actionNotice && <p className="neighbor-action-notice">{actionNotice}</p>}
-      <dl className="neighbor-detail-list">
-        <div><dt>DNI</dt><dd>{neighbor.dni}</dd></div>
-        <div><dt>Fecha de nacimiento</dt><dd>{neighbor.fechaNacimiento}</dd></div>
-        <div><dt>Fecha de registro</dt><dd>{neighbor.fechaRegistro}</dd></div>
-        <div><dt>Confirmación de correo</dt><dd>{neighbor.fechaConfirmacionCorreo || 'Pendiente'}</dd></div>
-      </dl>
-      <section className="neighbor-contact-section">
-        <div className="neighbor-section-heading">
-          <h3>Contacto</h3>
-          {!editingContact && <button type="button" onClick={onStartEdit}>Editar contacto</button>}
-        </div>
-        {editingContact ? (
-          <div className="neighbor-contact-form">
-            <label>Correo electrónico<input value={contactDraft.correo} onChange={(event) => onContactChange((current) => ({ ...current, correo: event.target.value }))} /></label>
-            <label>Celular<input value={contactDraft.celular} onChange={(event) => onContactChange((current) => ({ ...current, celular: event.target.value }))} /></label>
-            <div className="neighbor-inline-actions">
-              <button type="button" onClick={onCancelEdit}>Cancelar</button>
-              <button type="button" onClick={onSaveContact}>Guardar cambios</button>
-            </div>
+    <div
+      className="modal-backdrop neighbor-detail-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <section
+        aria-labelledby="neighbor-detail-title"
+        aria-modal="true"
+        className="neighbor-detail-modal"
+        role="dialog"
+      >
+        <header className="neighbor-detail-header">
+          <div className="neighbor-detail-kicker-row">
+            <span className="section-kicker">Detalle vecinal</span>
+            <button
+              aria-label="Cerrar detalle vecinal"
+              className="neighbor-modal-close"
+              type="button"
+              onClick={onClose}
+            >
+              ×
+            </button>
           </div>
-        ) : (
-          <dl className="neighbor-detail-list compact">
-            <div><dt>Correo</dt><dd>{neighbor.correo}</dd></div>
-            <div><dt>Celular</dt><dd>{neighbor.celular}</dd></div>
+          <div className="neighbor-detail-title-row">
+            <h2 id="neighbor-detail-title">{neighbor.nombreCompleto}</h2>
+            <span className={`neighbor-state-badge ${getNeighborStateTone(neighbor.estado)}`}>
+              {getNeighborStateLabel(neighbor.estado)}
+            </span>
+          </div>
+        </header>
+        <div className="neighbor-detail-body">
+          {actionNotice && <p className="neighbor-action-notice">{actionNotice}</p>}
+          <dl className="neighbor-detail-list">
+            <div><dt>DNI</dt><dd>{neighbor.dni}</dd></div>
+            <div><dt>Fecha de nacimiento</dt><dd>{neighbor.fechaNacimiento}</dd></div>
+            <div><dt>Fecha de registro</dt><dd>{neighbor.fechaRegistro}</dd></div>
+            <div><dt>Confirmación de correo</dt><dd>{neighbor.fechaConfirmacionCorreo || 'Pendiente'}</dd></div>
           </dl>
-        )}
-      </section>
-      <section className="neighbor-admin-actions">
-        {neighbor.estado === 'PENDIENTE_CONFIRMACION' && <button type="button" onClick={() => onOpenAction('resend')}>Reenviar correo de confirmación</button>}
-        {neighbor.estado === 'ACTIVO' && <button type="button" onClick={() => onOpenAction('block')}>Bloquear cuenta</button>}
-        {neighbor.estado === 'BLOQUEADO' && <button type="button" onClick={() => onOpenAction('reactivate')}>Reactivar cuenta</button>}
-      </section>
-      <section className="neighbor-registrations">
-        <h3>Inscripciones</h3>
-        {neighbor.inscripciones.length > 0 ? (
-          <div className="neighbor-registration-list">
-            {neighbor.inscripciones.map((registration) => (
-              <div key={registration.codigoInscripcion}>
-                <strong>{registration.evento}</strong>
-                <span>{registration.fechaEvento}</span>
-                <small>{registration.estadoInscripcion} · {registration.codigoInscripcion} · {registration.asistencia}</small>
+          <section className="neighbor-contact-section">
+            <div className="neighbor-section-heading">
+              <h3>Contacto</h3>
+            </div>
+            {editingContact ? (
+              <div className="neighbor-contact-form">
+                <label>Correo electrónico<input value={contactDraft.correo} onChange={(event) => onContactChange((current) => ({ ...current, correo: event.target.value }))} /></label>
+                <label>Celular<input inputMode="numeric" value={contactDraft.celular} onChange={(event) => onContactChange((current) => ({ ...current, celular: event.target.value.replace(/\D/g, '') }))} /></label>
               </div>
-            ))}
-          </div>
-        ) : (
-          <p>Este vecino aún no registra inscripciones.</p>
-        )}
+            ) : (
+              <dl className="neighbor-detail-list compact">
+                <div><dt>Correo</dt><dd>{neighbor.correo}</dd></div>
+                <div><dt>Celular</dt><dd>{cleanPhone}</dd></div>
+              </dl>
+            )}
+          </section>
+          <section className="neighbor-registrations">
+            <h3>Inscripciones</h3>
+            {neighbor.inscripciones.length > 0 ? (
+              <div className="neighbor-registration-list">
+                {neighbor.inscripciones.map((registration) => (
+                  <div className="neighbor-registration-row" key={registration.codigoInscripcion}>
+                    <span className="neighbor-registration-event">
+                      <strong>{registration.evento}</strong>
+                      <small>{registration.fechaEvento}</small>
+                    </span>
+                    <dl className="neighbor-registration-meta">
+                      <div><dt>Inscripción:</dt><dd>{registration.estadoInscripcion}</dd></div>
+                      <div><dt>Código:</dt><dd>{registration.codigoInscripcion}</dd></div>
+                      <div><dt>Asistencia:</dt><dd className={`neighbor-attendance-status ${registration.asistencia.toLowerCase()}`}>{registration.asistencia}</dd></div>
+                    </dl>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p>Este vecino aún no registra inscripciones.</p>
+            )}
+          </section>
+        </div>
+        <footer className="neighbor-detail-footer">
+          {editingContact ? (
+            <>
+              <button className="neighbor-secondary-action" type="button" onClick={onCancelEdit}>
+                Cancelar
+              </button>
+              <button className="neighbor-primary-action" type="button" onClick={onSaveContact}>
+                Guardar cambios
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="neighbor-secondary-action" type="button" onClick={onStartEdit}>
+                Editar contacto
+              </button>
+              {contextualAction && (
+                <button
+                  className={
+                    contextualAction.action === 'block'
+                      ? 'neighbor-primary-action is-danger'
+                      : 'neighbor-primary-action'
+                  }
+                  type="button"
+                  onClick={() => onOpenAction(contextualAction.action)}
+                >
+                  {contextualAction.label}
+                </button>
+              )}
+            </>
+          )}
+        </footer>
       </section>
-    </aside>
+    </div>
   );
 }
 
@@ -2183,7 +2474,7 @@ function NeighborAccountActionModal({ action, reason, onCancel, onConfirm, onRea
       : 'Reenviar correo de confirmación';
 
   return (
-    <div className="modal-backdrop" role="presentation">
+    <div className="modal-backdrop neighbor-action-backdrop" role="presentation">
       <section className="confirm-modal neighbor-action-modal" role="dialog" aria-modal="true">
         <span className="section-kicker">Acción administrativa</span>
         <h2>{title}</h2>
@@ -2203,6 +2494,614 @@ function NeighborAccountActionModal({ action, reason, onCancel, onConfirm, onRea
         </div>
       </section>
     </div>
+  );
+}
+
+function SettingsUsersPage() {
+  const [searchValue, setSearchValue] = useState('');
+  const [roleFilter, setRoleFilter] = useState('Todos');
+  const [users, setUsers] = useState(settingsUsers);
+  const filteredUsers = users.filter((user) => {
+    const matchesSearch =
+      searchValue.trim().length === 0 ||
+      [user.nombre, user.correo, user.rol].join(' ').toLowerCase().includes(searchValue.trim().toLowerCase());
+    const matchesRole = roleFilter === 'Todos' || user.rol === roleFilter;
+
+    return matchesSearch && matchesRole;
+  });
+
+  return (
+    <SettingsTablePage
+      actionLabel="Nuevo usuario"
+      columns={['Usuario', 'Correo', 'Rol', 'Área responsable', 'Estado', 'Acción']}
+      description="Administra las cuentas internas del sistema municipal."
+      filterLabel="Rol"
+      filterOptions={['Todos', 'Administrador', 'Directivo', 'Operativo']}
+      filterValue={roleFilter}
+      kicker="Configuración"
+      searchPlaceholder="Nombre, correo o rol"
+      searchValue={searchValue}
+      title="Usuarios"
+      onAction={() => {}}
+      onFilterChange={setRoleFilter}
+      onSearchChange={setSearchValue}
+    >
+      <div className="admin-table settings-table settings-users-table">
+        <div className="admin-table-row admin-table-head">
+          <span>Usuario</span><span>Correo</span><span>Rol</span><span>Área responsable</span><span>Estado</span><span>Acción</span>
+        </div>
+        {filteredUsers.map((user) => (
+          <div className="admin-table-row" key={user.id}>
+            <span><strong>{user.nombre}</strong><small>Usuario interno</small></span>
+            <span>{user.correo}</span>
+            <span>{user.rol}</span>
+            <span>{user.area}</span>
+            <SettingsStatus state={user.estado} />
+            <SettingsRowActions
+              isActive={user.estado === 'ACTIVO'}
+              label={user.nombre}
+              onToggle={() => setUsers((current) => toggleSettingsItemState(current, user.id))}
+            />
+          </div>
+        ))}
+      </div>
+    </SettingsTablePage>
+  );
+}
+
+function SettingsCategoriesPage() {
+  const [searchValue, setSearchValue] = useState('');
+  const [categories, setCategories] = useState(settingsCategories);
+  const filteredCategories = categories.filter((category) =>
+    category.nombre.toLowerCase().includes(searchValue.trim().toLowerCase()),
+  );
+
+  return (
+    <SettingsTablePage
+      actionLabel="Nueva categoría"
+      description="Gestiona las categorías utilizadas para clasificar eventos municipales."
+      kicker="Configuración"
+      searchPlaceholder="Nombre de categoría"
+      searchValue={searchValue}
+      title="Categorías"
+      onAction={() => {}}
+      onSearchChange={setSearchValue}
+    >
+      <div className="admin-table settings-table settings-categories-table">
+        <div className="admin-table-row admin-table-head">
+          <span>Categoría</span><span>Descripción</span><span>Eventos asociados</span><span>Estado</span><span>Acción</span>
+        </div>
+        {filteredCategories.map((category) => (
+          <div className="admin-table-row" key={category.id}>
+            <span><strong>{category.nombre}</strong></span>
+            <span>{category.descripcion}</span>
+            <span>{category.eventosAsociados}</span>
+            <SettingsStatus state={category.estado} />
+            <SettingsRowActions
+              isActive={category.estado === 'ACTIVO'}
+              label={category.nombre}
+              onToggle={() => setCategories((current) => toggleSettingsItemState(current, category.id))}
+            />
+          </div>
+        ))}
+      </div>
+    </SettingsTablePage>
+  );
+}
+
+function SettingsLocationsPage() {
+  const [searchValue, setSearchValue] = useState('');
+  const [locations, setLocations] = useState(settingsLocations);
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [locationModalMode, setLocationModalMode] = useState(null);
+  const [locationFormData, setLocationFormData] = useState(getEmptyLocationFormData());
+  const [locationFormErrors, setLocationFormErrors] = useState({});
+  const isLocationModalOpen = Boolean(locationModalMode);
+  const filteredLocations = locations.filter((location) => {
+    return (
+      searchValue.trim().length === 0 ||
+      [location.nombre, location.direccion, location.referencia]
+        .join(' ')
+        .toLowerCase()
+        .includes(searchValue.trim().toLowerCase())
+    );
+  });
+
+  useEffect(() => {
+    if (!isLocationModalOpen) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        closeLocationModal();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isLocationModalOpen]);
+
+  const closeLocationModal = () => {
+    setLocationModalMode(null);
+    setSelectedLocation(null);
+    setLocationFormErrors({});
+  };
+
+  const openLocationDetail = (location) => {
+    setSelectedLocation(location);
+    setLocationFormData(getLocationFormData(location));
+    setLocationFormErrors({});
+    setLocationModalMode('detail');
+  };
+
+  const openLocationCreate = () => {
+    setSelectedLocation(null);
+    setLocationFormData(getEmptyLocationFormData());
+    setLocationFormErrors({});
+    setLocationModalMode('create');
+  };
+
+  const openLocationEdit = () => {
+    if (!selectedLocation) {
+      return;
+    }
+
+    setLocationFormData(getLocationFormData(selectedLocation));
+    setLocationFormErrors({});
+    setLocationModalMode('edit');
+  };
+
+  const saveLocation = () => {
+    const errors = validateLocationForm(locationFormData);
+
+    if (Object.keys(errors).length > 0) {
+      setLocationFormErrors(errors);
+      return;
+    }
+
+    const normalizedLocation = normalizeLocationFromForm(locationFormData, selectedLocation);
+
+    if (locationModalMode === 'create') {
+      const nextLocation = {
+        ...normalizedLocation,
+        aforoReferencial: '',
+        id: Math.max(0, ...locations.map((location) => location.id)) + 1,
+        tipo: 'No especificado',
+      };
+
+      setLocations((current) => [...current, nextLocation]);
+      setSelectedLocation(nextLocation);
+      setLocationModalMode('detail');
+      setLocationFormErrors({});
+      return;
+    }
+
+    if (!selectedLocation) {
+      return;
+    }
+
+    const updatedLocation = {
+      ...normalizedLocation,
+      id: selectedLocation.id,
+    };
+
+    setLocations((current) =>
+      current.map((location) => (location.id === selectedLocation.id ? updatedLocation : location)),
+    );
+    setSelectedLocation(updatedLocation);
+    setLocationModalMode('detail');
+    setLocationFormErrors({});
+  };
+
+  const toggleSelectedLocationState = () => {
+    if (!selectedLocation) {
+      return;
+    }
+
+    const nextState = selectedLocation.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
+    const updatedLocation = { ...selectedLocation, estado: nextState };
+
+    setLocations((current) =>
+      current.map((location) => (location.id === selectedLocation.id ? updatedLocation : location)),
+    );
+    setSelectedLocation(updatedLocation);
+    setLocationFormData(getLocationFormData(updatedLocation));
+  };
+
+  return (
+    <>
+      <SettingsTablePage
+        actionLabel="Nueva ubicación"
+        description="Administra los espacios municipales o puntos recurrentes donde se desarrollan eventos."
+        kicker="Configuración"
+        searchPlaceholder="Buscar por nombre, dirección o referencia"
+        searchValue={searchValue}
+        title="Ubicaciones"
+        onAction={openLocationCreate}
+        onSearchChange={setSearchValue}
+      >
+        <div className="admin-table settings-table settings-locations-table">
+          <div className="admin-table-row admin-table-head">
+            <span>Ubicación</span><span>Dirección</span><span>Estado</span><span>Acción</span>
+          </div>
+          {filteredLocations.map((location) => (
+            <div className="admin-table-row" key={location.id}>
+              <span><strong>{location.nombre}</strong><small>{location.referencia}</small></span>
+              <span>{location.direccion}</span>
+              <SettingsStatus state={location.estado} />
+              <span className="settings-row-actions">
+                <button
+                  aria-label={`Ver o editar ubicación ${location.nombre}`}
+                  className="table-icon-action is-detail neighbor-detail-action location-detail-action"
+                  data-tooltip="Ver/editar ubicación"
+                  type="button"
+                  onClick={() => openLocationDetail(location)}
+                >
+                  <ViewIcon />
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
+      </SettingsTablePage>
+
+      {isLocationModalOpen && (
+        <LocationDetailModal
+          errors={locationFormErrors}
+          formData={locationFormData}
+          location={selectedLocation}
+          mode={locationModalMode}
+          onClose={closeLocationModal}
+          onEdit={openLocationEdit}
+          onFormChange={setLocationFormData}
+          onSave={saveLocation}
+          onToggleState={toggleSelectedLocationState}
+        />
+      )}
+    </>
+  );
+}
+
+function getEmptyLocationFormData() {
+  return {
+    direccion: '',
+    estado: 'ACTIVO',
+    latitud: '',
+    longitud: '',
+    nombre: '',
+    referencia: '',
+  };
+}
+
+function getLocationFormData(location) {
+  return {
+    direccion: location?.direccion ?? '',
+    estado: location?.estado ?? 'ACTIVO',
+    latitud: location?.latitud ? String(location.latitud) : '',
+    longitud: location?.longitud ? String(location.longitud) : '',
+    nombre: location?.nombre ?? '',
+    referencia: location?.referencia ?? '',
+  };
+}
+
+function validateLocationForm(formData) {
+  const errors = {};
+
+  if (!formData.nombre.trim()) {
+    errors.nombre = 'Ingrese el nombre de la ubicación.';
+  }
+
+  if (!formData.direccion.trim()) {
+    errors.direccion = 'Ingrese la dirección de la ubicación.';
+  }
+
+  if (formData.latitud.trim() && Number.isNaN(Number(formData.latitud))) {
+    errors.latitud = 'La latitud debe ser numérica.';
+  }
+
+  if (formData.longitud.trim() && Number.isNaN(Number(formData.longitud))) {
+    errors.longitud = 'La longitud debe ser numérica.';
+  }
+
+  return errors;
+}
+
+function normalizeLocationFromForm(formData, baseLocation = {}) {
+  const safeBaseLocation = baseLocation ?? {};
+
+  return {
+    aforoReferencial: safeBaseLocation.aforoReferencial ?? '',
+    direccion: formData.direccion.trim(),
+    estado: formData.estado,
+    latitud: formData.latitud.trim(),
+    longitud: formData.longitud.trim(),
+    nombre: formData.nombre.trim(),
+    referencia: formData.referencia.trim(),
+    tipo: safeBaseLocation.tipo ?? 'No especificado',
+  };
+}
+
+function LocationDetailModal({
+  errors,
+  formData,
+  location,
+  mode,
+  onClose,
+  onEdit,
+  onFormChange,
+  onSave,
+  onToggleState,
+}) {
+  const isEditing = mode === 'create' || mode === 'edit';
+  const visibleLocation = isEditing ? normalizeLocationFromForm(formData, location) : location;
+  const mapEmbedUrl = getSettingsLocationMapEmbedUrl(visibleLocation);
+  const mapsUrl = getSettingsLocationMapsUrl(visibleLocation);
+  const modalTitle = mode === 'create' ? 'Nueva ubicación' : visibleLocation?.nombre;
+  const statusLabel = visibleLocation?.estado === 'ACTIVO' ? 'Activa' : 'Inactiva';
+
+  const updateField = (field, value) => {
+    onFormChange((current) => ({ ...current, [field]: value }));
+  };
+
+  return (
+    <div
+      aria-modal="true"
+      className="modal-backdrop neighbor-detail-backdrop location-detail-backdrop"
+      role="dialog"
+      onMouseDown={onClose}
+    >
+      <section
+        className="neighbor-detail-modal location-detail-modal"
+        aria-labelledby="location-detail-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header className="neighbor-detail-header location-detail-header">
+          <div className="neighbor-detail-kicker-row">
+            <span className="section-kicker">Detalle de ubicación</span>
+            <button className="neighbor-modal-close" type="button" aria-label="Cerrar detalle de ubicación" onClick={onClose}>
+              ×
+            </button>
+          </div>
+          <div className="neighbor-detail-title-row">
+            <h2 id="location-detail-title">{modalTitle}</h2>
+            <SettingsStatus state={visibleLocation?.estado ?? 'ACTIVO'} />
+          </div>
+        </header>
+
+        <div className="neighbor-detail-body location-detail-body">
+          {isEditing ? (
+            <LocationForm
+              errors={errors}
+              formData={formData}
+              onFieldChange={updateField}
+            />
+          ) : (
+            <dl className="neighbor-detail-list location-detail-list">
+              <div>
+                <dt>Nombre de ubicación</dt>
+                <dd>{visibleLocation.nombre}</dd>
+              </div>
+              <div>
+                <dt>Dirección</dt>
+                <dd>{visibleLocation.direccion}</dd>
+              </div>
+              <div>
+                <dt>Referencia</dt>
+                <dd>{visibleLocation.referencia || 'Sin referencia registrada'}</dd>
+              </div>
+              <div>
+                <dt>Estado</dt>
+                <dd>{statusLabel}</dd>
+              </div>
+              <div>
+                <dt>Latitud</dt>
+                <dd>{visibleLocation.latitud || 'No registrada'}</dd>
+              </div>
+              <div>
+                <dt>Longitud</dt>
+                <dd>{visibleLocation.longitud || 'No registrada'}</dd>
+              </div>
+            </dl>
+          )}
+
+          <section className="location-map-card" aria-label="Previsualización de ubicación en mapa">
+            <div className="neighbor-section-heading">
+              <h3>Mapa</h3>
+              {mapsUrl && (
+                <a href={mapsUrl} target="_blank" rel="noreferrer">
+                  Abrir en Google Maps
+                </a>
+              )}
+            </div>
+            {mapEmbedUrl ? (
+              <iframe
+                src={mapEmbedUrl}
+                title={`Mapa de ${visibleLocation?.nombre || 'ubicación'}`}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            ) : (
+              <p>Agrega latitud y longitud para visualizar el punto registrado.</p>
+            )}
+          </section>
+        </div>
+
+        <footer className="neighbor-detail-footer">
+          {isEditing ? (
+            <>
+              <button className="neighbor-secondary-action" type="button" onClick={onClose}>
+                Cancelar
+              </button>
+              <button className="neighbor-primary-action" type="button" onClick={onSave}>
+                Guardar ubicación
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="neighbor-secondary-action" type="button" onClick={onEdit}>
+                Editar ubicación
+              </button>
+              <button
+                className={
+                  visibleLocation?.estado === 'ACTIVO'
+                    ? 'neighbor-primary-action is-danger'
+                    : 'neighbor-primary-action is-positive'
+                }
+                type="button"
+                onClick={onToggleState}
+              >
+                {visibleLocation?.estado === 'ACTIVO' ? 'Desactivar ubicación' : 'Activar ubicación'}
+              </button>
+            </>
+          )}
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+function LocationForm({ errors, formData, onFieldChange }) {
+  return (
+    <div className="location-form-grid">
+      <label className="form-field">
+        Nombre
+        <input
+          value={formData.nombre}
+          onChange={(event) => onFieldChange('nombre', event.target.value)}
+        />
+        {errors.nombre && <small className="form-error">{errors.nombre}</small>}
+      </label>
+      <label className="form-field">
+        Estado
+        <select
+          value={formData.estado}
+          onChange={(event) => onFieldChange('estado', event.target.value)}
+        >
+          <option value="ACTIVO">Activa</option>
+          <option value="INACTIVO">Inactiva</option>
+        </select>
+      </label>
+      <label className="form-field span-2">
+        Dirección
+        <input
+          value={formData.direccion}
+          onChange={(event) => onFieldChange('direccion', event.target.value)}
+        />
+        {errors.direccion && <small className="form-error">{errors.direccion}</small>}
+      </label>
+      <label className="form-field span-2">
+        Referencia
+        <input
+          value={formData.referencia}
+          onChange={(event) => onFieldChange('referencia', event.target.value)}
+        />
+      </label>
+      <label className="form-field">
+        Latitud
+        <input
+          inputMode="decimal"
+          value={formData.latitud}
+          onChange={(event) => onFieldChange('latitud', event.target.value)}
+        />
+        {errors.latitud && <small className="form-error">{errors.latitud}</small>}
+      </label>
+      <label className="form-field">
+        Longitud
+        <input
+          inputMode="decimal"
+          value={formData.longitud}
+          onChange={(event) => onFieldChange('longitud', event.target.value)}
+        />
+        {errors.longitud && <small className="form-error">{errors.longitud}</small>}
+      </label>
+    </div>
+  );
+}
+
+function SettingsTablePage({
+  actionLabel,
+  children,
+  description,
+  filterLabel,
+  filterOptions,
+  filterValue,
+  kicker,
+  onAction,
+  onFilterChange,
+  onSearchChange,
+  searchPlaceholder,
+  searchValue,
+  title,
+}) {
+  return (
+    <section className="settings-view" aria-labelledby={`settings-${title.toLowerCase()}-title`}>
+      <header className="admin-topbar">
+        <div>
+          <span className="section-kicker">{kicker}</span>
+          <h1 id={`settings-${title.toLowerCase()}-title`}>{title}</h1>
+          <p>{description}</p>
+        </div>
+        <button className="admin-new-event-action" type="button" onClick={onAction}>
+          <span aria-hidden="true">+</span>
+          {actionLabel}
+        </button>
+      </header>
+      <article className="admin-table-panel admin-table-featured settings-panel">
+        <div className={`admin-filters settings-filters${filterOptions ? '' : ' single-filter'}`}>
+          <label>
+            Buscar
+            <input
+              placeholder={searchPlaceholder}
+              type="search"
+              value={searchValue}
+              onChange={(event) => onSearchChange(event.target.value)}
+            />
+          </label>
+          {filterOptions && (
+            <label>
+              {filterLabel}
+              <select value={filterValue} onChange={(event) => onFilterChange(event.target.value)}>
+                {filterOptions.map((option) => (
+                  <option key={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+        {children}
+      </article>
+    </section>
+  );
+}
+
+function SettingsStatus({ state }) {
+  return (
+    <span className={`settings-status ${state === 'ACTIVO' ? 'is-active' : 'is-inactive'}`}>
+      {state === 'ACTIVO' ? 'Activo' : 'Inactivo'}
+    </span>
+  );
+}
+
+function SettingsRowActions({ isActive, label, onToggle }) {
+  return (
+    <span className="settings-row-actions">
+      <button aria-label={`Ver o editar ${label}`} className="table-icon-action is-detail" type="button">
+        <ViewIcon />
+      </button>
+      <button className="settings-toggle-action" type="button" onClick={onToggle}>
+        {isActive ? 'Desactivar' : 'Activar'}
+      </button>
+    </span>
+  );
+}
+
+function toggleSettingsItemState(items, itemId) {
+  return items.map((item) =>
+    item.id === itemId
+      ? { ...item, estado: item.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO' }
+      : item,
   );
 }
 

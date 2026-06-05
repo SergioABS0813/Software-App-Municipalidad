@@ -8,7 +8,7 @@
   height: 100svh;
   max-height: 100svh;
   min-height: 100svh;
-  overflow-y: auto;
+  overflow: visible;
   position: sticky;
   top: 0;
 }
