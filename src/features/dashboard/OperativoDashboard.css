@@ -747,3 +747,52 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (min-width: 1025px) and (max-width: 1100px) {
+  .operative-shell .admin-sidebar {
+    height: 100svh;
+    max-height: 100svh;
+    min-height: 100svh;
+    overflow: visible;
+    position: sticky;
+  }
+}
+
+@media (max-width: 1024px) {
+  .operative-shell .admin-sidebar,
+  .operative-shell.is-sidebar-collapsed .admin-sidebar {
+    height: 100svh;
+    max-height: none;
+    min-height: 100svh;
+    overflow-y: auto;
+    position: fixed;
+  }
+
+  .operative-shell .admin-nav {
+    display: grid;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    width: 100%;
+  }
+
+  .operative-shell .admin-main {
+    padding: 76px 24px 24px;
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .operative-shell .admin-main {
+    padding: 72px 18px 22px;
+  }
+
+  .operative-shell .admin-topbar {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .operative-shell .admin-main {
+    padding: 68px 14px 20px;
+  }
+}

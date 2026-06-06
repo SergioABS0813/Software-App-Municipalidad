@@ -262,6 +262,7 @@ function OperativoDashboard({ onLogout, user }) {
     operativeUser.fullName || operativeUser.name || fallbackOperativeUser.fullName;
   const now = useMemo(() => new Date(), []);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarDrawerOpen, setIsSidebarDrawerOpen] = useState(false);
   const [activeOperativeSection, setActiveOperativeSection] = useState('control-acceso');
   const operativeEvents = useMemo(
     () =>
@@ -309,6 +310,23 @@ function OperativoDashboard({ onLogout, user }) {
   const availableCapacity = hasCapacityControl
     ? Math.max(aforoMaximo - validValidationCount, 0)
     : null;
+
+  useEffect(() => {
+    if (!isSidebarDrawerOpen) {
+      return undefined;
+    }
+
+    function closeDrawerOnEscape(event) {
+      if (event.key === 'Escape') {
+        setIsSidebarDrawerOpen(false);
+      }
+    }
+
+    document.addEventListener('keydown', closeDrawerOnEscape);
+
+    return () => document.removeEventListener('keydown', closeDrawerOnEscape);
+  }, [isSidebarDrawerOpen]);
+
   useEffect(() => {
     if (!hasAuthorizedEvent) {
       return undefined;
@@ -346,11 +364,25 @@ function OperativoDashboard({ onLogout, user }) {
   }, [hasAuthorizedEvent, isManualRegistrationOpen]);
 
   function navigateOperativeSection(sectionId) {
+    closeSidebarDrawer();
     setActiveOperativeSection(sectionId);
     document.getElementById(sectionId)?.scrollIntoView({
       behavior: 'smooth',
       block: 'start',
     });
+  }
+
+  function toggleSidebarControl() {
+    if (window.matchMedia('(max-width: 1024px)').matches) {
+      setIsSidebarDrawerOpen((isOpen) => !isOpen);
+      return;
+    }
+
+    setIsSidebarCollapsed((isCollapsed) => !isCollapsed);
+  }
+
+  function closeSidebarDrawer() {
+    setIsSidebarDrawerOpen(false);
   }
 
   function simulateQrScan() {
@@ -481,16 +513,41 @@ function OperativoDashboard({ onLogout, user }) {
 
   return (
     <section
-      className={`admin-shell operative-shell${isSidebarCollapsed ? ' is-sidebar-collapsed' : ''}`}
+      className={[
+        'admin-shell operative-shell',
+        isSidebarCollapsed ? 'is-sidebar-collapsed' : '',
+        isSidebarDrawerOpen ? 'is-sidebar-drawer-open' : '',
+      ].filter(Boolean).join(' ')}
       aria-labelledby="operative-title"
     >
+      <button
+        className="admin-mobile-menu-button"
+        type="button"
+        aria-label={isSidebarDrawerOpen ? 'Cerrar menú lateral' : 'Abrir menú lateral'}
+        aria-expanded={isSidebarDrawerOpen}
+        onClick={() => setIsSidebarDrawerOpen((isOpen) => !isOpen)}
+      >
+        <span aria-hidden="true" />
+      </button>
+      <button
+        className="admin-sidebar-overlay"
+        type="button"
+        aria-label="Cerrar menú lateral"
+        onClick={closeSidebarDrawer}
+      />
       <aside className="admin-sidebar">
         <button
           className="sidebar-collapse-button"
           type="button"
-          aria-label={isSidebarCollapsed ? 'Mostrar sidebar' : 'Ocultar sidebar'}
-          title={isSidebarCollapsed ? 'Mostrar sidebar' : 'Ocultar sidebar'}
-          onClick={() => setIsSidebarCollapsed((isCollapsed) => !isCollapsed)}
+          aria-label={
+            isSidebarDrawerOpen
+              ? 'Cerrar menú lateral'
+              : isSidebarCollapsed
+                ? 'Abrir menú lateral'
+                : 'Cerrar menú lateral'
+          }
+          title={isSidebarCollapsed ? 'Abrir menú lateral' : 'Cerrar menú lateral'}
+          onClick={toggleSidebarControl}
         >
           <span aria-hidden="true" />
         </button>

@@ -470,6 +470,7 @@ function getDirectiveStateTone(state) {
 function DirectivoDashboard({ onLogout, user }) {
   const [currentDirectiveView, setCurrentDirectiveView] = useState('review');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarDrawerOpen, setIsSidebarDrawerOpen] = useState(false);
   const [reviewFilter, setReviewFilter] = useState('TODOS');
   const [selectedReviewEvent, setSelectedReviewEvent] = useState(null);
   const [selectedReportEvent, setSelectedReportEvent] = useState(null);
@@ -486,7 +487,24 @@ function DirectivoDashboard({ onLogout, user }) {
           : event.state === reviewFilter,
       );
 
+  useEffect(() => {
+    if (!isSidebarDrawerOpen) {
+      return undefined;
+    }
+
+    function closeDrawerOnEscape(event) {
+      if (event.key === 'Escape') {
+        setIsSidebarDrawerOpen(false);
+      }
+    }
+
+    document.addEventListener('keydown', closeDrawerOnEscape);
+
+    return () => document.removeEventListener('keydown', closeDrawerOnEscape);
+  }, [isSidebarDrawerOpen]);
+
   function navigateReviewSection(sectionId) {
+    closeSidebarDrawer();
     setActiveReviewSection(sectionId);
     document.getElementById(sectionId)?.scrollIntoView({
       behavior: 'smooth',
@@ -494,18 +512,56 @@ function DirectivoDashboard({ onLogout, user }) {
     });
   }
 
+  function toggleSidebarControl() {
+    if (window.matchMedia('(max-width: 1024px)').matches) {
+      setIsSidebarDrawerOpen((isOpen) => !isOpen);
+      return;
+    }
+
+    setIsSidebarCollapsed((isCollapsed) => !isCollapsed);
+  }
+
+  function closeSidebarDrawer() {
+    setIsSidebarDrawerOpen(false);
+  }
+
   return (
     <section
-      className={`admin-shell directive-shell${isSidebarCollapsed ? ' is-sidebar-collapsed' : ''}`}
+      className={[
+        'admin-shell directive-shell',
+        isSidebarCollapsed ? 'is-sidebar-collapsed' : '',
+        isSidebarDrawerOpen ? 'is-sidebar-drawer-open' : '',
+      ].filter(Boolean).join(' ')}
       aria-labelledby="directive-title"
     >
+      <button
+        className="admin-mobile-menu-button"
+        type="button"
+        aria-label={isSidebarDrawerOpen ? 'Cerrar menú lateral' : 'Abrir menú lateral'}
+        aria-expanded={isSidebarDrawerOpen}
+        onClick={() => setIsSidebarDrawerOpen((isOpen) => !isOpen)}
+      >
+        <span aria-hidden="true" />
+      </button>
+      <button
+        className="admin-sidebar-overlay"
+        type="button"
+        aria-label="Cerrar menú lateral"
+        onClick={closeSidebarDrawer}
+      />
       <aside className="admin-sidebar">
         <button
           className="sidebar-collapse-button"
           type="button"
-          aria-label={isSidebarCollapsed ? 'Mostrar sidebar' : 'Ocultar sidebar'}
-          title={isSidebarCollapsed ? 'Mostrar sidebar' : 'Ocultar sidebar'}
-          onClick={() => setIsSidebarCollapsed((isCollapsed) => !isCollapsed)}
+          aria-label={
+            isSidebarDrawerOpen
+              ? 'Cerrar menú lateral'
+              : isSidebarCollapsed
+                ? 'Abrir menú lateral'
+                : 'Cerrar menú lateral'
+          }
+          title={isSidebarCollapsed ? 'Abrir menú lateral' : 'Cerrar menú lateral'}
+          onClick={toggleSidebarControl}
         >
           <span aria-hidden="true" />
         </button>
@@ -606,6 +662,7 @@ function DirectivoDashboard({ onLogout, user }) {
                 className="admin-nav-logout directive-return-panel-action"
                 type="button"
                 onClick={() => {
+                  closeSidebarDrawer();
                   setSelectedReviewEvent(null);
                   setSelectedReportEvent(null);
                   setActiveReviewSection('ficha-directiva');
@@ -619,14 +676,20 @@ function DirectivoDashboard({ onLogout, user }) {
               <button
                 className={currentDirectiveView === 'review' ? 'active admin-nav-link' : 'admin-nav-link'}
                 type="button"
-                onClick={() => setCurrentDirectiveView('review')}
+                onClick={() => {
+                  closeSidebarDrawer();
+                  setCurrentDirectiveView('review');
+                }}
               >
                 Revisión
               </button>
               <button
                 className={currentDirectiveView === 'reports' ? 'active admin-nav-link' : 'admin-nav-link'}
                 type="button"
-                onClick={() => setCurrentDirectiveView('reports')}
+                onClick={() => {
+                  closeSidebarDrawer();
+                  setCurrentDirectiveView('reports');
+                }}
               >
                 Reportes
               </button>

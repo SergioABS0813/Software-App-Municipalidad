@@ -1,45 +1,43 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import municipalLogo from '../../assets/images/municipalidad-logo.png';
-import calendarCheck from '../../assets/icons/calendar-check.png';
-import clipboardCheck from '../../assets/icons/clipboard-check.png';
-import fileEdit from '../../assets/icons/file-edit.png';
-import triangleAlert from '../../assets/icons/triangle-alert.png';
 import { adminEvents, formatEventState } from './dashboardData';
 import NotificationMenu from './NotificationMenu';
 import './AdminDashboard.css';
 
-const managementStats = [
-  {
-    icon: calendarCheck,
-    label: 'Publicados',
-    tone: 'is-published',
-    trend: 'visibles en el portal',
-    value: adminEvents.filter((event) => event.state === 'PUBLICADO').length,
-  },
-  {
-    icon: fileEdit,
-    label: 'Borradores',
-    tone: 'is-draft',
-    trend: 'requieren completar datos',
-    value: adminEvents.filter((event) => event.state === 'BORRADOR').length,
-  },
-  {
-    icon: clipboardCheck,
-    label: 'Para revisión',
-    tone: 'is-review',
-    trend: 'pendientes del directivo',
-    value: adminEvents.filter((event) =>
-      ['EN_REVISION', 'OBSERVADO_EN_REVISION'].includes(event.state),
-    ).length,
-  },
-  {
-    icon: triangleAlert,
-    label: 'Observados',
-    tone: 'is-observed',
-    trend: 'requieren correcciones',
-    value: adminEvents.filter((event) => event.state === 'OBSERVADO').length,
-  },
-];
+function getManagementStats(events) {
+  return [
+    {
+      icon: CalendarCheckLineIcon,
+      label: 'Publicados',
+      tone: 'is-published',
+      trend: 'visibles en el portal',
+      value: events.filter((event) => event.state === 'PUBLICADO').length,
+    },
+    {
+      icon: FileEditLineIcon,
+      label: 'Borradores',
+      tone: 'is-draft',
+      trend: 'requieren completar datos',
+      value: events.filter((event) => event.state === 'BORRADOR').length,
+    },
+    {
+      icon: ClipboardCheckLineIcon,
+      label: 'Para revisión',
+      tone: 'is-review',
+      trend: 'pendientes del directivo',
+      value: events.filter((event) =>
+        ['EN_REVISION', 'OBSERVADO_EN_REVISION'].includes(event.state),
+      ).length,
+    },
+    {
+      icon: TriangleAlertLineIcon,
+      label: 'Observados',
+      tone: 'is-observed',
+      trend: 'requieren correcciones',
+      value: events.filter((event) => event.state === 'OBSERVADO').length,
+    },
+  ];
+}
 
 const adminNotifications = [
   {
@@ -240,17 +238,24 @@ const neighborStatusOptions = [
 ];
 
 const settingsUsers = [
-  { id: 1, nombre: 'Administrador municipal', correo: 'admin@munisanmiguel.gob.pe', rol: 'Administrador', area: 'Gerencia Municipal', estado: 'ACTIVO' },
-  { id: 2, nombre: 'Directivo de Cultura', correo: 'directivo@munisanmiguel.gob.pe', rol: 'Directivo', area: 'Subgerencia de Educación y Cultura', estado: 'ACTIVO' },
-  { id: 3, nombre: 'Operativo de asistencia', correo: 'operativo@munisanmiguel.gob.pe', rol: 'Operativo', area: 'Oficina de Participación Vecinal', estado: 'INACTIVO' },
+  { id: 1, dni: '12345678', nombre: 'Administrador municipal', correo: 'admin@munisanmiguel.gob.pe', rol: 'Administrador', areaId: 1, area: 'Gerencia de Desarrollo Social', estado: 'ACTIVO' },
+  { id: 2, dni: '87654321', nombre: 'Directivo de Cultura', correo: 'directivo@munisanmiguel.gob.pe', rol: 'Directivo', areaId: 3, area: 'Subgerencia de Educación y Cultura', estado: 'ACTIVO' },
+  { id: 3, dni: '11223344', nombre: 'Operativo de asistencia', correo: 'operativo@munisanmiguel.gob.pe', rol: 'Operativo', areaId: 5, area: 'Oficina de Participación Vecinal', estado: 'INACTIVO' },
 ];
 
+const identityLookupMock = {
+  11223344: { nombreCompleto: 'Operativo de asistencia' },
+  12345678: { nombreCompleto: 'Administrador municipal' },
+  87654321: { nombreCompleto: 'Directivo de Cultura' },
+};
+
 const settingsCategories = [
-  { id: 1, nombre: 'Cultura', descripcion: 'Actividades culturales, artísticas y comunitarias.', eventosAsociados: 8, estado: 'ACTIVO' },
-  { id: 2, nombre: 'Deporte', descripcion: 'Eventos deportivos, recreativos y competencias vecinales.', eventosAsociados: 5, estado: 'ACTIVO' },
-  { id: 3, nombre: 'Participación vecinal', descripcion: 'Encuentros ciudadanos y acciones de integración barrial.', eventosAsociados: 4, estado: 'ACTIVO' },
-  { id: 4, nombre: 'Salud', descripcion: 'Campañas preventivas y servicios de salud municipal.', eventosAsociados: 3, estado: 'ACTIVO' },
-  { id: 5, nombre: 'Educación', descripcion: 'Talleres, charlas y actividades formativas.', eventosAsociados: 0, estado: 'INACTIVO' },
+  // En backend, eventosAsociados debe calcularse con JOIN/COUNT desde eventos.
+  { id: 1, nombre: 'Cultura', eventosAsociados: 8 },
+  { id: 2, nombre: 'Deporte', eventosAsociados: 5 },
+  { id: 3, nombre: 'Participación vecinal', eventosAsociados: 4 },
+  { id: 4, nombre: 'Salud', eventosAsociados: 3 },
+  { id: 5, nombre: 'Educación', eventosAsociados: 0 },
 ];
 
 const settingsLocations = [
@@ -1061,19 +1066,26 @@ function AdminDashboard({ onLogout, user }) {
   const [currentAdminView, setCurrentAdminView] = useState(() =>
     window.location.pathname === '/admin/vecinos'
       ? 'neighbors'
-      : window.location.pathname === '/admin/configuracion/usuarios'
+      : window.location.pathname === '/admin/configuracion' ||
+          window.location.pathname === '/admin/configuracion/san-miguel'
         ? 'settings-users'
-        : window.location.pathname === '/admin/configuracion/categorias'
-          ? 'settings-categories'
-          : window.location.pathname === '/admin/configuracion/ubicaciones'
-            ? 'settings-locations'
-            : 'dashboard',
+        : window.location.pathname === '/admin/configuracion/usuarios'
+          ? 'settings-users'
+          : window.location.pathname === '/admin/configuracion/categorias'
+            ? 'settings-categories'
+            : window.location.pathname === '/admin/configuracion/ubicaciones'
+              ? 'settings-locations'
+              : 'dashboard',
   );
   const [isSettingsNavOpen, setIsSettingsNavOpen] = useState(() =>
     window.location.pathname.startsWith('/admin/configuracion'),
   );
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarDrawerOpen, setIsSidebarDrawerOpen] = useState(false);
+  const [eventItems, setEventItems] = useState(adminEvents);
   const [pendingEventAction, setPendingEventAction] = useState(null);
+  const [eventToDelete, setEventToDelete] = useState(null);
+  const [eventDeleteNotice, setEventDeleteNotice] = useState('');
   const [validationIssue, setValidationIssue] = useState(null);
   const [selectedAdminEvent, setSelectedAdminEvent] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -1087,6 +1099,23 @@ function AdminDashboard({ onLogout, user }) {
   const isSettingsView = currentAdminView.startsWith('settings-');
   const adminUser = user ?? fallbackAdminUser;
   const adminUserName = getUserDisplayName(adminUser);
+  const managementStats = useMemo(() => getManagementStats(eventItems), [eventItems]);
+
+  useEffect(() => {
+    if (!isSidebarDrawerOpen) {
+      return undefined;
+    }
+
+    function closeDrawerOnEscape(event) {
+      if (event.key === 'Escape') {
+        setIsSidebarDrawerOpen(false);
+      }
+    }
+
+    document.addEventListener('keydown', closeDrawerOnEscape);
+
+    return () => document.removeEventListener('keydown', closeDrawerOnEscape);
+  }, [isSidebarDrawerOpen]);
 
   useEffect(() => {
     if (!activePendingPopover) {
@@ -1147,6 +1176,7 @@ function AdminDashboard({ onLogout, user }) {
   }, [isEventFormView, currentAdminView]);
 
   function navigateToFormSection(sectionId) {
+    closeSidebarDrawer();
     setActiveFormSection(sectionId);
     document.getElementById(sectionId)?.scrollIntoView({
       behavior: 'smooth',
@@ -1154,10 +1184,23 @@ function AdminDashboard({ onLogout, user }) {
     });
   }
 
+  function toggleSidebarControl() {
+    if (window.matchMedia('(max-width: 1024px)').matches) {
+      setIsSidebarDrawerOpen((isOpen) => !isOpen);
+      return;
+    }
+
+    setIsSidebarCollapsed((isCollapsed) => !isCollapsed);
+  }
+
+  function closeSidebarDrawer() {
+    setIsSidebarDrawerOpen(false);
+  }
+
   const filteredAdminEvents = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
-    return adminEvents.filter((event) => {
+    return eventItems.filter((event) => {
       const matchesSearch =
         normalizedSearch.length === 0 ||
         [event.title, event.venue, event.organizer]
@@ -1170,20 +1213,115 @@ function AdminDashboard({ onLogout, user }) {
 
       return matchesSearch && matchesState && matchesCategory;
     });
-  }, [categoryFilter, searchTerm, stateFilter]);
+  }, [categoryFilter, eventItems, searchTerm, stateFilter]);
+
+  function openAdminEventEdit(event) {
+    setSelectedAdminEvent(event);
+    setCurrentAdminView('edit-event');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function openAdminEventReview(event) {
+    setSelectedAdminEvent(event);
+    setCurrentAdminView('review-event');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function openPublishedEventInPortal(event) {
+    window.location.assign(`/eventos/${event.id}`);
+  }
+
+  function runAdminEventTableAction(event) {
+    const actionConfig = getAdminEventActionConfig(event);
+
+    if (!actionConfig) {
+      return;
+    }
+
+    if (actionConfig.type === 'edit') {
+      openAdminEventEdit(event);
+      return;
+    }
+
+    if (actionConfig.type === 'review') {
+      openAdminEventReview(event);
+      return;
+    }
+
+    if (actionConfig.type === 'portal') {
+      openPublishedEventInPortal(event);
+    }
+  }
+
+  function requestDeleteDraftEvent(event) {
+    setEventDeleteNotice('');
+    setEventToDelete(event);
+  }
+
+  function cancelDeleteDraftEvent() {
+    setEventToDelete(null);
+  }
+
+  function confirmDeleteDraftEvent() {
+    if (!eventToDelete) {
+      return;
+    }
+
+    const currentEvent = eventItems.find((event) => event.id === eventToDelete.id);
+
+    if (currentEvent?.state !== 'BORRADOR') {
+      setEventToDelete(null);
+      setEventDeleteNotice('Solo se pueden eliminar eventos en estado borrador.');
+      return;
+    }
+
+    setEventItems((currentEvents) =>
+      currentEvents.filter((event) => event.id !== eventToDelete.id),
+    );
+    registerEventAuditLog('ELIMINAR_EVENTO_BORRADOR', eventToDelete.id);
+    setEventToDelete(null);
+    setSelectedAdminEvent(null);
+    setCurrentAdminView('dashboard');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   return (
     <section
-      className={`admin-shell${isSidebarCollapsed ? ' is-sidebar-collapsed' : ''}`}
+      className={[
+        'admin-shell',
+        isSidebarCollapsed ? 'is-sidebar-collapsed' : '',
+        isSidebarDrawerOpen ? 'is-sidebar-drawer-open' : '',
+      ].filter(Boolean).join(' ')}
       aria-labelledby="admin-title"
     >
+      <button
+        className="admin-mobile-menu-button"
+        type="button"
+        aria-label={isSidebarDrawerOpen ? 'Cerrar menú lateral' : 'Abrir menú lateral'}
+        aria-expanded={isSidebarDrawerOpen}
+        onClick={() => setIsSidebarDrawerOpen((isOpen) => !isOpen)}
+      >
+        <span aria-hidden="true" />
+      </button>
+      <button
+        className="admin-sidebar-overlay"
+        type="button"
+        aria-label="Cerrar menú lateral"
+        onClick={closeSidebarDrawer}
+      />
       <aside className="admin-sidebar">
         <button
           className="sidebar-collapse-button"
           type="button"
-          aria-label={isSidebarCollapsed ? 'Mostrar sidebar' : 'Ocultar sidebar'}
-          title={isSidebarCollapsed ? 'Mostrar sidebar' : 'Ocultar sidebar'}
-          onClick={() => setIsSidebarCollapsed((isCollapsed) => !isCollapsed)}
+          aria-label={
+            isSidebarDrawerOpen
+              ? 'Cerrar menú lateral'
+              : isSidebarCollapsed
+                ? 'Abrir menú lateral'
+                : 'Cerrar menú lateral'
+          }
+          title={isSidebarCollapsed ? 'Abrir menú lateral' : 'Cerrar menú lateral'}
+          onClick={toggleSidebarControl}
         >
           <span aria-hidden="true" />
         </button>
@@ -1237,6 +1375,7 @@ function AdminDashboard({ onLogout, user }) {
               className="admin-nav-logout"
               type="button"
               onClick={() => {
+                closeSidebarDrawer();
                 setSelectedAdminEvent(null);
                 setCurrentAdminView('dashboard');
               }}
@@ -1252,6 +1391,7 @@ function AdminDashboard({ onLogout, user }) {
               }
               type="button"
               onClick={() => {
+                closeSidebarDrawer();
                 window.history.pushState(null, '', '/admin');
                 setCurrentAdminView('dashboard');
               }}
@@ -1264,6 +1404,7 @@ function AdminDashboard({ onLogout, user }) {
               }
               type="button"
               onClick={() => {
+                closeSidebarDrawer();
                 window.history.pushState(null, '', '/admin/vecinos');
                 setCurrentAdminView('neighbors');
               }}
@@ -1296,6 +1437,7 @@ function AdminDashboard({ onLogout, user }) {
                       key={item.view}
                       type="button"
                       onClick={() => {
+                        closeSidebarDrawer();
                         window.history.pushState(null, '', item.path);
                         setCurrentAdminView(item.view);
                         setIsSettingsNavOpen(true);
@@ -1337,7 +1479,16 @@ function AdminDashboard({ onLogout, user }) {
                 type,
               })
             }
+            onRequestDelete={requestDeleteDraftEvent}
             onValidationIssue={setValidationIssue}
+          />
+        ) : currentAdminView === 'review-event' && selectedAdminEvent ? (
+          <EventReviewStatusView
+            event={selectedAdminEvent}
+            onBack={() => {
+              setSelectedAdminEvent(null);
+              setCurrentAdminView('dashboard');
+            }}
           />
         ) : currentAdminView === 'neighbors' ? (
           <NeighborAccountsPage adminUserName={adminUserName} />
@@ -1375,7 +1526,9 @@ function AdminDashboard({ onLogout, user }) {
                   className={`admin-stat-card management-stat-card ${stat.tone}`}
                   key={stat.label}
                 >
-                  <img alt="" className="admin-stat-icon" src={stat.icon} />
+                  <span className="admin-stat-icon">
+                    <stat.icon />
+                  </span>
                   <div>
                     <span>{stat.label}</span>
                     <strong>{stat.value}</strong>
@@ -1392,6 +1545,7 @@ function AdminDashboard({ onLogout, user }) {
                   <h2>Eventos en gestion</h2>
                 </div>
               </div>
+              {eventDeleteNotice && <p className="settings-inline-notice">{eventDeleteNotice}</p>}
 
               <div className="admin-filters" aria-label="Filtros de eventos">
                 <label>
@@ -1429,62 +1583,57 @@ function AdminDashboard({ onLogout, user }) {
                 </label>
               </div>
 
-              <div className="admin-table">
+              <div className="admin-table events-management-table">
                 <div className="admin-table-row admin-table-head">
                   <span>Evento</span>
                   <span>Estado</span>
                   <span>Categoría</span>
-                  <span>Cupos</span>
                   <span>Completitud</span>
                   <span>Acción</span>
                 </div>
-                {filteredAdminEvents.map((event) => (
-                  <div className="admin-table-row" key={event.id}>
-                    <span>
-                      <strong>{event.title}</strong>
-                      <small>{event.date} - {event.venue}</small>
-                    </span>
-                    <span>
-                      <StateBadge state={event.state} />
-                    </span>
-                    <span>{event.category}</span>
-                    <span>{event.spots}</span>
-                    <span className="completeness-cell">
-                      <CompletenessMeter compact value={event.completeness} />
-                      <PendingItemsControl
-                        activePendingPopover={activePendingPopover}
-                        event={event}
-                        onToggle={setActivePendingPopover}
-                        popoverRef={pendingPopoverRef}
-                      />
-                    </span>
-                    <span>
-                      <button
-                        aria-label={
-                          event.state === 'FINALIZADO'
-                            ? `Ver detalle de ${event.title}`
-                            : `Editar ${event.title}`
-                        }
-                        className={
-                          event.state === 'FINALIZADO'
-                            ? 'table-icon-action is-detail'
-                            : 'table-icon-action'
-                        }
-                        title={event.state === 'FINALIZADO' ? 'Ver detalle' : 'Editar evento'}
-                        type="button"
-                        onClick={() => {
-                          if (event.state !== 'FINALIZADO') {
-                            setSelectedAdminEvent(event);
-                            setCurrentAdminView('edit-event');
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          }
-                        }}
-                      >
-                        {event.state === 'FINALIZADO' ? <ViewIcon /> : <EditIcon />}
-                      </button>
-                    </span>
-                  </div>
-                ))}
+                {filteredAdminEvents.map((event) => {
+                  const actionConfig = getAdminEventActionConfig(event);
+                  const ActionIcon = actionConfig?.icon;
+
+                  return (
+                    <div className="admin-table-row" key={event.id}>
+                      <span className="event-management-name-cell">
+                        <strong>{event.title}</strong>
+                        <small>{event.date} - {event.venue}</small>
+                      </span>
+                      <span>
+                        <StateBadge state={event.state} />
+                      </span>
+                      <span>{event.category}</span>
+                      <span className="completeness-cell">
+                        <CompletenessMeter compact value={event.completeness} />
+                        <PendingItemsControl
+                          activePendingPopover={activePendingPopover}
+                          event={event}
+                          onToggle={setActivePendingPopover}
+                          popoverRef={pendingPopoverRef}
+                        />
+                      </span>
+                      <span className="event-action-cell">
+                        {actionConfig && ActionIcon ? (
+                          <button
+                            aria-label={actionConfig.label}
+                            className="table-icon-action event-table-action neighbor-detail-action"
+                            data-tooltip={actionConfig.tooltip}
+                            type="button"
+                            onClick={() => runAdminEventTableAction(event)}
+                          >
+                            <ActionIcon />
+                          </button>
+                        ) : (
+                          <span className="event-action-empty" aria-label="Sin acción disponible">
+                            -
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </section>
 
@@ -1511,7 +1660,64 @@ function AdminDashboard({ onLogout, user }) {
             onClose={() => setValidationIssue(null)}
           />
         )}
+
+        {eventToDelete && (
+          <DeleteDraftEventModal
+            event={eventToDelete}
+            onCancel={cancelDeleteDraftEvent}
+            onConfirm={confirmDeleteDraftEvent}
+          />
+        )}
       </main>
+    </section>
+  );
+}
+
+function EventReviewStatusView({ event, onBack }) {
+  const pendingItems = event.pendingItems?.length
+    ? event.pendingItems
+    : ['La ficha se encuentra registrada para seguimiento directivo.'];
+
+  return (
+    <section className="review-status-view" aria-labelledby="review-status-title">
+      <header className="admin-topbar">
+        <div>
+          <span className="section-kicker">Seguimiento de revisión</span>
+          <h1 id="review-status-title">Estado del evento</h1>
+        </div>
+        <button className="admin-new-event-action event-form-top-action" type="button" onClick={onBack}>
+          Volver
+        </button>
+      </header>
+
+      <section className="review-status-grid">
+        <article className="admin-panel review-status-summary">
+          <span className="section-kicker">Evento</span>
+          <h2>{event.title}</h2>
+          <p>{event.date} - {event.venue}</p>
+          <div className="review-status-meta">
+            <StateBadge state={event.state} />
+            <CompletenessMeter value={event.completeness} />
+          </div>
+        </article>
+
+        <article className="admin-panel review-status-summary">
+          <span className="section-kicker">Estado actual</span>
+          <h2>{formatEventState(event.state)}</h2>
+          <p>{getStateSummaryText(event.state)}</p>
+          {event.resentToReviewAt && <small>Reenviado: {event.resentToReviewAt}</small>}
+          {event.sentToReviewAt && <small>Enviado: {event.sentToReviewAt}</small>}
+        </article>
+
+        <article className="admin-panel review-status-notes">
+          <span className="section-kicker">Pendientes y observaciones</span>
+          <ul>
+            {pendingItems.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </article>
+      </section>
     </section>
   );
 }
@@ -1522,9 +1728,12 @@ function PendingItemsControl({
   onToggle,
   popoverRef,
 }) {
-  const pendingItems = event.pendingItems ?? [];
+  const pendingItems =
+    event.completeness < 100 && (event.pendingItems?.length ?? 0) === 0
+      ? ['Faltan datos obligatorios']
+      : event.pendingItems ?? [];
 
-  if (pendingItems.length === 0) {
+  if (event.completeness >= 100 || pendingItems.length === 0) {
     return null;
   }
 
@@ -1551,6 +1760,10 @@ function PendingItemsControl({
         aria-expanded={isOpen}
         aria-label={`${pendingItems.length} pendientes de ${event.title}`}
         className="pending-control-button"
+        data-tooltip={
+          pendingItems.length > 1 ? 'Ficha incompleta' : pendingItems[0]
+        }
+        title={pendingItems.length > 1 ? 'Ficha incompleta' : pendingItems[0]}
         type="button"
         onClick={togglePendingPopover}
       >
@@ -1918,6 +2131,46 @@ function getStateSummaryText(state) {
   return stateMessages[state] ?? 'Estado registrado.';
 }
 
+function getAdminEventActionConfig(event) {
+  if (event.state === 'BORRADOR') {
+    return {
+      icon: EditIcon,
+      label: `Editar ${event.title}`,
+      tooltip: 'Editar evento',
+      type: 'edit',
+    };
+  }
+
+  if (event.state === 'OBSERVADO') {
+    return {
+      icon: EditIcon,
+      label: `Corregir ${event.title}`,
+      tooltip: 'Corregir evento observado',
+      type: 'edit',
+    };
+  }
+
+  if (['EN_REVISION', 'OBSERVADO_EN_REVISION', 'APROBADO'].includes(event.state)) {
+    return {
+      icon: ClipboardCheckLineIcon,
+      label: `Ver estado de revision de ${event.title}`,
+      tooltip: 'Ver estado de revisión',
+      type: 'review',
+    };
+  }
+
+  if (event.state === 'PUBLICADO') {
+    return {
+      icon: ViewIcon,
+      label: `Ver ${event.title} en el portal ciudadano`,
+      tooltip: 'Ver en portal ciudadano',
+      type: 'portal',
+    };
+  }
+
+  return null;
+}
+
 function ViewIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -1932,6 +2185,71 @@ function EditIcon() {
     <svg aria-hidden="true" viewBox="0 0 24 24">
       <path d="m14.7 5.3 4 4" />
       <path d="M4 20h4.2L19.5 8.7a2.8 2.8 0 0 0-4-4L4.2 16H4v4Z" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M4 7h16" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+      <path d="M6 7l1 14h10l1-14" />
+      <path d="M9 7V4h6v3" />
+    </svg>
+  );
+}
+
+function InfoLineIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5" />
+      <path d="M12 8h.01" />
+    </svg>
+  );
+}
+
+function CalendarCheckLineIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M7 2v4" />
+      <path d="M17 2v4" />
+      <path d="M4 9h16" />
+      <path d="M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+      <path d="m8.5 14 2.2 2.2 4.8-5" />
+    </svg>
+  );
+}
+
+function FileEditLineIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+      <path d="M14 2v6h6" />
+      <path d="m12.5 16.5 4.8-4.8a1.7 1.7 0 0 1 2.4 2.4l-4.8 4.8H12v-2.4Z" />
+    </svg>
+  );
+}
+
+function ClipboardCheckLineIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M9 4h6" />
+      <path d="M9 4a3 3 0 0 1 6 0" />
+      <path d="M8 5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+      <path d="m8.5 14 2.2 2.2 4.8-5" />
+    </svg>
+  );
+}
+
+function TriangleAlertLineIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M12 3 2.8 19a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L12 3Z" />
+      <path d="M12 9v5" />
+      <path d="M12 18h.01" />
     </svg>
   );
 }
@@ -2090,12 +2408,34 @@ function NeighborAccountsPage({ adminUserName }) {
       return matchesState && matchesSearch;
     });
   }, [neighbors, searchValue, stateFilterValue]);
-  const summary = {
-    active: neighbors.filter((neighbor) => neighbor.estado === 'ACTIVO').length,
-    blocked: neighbors.filter((neighbor) => neighbor.estado === 'BLOQUEADO').length,
-    pending: neighbors.filter((neighbor) => neighbor.estado === 'PENDIENTE_CONFIRMACION').length,
-    total: neighbors.length,
-  };
+
+  function openNeighborDetailModal(neighbor) {
+    setSelectedNeighbor(neighbor);
+    setEditingContact(false);
+    setNotice('');
+  }
+
+  // function closeNeighborDetailModal() {
+  //   if (actionModal) {
+  //     return;
+  //   }
+
+  //   setSelectedNeighbor(null);
+  //   setEditingContact(false);
+  //   setNotice('');
+  // }
+
+  const closeNeighborDetailModal = useCallback(() =>{
+    if(actionModal){
+      return;
+    }
+
+    setSelectedNeighbor(null);
+    setEditingContact(false);
+    setNotice('');
+
+
+  }, [actionModal]);
 
   useEffect(() => {
     if (!modalNeighbor) {
@@ -2113,23 +2453,7 @@ function NeighborAccountsPage({ adminUserName }) {
     return () => {
       document.removeEventListener('keydown', closeNeighborModalOnEscape);
     };
-  }, [modalNeighbor, actionModal]);
-
-  function openNeighborDetailModal(neighbor) {
-    setSelectedNeighbor(neighbor);
-    setEditingContact(false);
-    setNotice('');
-  }
-
-  function closeNeighborDetailModal() {
-    if (actionModal) {
-      return;
-    }
-
-    setSelectedNeighbor(null);
-    setEditingContact(false);
-    setNotice('');
-  }
+  }, [modalNeighbor, closeNeighborDetailModal]);
 
   function startContactEdit() {
     if (!modalNeighbor) {
@@ -2314,16 +2638,6 @@ function NeighborAccountsPage({ adminUserName }) {
   );
 }
 
-function NeighborStatCard({ label, value }) {
-  return (
-    <article className="admin-panel admin-stat-card management-stat-card neighbor-stat-card">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>cuentas</small>
-    </article>
-  );
-}
-
 function NeighborDetailModal({
   actionNotice,
   contactDraft,
@@ -2501,91 +2815,815 @@ function SettingsUsersPage() {
   const [searchValue, setSearchValue] = useState('');
   const [roleFilter, setRoleFilter] = useState('Todos');
   const [users, setUsers] = useState(settingsUsers);
+  const [userModalMode, setUserModalMode] = useState(null);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [userFormData, setUserFormData] = useState(getEmptyUserFormData());
+  const [userFormErrors, setUserFormErrors] = useState({});
+  const [identityLookupNotice, setIdentityLookupNotice] = useState('');
+  const [passwordResetNotice, setPasswordResetNotice] = useState('');
+  const selectedUser = users.find((user) => user.id === selectedUserId) ?? null;
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
       searchValue.trim().length === 0 ||
-      [user.nombre, user.correo, user.rol].join(' ').toLowerCase().includes(searchValue.trim().toLowerCase());
+      [user.nombre, user.correo, user.rol]
+        .join(' ')
+        .toLowerCase()
+        .includes(searchValue.trim().toLowerCase());
     const matchesRole = roleFilter === 'Todos' || user.rol === roleFilter;
 
     return matchesSearch && matchesRole;
   });
 
+  const closeUserModal = () => {
+    setUserModalMode(null);
+    setSelectedUserId(null);
+    setUserFormData(getEmptyUserFormData());
+    setUserFormErrors({});
+    setIdentityLookupNotice('');
+    setPasswordResetNotice('');
+  };
+
+  const openCreateUserModal = () => {
+    setSelectedUserId(null);
+    setUserFormData(getEmptyUserFormData());
+    setUserFormErrors({});
+    setIdentityLookupNotice('');
+    setPasswordResetNotice('');
+    setUserModalMode('create');
+  };
+
+  const openEditUserModal = (user) => {
+    setSelectedUserId(user.id);
+    setUserFormData(getUserFormData(user));
+    setUserFormErrors({});
+    setIdentityLookupNotice('');
+    setPasswordResetNotice('');
+    setUserModalMode('edit');
+  };
+
+  const saveUser = () => {
+    const errors = validateUserForm(userFormData, userModalMode);
+
+    if (Object.keys(errors).length > 0) {
+      setUserFormErrors(errors);
+      return;
+    }
+
+    const selectedArea = getMunicipalAreaById(userFormData.areaId);
+    const normalizedUser = {
+      area: selectedArea?.nombre ?? userFormData.area,
+      areaId: Number(userFormData.areaId),
+      correo: userFormData.correo.trim(),
+      dni: userFormData.dni.trim(),
+      estado: selectedUser?.estado ?? 'ACTIVO',
+      nombre: userFormData.nombre.trim(),
+      rol: userFormData.rol,
+    };
+
+    if (userModalMode === 'edit' && selectedUser) {
+      const changedFields = getChangedUserFields(selectedUser, normalizedUser);
+
+      setUsers((currentUsers) =>
+        currentUsers.map((user) =>
+          user.id === selectedUser.id ? { ...user, ...normalizedUser } : user,
+        ),
+      );
+      notifyUserAccountChanges(normalizedUser, changedFields);
+      registerUserAuditLog('UPDATE_INTERNAL_USER', selectedUser.id, changedFields);
+    } else {
+      setUsers((currentUsers) => [
+        ...currentUsers,
+        {
+          ...normalizedUser,
+          id: Math.max(0, ...currentUsers.map((user) => user.id)) + 1,
+        },
+      ]);
+    }
+
+    closeUserModal();
+  };
+
+  const toggleUserState = () => {
+    if (!selectedUser) {
+      return;
+    }
+
+    const nextState = selectedUser.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
+
+    setUsers((currentUsers) =>
+      currentUsers.map((user) =>
+        user.id === selectedUser.id
+          ? { ...user, estado: nextState }
+          : user,
+      ),
+    );
+    notifyUserAccountChanges({ ...selectedUser, estado: nextState }, ['estado']);
+    registerUserAuditLog('TOGGLE_INTERNAL_USER_STATE', selectedUser.id, ['estado']);
+    closeUserModal();
+  };
+
   return (
-    <SettingsTablePage
-      actionLabel="Nuevo usuario"
-      columns={['Usuario', 'Correo', 'Rol', 'Área responsable', 'Estado', 'Acción']}
-      description="Administra las cuentas internas del sistema municipal."
-      filterLabel="Rol"
-      filterOptions={['Todos', 'Administrador', 'Directivo', 'Operativo']}
-      filterValue={roleFilter}
-      kicker="Configuración"
-      searchPlaceholder="Nombre, correo o rol"
-      searchValue={searchValue}
-      title="Usuarios"
-      onAction={() => {}}
-      onFilterChange={setRoleFilter}
-      onSearchChange={setSearchValue}
-    >
-      <div className="admin-table settings-table settings-users-table">
-        <div className="admin-table-row admin-table-head">
-          <span>Usuario</span><span>Correo</span><span>Rol</span><span>Área responsable</span><span>Estado</span><span>Acción</span>
-        </div>
-        {filteredUsers.map((user) => (
-          <div className="admin-table-row" key={user.id}>
-            <span><strong>{user.nombre}</strong><small>Usuario interno</small></span>
-            <span>{user.correo}</span>
-            <span>{user.rol}</span>
-            <span>{user.area}</span>
-            <SettingsStatus state={user.estado} />
-            <SettingsRowActions
-              isActive={user.estado === 'ACTIVO'}
-              label={user.nombre}
-              onToggle={() => setUsers((current) => toggleSettingsItemState(current, user.id))}
-            />
+    <>
+      <SettingsTablePage
+        actionLabel="Nuevo usuario"
+        cardKicker="Configuración"
+        cardTitle="Usuarios internos"
+        description="Administra las cuentas internas del sistema municipal."
+        filterLabel="Rol"
+        filterOptions={['Todos', 'Administrador', 'Directivo', 'Operativo']}
+        filterValue={roleFilter}
+        searchPlaceholder="Nombre, correo o rol"
+        searchValue={searchValue}
+        title="Usuarios"
+        onAction={openCreateUserModal}
+        onFilterChange={setRoleFilter}
+        onSearchChange={setSearchValue}
+      >
+        <div className="admin-table settings-table settings-users-table">
+          <div className="admin-table-row admin-table-head">
+            <span>Usuario</span><span>Correo</span><span>Rol</span><span>Estado</span><span>Acción</span>
           </div>
-        ))}
-      </div>
-    </SettingsTablePage>
+          {filteredUsers.map((user) => (
+            <div className="admin-table-row" key={user.id}>
+              <span><strong>{user.nombre}</strong><small>Usuario interno</small></span>
+              <span>{user.correo}</span>
+              <span>{user.rol}</span>
+              <SettingsStatus state={user.estado} />
+              <span className="settings-row-actions settings-user-actions">
+                <button
+                  aria-label={`Ver o editar usuario ${user.nombre}`}
+                  className="table-icon-action is-detail neighbor-detail-action settings-user-detail-action"
+                  data-tooltip="Ver/editar usuario"
+            type="button"
+            onClick={() => openEditUserModal(user)}
+          >
+            <ViewIcon />
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
+      </SettingsTablePage>
+
+      {userModalMode && (
+        <UserFormModal
+          errors={userFormErrors}
+          formData={userFormData}
+          identityNotice={identityLookupNotice}
+          mode={userModalMode}
+          passwordResetNotice={passwordResetNotice}
+          user={selectedUser}
+          onClose={closeUserModal}
+          onFieldChange={(field, value) => {
+            setUserFormData((current) => ({ ...current, [field]: value }));
+            setUserFormErrors((current) => ({ ...current, [field]: undefined }));
+          }}
+          onLookupDni={() => {
+            const identity = identityLookupMock[userFormData.dni];
+
+            if (identity) {
+              setUserFormData((current) => ({
+                ...current,
+                identityVerified: true,
+                nombre: identity.nombreCompleto,
+              }));
+              setUserFormErrors((current) => ({ ...current, identityVerified: undefined }));
+              setIdentityLookupNotice(`Identidad verificada: ${identity.nombreCompleto}`);
+            } else {
+              setUserFormData((current) => ({ ...current, identityVerified: false, nombre: '' }));
+              setIdentityLookupNotice('No se encontraron datos para el DNI ingresado.');
+            }
+          }}
+          onSendResetPassword={() => {
+            if (!selectedUser) {
+              return;
+            }
+
+            requestPasswordResetLink(selectedUser);
+            registerUserAuditLog('SEND_PASSWORD_RESET_LINK', selectedUser.id, ['passwordReset']);
+            setPasswordResetNotice('Enlace de restablecimiento enviado al correo registrado.');
+          }}
+          onSave={saveUser}
+          onToggleState={toggleUserState}
+        />
+      )}
+    </>
+  );
+}
+
+function getEmptyUserFormData() {
+  return {
+    area: '',
+    areaId: '',
+    confirmarPassword: '',
+    correo: '',
+    dni: '',
+    identityVerified: false,
+    nombre: '',
+    password: '',
+    rol: '',
+  };
+}
+
+function getUserFormData(user) {
+  return {
+    area: user?.area ?? '',
+    areaId: user?.areaId ? String(user.areaId) : '',
+    confirmarPassword: '',
+    correo: user?.correo ?? '',
+    dni: user?.dni ?? '',
+    identityVerified: Boolean(user?.nombre),
+    nombre: user?.nombre ?? '',
+    password: '',
+    rol: user?.rol ?? '',
+  };
+}
+
+function validateUserForm(formData, mode) {
+  const errors = {};
+  const isCreating = mode === 'create';
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (isCreating && !/^\d{8}$/.test(formData.dni.trim())) {
+    errors.dni = 'Ingrese un DNI válido de 8 dígitos.';
+  }
+
+  if (isCreating && (!formData.identityVerified || !formData.nombre.trim())) {
+    errors.identityVerified = 'Verifique la identidad con un DNI válido antes de guardar.';
+  }
+
+  if (!formData.correo.trim()) {
+    errors.correo = 'Ingrese el correo electrónico.';
+  } else if (!emailPattern.test(formData.correo.trim())) {
+    errors.correo = 'Ingrese un correo electrónico válido.';
+  }
+
+  if (!formData.rol) {
+    errors.rol = 'Seleccione un rol.';
+  }
+
+  if (!formData.areaId) {
+    errors.areaId = 'Seleccione un área municipal.';
+  }
+
+  if (isCreating && !formData.password) {
+    errors.password = 'Ingrese una contraseña.';
+  }
+
+  if (isCreating && !formData.confirmarPassword) {
+    errors.confirmarPassword = 'Confirme la contraseña.';
+  }
+
+  if (formData.password && formData.password !== formData.confirmarPassword) {
+    errors.confirmarPassword = 'Las contraseñas no coinciden.';
+  }
+
+  return errors;
+}
+
+function getChangedUserFields(currentUser, nextUser) {
+  return ['correo', 'rol', 'areaId', 'area'].filter((field) => currentUser[field] !== nextUser[field]);
+}
+
+function notifyUserAccountChanges(user, changedFields) {
+  return {
+    changedFields,
+    recipient: user.correo,
+    status: 'queued',
+  };
+}
+
+function registerUserAuditLog(action, userId, changedFields) {
+  return {
+    action,
+    changedFields,
+    status: 'registered',
+    userId,
+  };
+}
+
+function requestPasswordResetLink(user) {
+  return {
+    recipient: user.correo,
+    status: 'sent',
+  };
+}
+
+function registerEventAuditLog(action, eventId) {
+  return {
+    action,
+    eventId,
+    status: 'registered',
+  };
+}
+
+function UserFormModal({
+  errors,
+  formData,
+  identityNotice,
+  mode,
+  onClose,
+  onFieldChange,
+  onLookupDni,
+  onSendResetPassword,
+  onSave,
+  onToggleState,
+  passwordResetNotice,
+  user,
+}) {
+  const isEditing = mode === 'edit';
+  const identityMessage =
+    identityNotice ||
+    (formData.identityVerified && formData.nombre
+      ? `Identidad verificada: ${formData.nombre}`
+      : '');
+
+  return (
+    <div className="modal-backdrop neighbor-detail-backdrop user-detail-backdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        className="neighbor-detail-modal user-detail-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="user-detail-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header className="neighbor-detail-header user-detail-header">
+          <div className="neighbor-detail-kicker-row">
+            <span className="section-kicker">Configuración</span>
+            <button className="neighbor-modal-close" type="button" aria-label="Cerrar usuario" onClick={onClose}>
+              ×
+            </button>
+          </div>
+          <div className="neighbor-detail-title-row">
+            <h2 id="user-detail-title">{isEditing ? 'Editar usuario' : 'Nuevo usuario'}</h2>
+            {isEditing && <SettingsStatus state={user?.estado ?? 'ACTIVO'} />}
+          </div>
+        </header>
+
+        <div className="neighbor-detail-body user-detail-body">
+          <div className="user-form-grid">
+            <label className="form-field span-2">
+              DNI
+              <span className={`user-dni-field${isEditing ? ' is-readonly' : ''}`}>
+                <input
+                  disabled={isEditing}
+                  inputMode="numeric"
+                  maxLength={8}
+                  readOnly={isEditing}
+                  value={formData.dni}
+                  onChange={(event) => {
+                    if (isEditing) {
+                      return;
+                    }
+
+                    const nextDni = event.target.value.replace(/\D/g, '').slice(0, 8);
+                    onFieldChange('dni', nextDni);
+                    onFieldChange('nombre', '');
+                    onFieldChange('identityVerified', false);
+                  }}
+                />
+                {!isEditing && (
+                  <button
+                    disabled={formData.dni.length !== 8}
+                    type="button"
+                    onClick={onLookupDni}
+                  >
+                    Buscar
+                  </button>
+                )}
+              </span>
+              {errors.dni && <small className="form-error">{errors.dni}</small>}
+              {errors.identityVerified && <small className="form-error">{errors.identityVerified}</small>}
+              {identityMessage && (
+                <small className={`user-identity-notice${formData.identityVerified ? '' : ' is-error'}`}>
+                  {identityMessage}
+                </small>
+              )}
+            </label>
+
+            <label className="form-field">
+              Correo electrónico
+              <input type="email" value={formData.correo} onChange={(event) => onFieldChange('correo', event.target.value)} />
+              {errors.correo && <small className="form-error">{errors.correo}</small>}
+            </label>
+
+            <label className="form-field">
+              Área municipal
+              <UserAreaCombobox
+                value={formData.areaId}
+                onChange={(area) => {
+                  onFieldChange('areaId', area?.area_municipal_id ? String(area.area_municipal_id) : '');
+                  onFieldChange('area', area?.nombre ?? '');
+                }}
+              />
+              {errors.areaId && <small className="form-error">{errors.areaId}</small>}
+            </label>
+
+            <label className="form-field">
+              Rol
+              <select value={formData.rol} onChange={(event) => onFieldChange('rol', event.target.value)}>
+                <option value="">Seleccionar rol</option>
+                <option value="Administrador">Administrador</option>
+                <option value="Directivo">Directivo</option>
+                <option value="Operativo">Operativo</option>
+              </select>
+              {errors.rol && <small className="form-error">{errors.rol}</small>}
+            </label>
+
+            {isEditing && (
+              <section className="user-security-section span-2">
+                <span>
+                  <strong>Seguridad de la cuenta</strong>
+                  <small>
+                    Permite enviar un enlace para que el usuario restablezca su contraseña desde su correo.
+                  </small>
+                  {passwordResetNotice && <small className="user-reset-notice">{passwordResetNotice}</small>}
+                </span>
+                <button className="user-reset-action" type="button" onClick={onSendResetPassword}>
+                  <span aria-hidden="true">+</span>
+                  Enviar enlace de restablecimiento
+                </button>
+              </section>
+            )}
+
+            {isEditing && (
+              <div className="user-audit-notice span-2">
+                <span className="user-audit-icon">
+                  <InfoLineIcon />
+                </span>
+                <span>
+                  Los cambios realizados en esta cuenta serán notificados al correo del usuario y registrados en la bitácora del sistema.
+                  {' '}
+                  Si se modifica el correo electrónico, la notificación será enviada al correo anterior y al nuevo correo registrado.
+                </span>
+              </div>
+            )}
+
+            {!isEditing && (
+              <>
+                <label className="form-field">
+                  Password
+                  <input
+                    placeholder="Ingrese una contraseña"
+                    type="password"
+                    value={formData.password}
+                    onChange={(event) => onFieldChange('password', event.target.value)}
+                  />
+                  {errors.password && <small className="form-error">{errors.password}</small>}
+                </label>
+
+                <label className="form-field">
+                  Confirmar password
+                  <input
+                    type="password"
+                    value={formData.confirmarPassword}
+                    onChange={(event) => onFieldChange('confirmarPassword', event.target.value)}
+                  />
+                  {errors.confirmarPassword && <small className="form-error">{errors.confirmarPassword}</small>}
+                </label>
+              </>
+            )}
+          </div>
+        </div>
+
+        <footer className="neighbor-detail-footer user-detail-footer">
+          <span className="user-footer-state-action">
+            {isEditing && (
+              <button
+                className={user?.estado === 'ACTIVO' ? 'neighbor-primary-action is-danger' : 'neighbor-primary-action is-positive'}
+                type="button"
+                onClick={onToggleState}
+              >
+                {user?.estado === 'ACTIVO' ? 'Desactivar usuario' : 'Activar usuario'}
+              </button>
+            )}
+          </span>
+          <span className="user-footer-main-actions">
+            <button className="neighbor-secondary-action" type="button" onClick={onClose}>
+              Cancelar
+            </button>
+            <button className="neighbor-primary-action" type="button" onClick={onSave}>
+              {isEditing ? 'Guardar cambios' : 'Guardar usuario'}
+            </button>
+          </span>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+function UserAreaCombobox({ onChange, value }) {
+  const initialArea = getMunicipalAreaById(value);
+  const [selectedArea, setSelectedArea] = useState(initialArea ?? null);
+  const [searchValue, setSearchValue] = useState(initialArea?.nombre ?? '');
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const comboboxRef = useRef(null);
+  const normalizedSearch = normalizeSearchText(searchValue.trim());
+  const filteredAreas = areasMunicipales.filter((area) => {
+    if (!normalizedSearch) {
+      return true;
+    }
+
+    return [area.nombre, area.tipo_area].some((areaValue) =>
+      normalizeSearchText(areaValue).includes(normalizedSearch),
+    );
+  });
+
+  useEffect(() => {
+    function closeOnOutsideClick(event) {
+      if (!comboboxRef.current?.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', closeOnOutsideClick);
+
+    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
+  }, []);
+
+  function selectArea(area) {
+    setSelectedArea(area);
+    setSearchValue(area.nombre);
+    setIsOpen(false);
+    setHighlightedIndex(0);
+    onChange(area);
+  }
+
+  function handleSearchChange(event) {
+    setSearchValue(event.target.value);
+    setSelectedArea(null);
+    setIsOpen(true);
+    setHighlightedIndex(0);
+    onChange(null);
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setIsOpen(true);
+      setHighlightedIndex((currentIndex) =>
+        Math.min(currentIndex + 1, Math.max(filteredAreas.length - 1, 0)),
+      );
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setHighlightedIndex((currentIndex) => Math.max(currentIndex - 1, 0));
+      return;
+    }
+
+    if (event.key === 'Enter' && isOpen && filteredAreas[highlightedIndex]) {
+      event.preventDefault();
+      selectArea(filteredAreas[highlightedIndex]);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      setIsOpen(false);
+    }
+  }
+
+  return (
+    <span className="area-combobox user-area-combobox" ref={comboboxRef}>
+      <input
+        aria-autocomplete="list"
+        aria-expanded={isOpen}
+        className="area-combobox-input"
+        placeholder="Buscar o seleccionar área"
+        role="combobox"
+        type="text"
+        value={searchValue}
+        onChange={handleSearchChange}
+        onClick={() => setIsOpen(true)}
+        onFocus={() => setIsOpen(true)}
+        onKeyDown={handleKeyDown}
+      />
+      {isOpen && (
+        <span className="area-combobox-menu" role="listbox">
+          {filteredAreas.length > 0 ? (
+            filteredAreas.map((area, index) => (
+              <button
+                aria-selected={selectedArea?.area_municipal_id === area.area_municipal_id}
+                className={index === highlightedIndex ? 'is-highlighted' : ''}
+                key={area.area_municipal_id}
+                role="option"
+                type="button"
+                onClick={() => selectArea(area)}
+                onMouseEnter={() => setHighlightedIndex(index)}
+              >
+                <span>{area.nombre}</span>
+                <small>{area.tipo_area}</small>
+              </button>
+            ))
+          ) : (
+            <span className="area-combobox-empty">No se encontraron áreas</span>
+          )}
+        </span>
+      )}
+    </span>
   );
 }
 
 function SettingsCategoriesPage() {
   const [searchValue, setSearchValue] = useState('');
   const [categories, setCategories] = useState(settingsCategories);
+  const [categoryFormValue, setCategoryFormValue] = useState('');
+  const [categoryFormError, setCategoryFormError] = useState('');
+  const [categoryNotice, setCategoryNotice] = useState('');
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
+  const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false);
   const filteredCategories = categories.filter((category) =>
     category.nombre.toLowerCase().includes(searchValue.trim().toLowerCase()),
   );
 
+  const closeCategoryForm = () => {
+    setCategoryFormValue('');
+    setCategoryFormError('');
+    setIsCategoryFormOpen(false);
+  };
+
+  const openCategoryForm = () => {
+    setCategoryNotice('');
+    setCategoryFormError('');
+    setCategoryFormValue('');
+    setIsCategoryFormOpen(true);
+  };
+
+  const saveCategory = () => {
+    const normalizedName = categoryFormValue.trim();
+
+    if (!normalizedName) {
+      setCategoryFormError('Ingrese el nombre de la categoría.');
+      return;
+    }
+
+    const hasDuplicate = categories.some((category) => category.nombre === normalizedName);
+
+    if (hasDuplicate) {
+      setCategoryFormError('Ya existe una categoría con ese nombre.');
+      return;
+    }
+
+    setCategories((current) => [
+      ...current,
+      {
+        eventosAsociados: 0,
+        id: Math.max(0, ...current.map((category) => category.id)) + 1,
+        nombre: normalizedName,
+      },
+    ]);
+    closeCategoryForm();
+  };
+
+  const requestCategoryDelete = (category) => {
+    if (category.eventosAsociados > 0) {
+      setCategoryNotice(
+        `No se puede eliminar la categoría ${category.nombre} porque tiene eventos asociados.`,
+      );
+      return;
+    }
+
+    setCategoryNotice('');
+    setCategoryToDelete(category);
+  };
+
+  const confirmCategoryDelete = () => {
+    if (!categoryToDelete) {
+      return;
+    }
+
+    setCategories((current) => current.filter((category) => category.id !== categoryToDelete.id));
+    setCategoryToDelete(null);
+  };
+
   return (
-    <SettingsTablePage
-      actionLabel="Nueva categoría"
-      description="Gestiona las categorías utilizadas para clasificar eventos municipales."
-      kicker="Configuración"
-      searchPlaceholder="Nombre de categoría"
-      searchValue={searchValue}
-      title="Categorías"
-      onAction={() => {}}
-      onSearchChange={setSearchValue}
-    >
-      <div className="admin-table settings-table settings-categories-table">
-        <div className="admin-table-row admin-table-head">
-          <span>Categoría</span><span>Descripción</span><span>Eventos asociados</span><span>Estado</span><span>Acción</span>
-        </div>
-        {filteredCategories.map((category) => (
-          <div className="admin-table-row" key={category.id}>
-            <span><strong>{category.nombre}</strong></span>
-            <span>{category.descripcion}</span>
-            <span>{category.eventosAsociados}</span>
-            <SettingsStatus state={category.estado} />
-            <SettingsRowActions
-              isActive={category.estado === 'ACTIVO'}
-              label={category.nombre}
-              onToggle={() => setCategories((current) => toggleSettingsItemState(current, category.id))}
-            />
+    <>
+      <SettingsTablePage
+        actionLabel="Nueva categoría"
+        cardKicker="Catálogo"
+        cardTitle="Categorías registradas"
+        description="Gestiona las categorías utilizadas para clasificar eventos municipales."
+        searchPlaceholder="Buscar categoría"
+        searchValue={searchValue}
+        title="Categorías"
+        onAction={openCategoryForm}
+        onSearchChange={setSearchValue}
+      >
+        {categoryNotice && <p className="settings-inline-notice">{categoryNotice}</p>}
+        <div className="admin-table settings-table settings-categories-table">
+          <div className="admin-table-row admin-table-head">
+            <span>Categoría</span><span>Eventos asociados</span><span>Acción</span>
           </div>
-        ))}
-      </div>
-    </SettingsTablePage>
+          {filteredCategories.map((category) => (
+            <div className="admin-table-row" key={category.id}>
+              <span><strong>{category.nombre}</strong></span>
+              <span className="category-events-count">{category.eventosAsociados}</span>
+              <span className="settings-row-actions category-row-actions">
+                <button
+                  aria-label={`Eliminar categoría ${category.nombre}`}
+                  className="table-icon-action is-detail neighbor-detail-action category-delete-action"
+                  data-tooltip={
+                    category.eventosAsociados === 0
+                      ? 'Eliminar categoría'
+                      : 'No se puede eliminar porque tiene eventos asociados'
+                  }
+                  type="button"
+                  onClick={() => requestCategoryDelete(category)}
+                >
+                  <TrashIcon />
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
+      </SettingsTablePage>
+
+      {isCategoryFormOpen && (
+        <CategoryFormModal
+          error={categoryFormError}
+          value={categoryFormValue}
+          onCancel={closeCategoryForm}
+          onSave={saveCategory}
+          onValueChange={(value) => {
+            setCategoryFormValue(value);
+            setCategoryFormError('');
+          }}
+        />
+      )}
+
+      {categoryToDelete && (
+        <CategoryDeleteModal
+          category={categoryToDelete}
+          onCancel={() => setCategoryToDelete(null)}
+          onConfirm={confirmCategoryDelete}
+        />
+      )}
+    </>
+  );
+}
+
+function CategoryFormModal({ error, onCancel, onSave, onValueChange, value }) {
+  return (
+    <div className="modal-backdrop category-modal-backdrop" role="presentation" onMouseDown={onCancel}>
+      <section
+        className="confirm-modal category-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="category-form-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <span className="section-kicker">Configuración</span>
+        <h2 id="category-form-title">Nueva categoría</h2>
+        <label className="form-field">
+          Nombre de categoría
+          <input
+            autoFocus
+            type="text"
+            value={value}
+            onChange={(event) => onValueChange(event.target.value)}
+          />
+          {error && <small className="form-error">{error}</small>}
+        </label>
+        <div className="modal-actions">
+          <button className="back-button" type="button" onClick={onCancel}>
+            Cancelar
+          </button>
+          <button className="primary-button" type="button" onClick={onSave}>
+            Guardar categoría
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function CategoryDeleteModal({ category, onCancel, onConfirm }) {
+  return (
+    <div className="modal-backdrop category-modal-backdrop" role="presentation" onMouseDown={onCancel}>
+      <section
+        className="confirm-modal category-modal category-delete-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="category-delete-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <span className="section-kicker">Configuración</span>
+        <h2 id="category-delete-title">Eliminar categoría</h2>
+        <p>
+          ¿Deseas eliminar la categoría "{category.nombre}"? Esta acción no se puede deshacer.
+        </p>
+        <div className="modal-actions">
+          <button className="back-button" type="button" onClick={onCancel}>
+            Cancelar
+          </button>
+          <button className="primary-button danger-action" type="button" onClick={onConfirm}>
+            Eliminar categoría
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -2607,6 +3645,12 @@ function SettingsLocationsPage() {
     );
   });
 
+  const closeLocationModal = () => {
+    setLocationModalMode(null);
+    setSelectedLocation(null);
+    setLocationFormErrors({});
+  };
+
   useEffect(() => {
     if (!isLocationModalOpen) {
       return undefined;
@@ -2622,12 +3666,6 @@ function SettingsLocationsPage() {
 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isLocationModalOpen]);
-
-  const closeLocationModal = () => {
-    setLocationModalMode(null);
-    setSelectedLocation(null);
-    setLocationFormErrors({});
-  };
 
   const openLocationDetail = (location) => {
     setSelectedLocation(location);
@@ -2714,8 +3752,9 @@ function SettingsLocationsPage() {
     <>
       <SettingsTablePage
         actionLabel="Nueva ubicación"
+        cardKicker="Catálogo"
+        cardTitle="Ubicaciones registradas"
         description="Administra los espacios municipales o puntos recurrentes donde se desarrollan eventos."
-        kicker="Configuración"
         searchPlaceholder="Buscar por nombre, dirección o referencia"
         searchValue={searchValue}
         title="Ubicaciones"
@@ -2853,7 +3892,7 @@ function LocationDetailModal({
       onMouseDown={onClose}
     >
       <section
-        className="neighbor-detail-modal location-detail-modal"
+        className={`neighbor-detail-modal location-detail-modal ${isEditing ? 'is-editing' : 'is-viewing'}`}
         aria-labelledby="location-detail-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
@@ -2870,7 +3909,7 @@ function LocationDetailModal({
           </div>
         </header>
 
-        <div className="neighbor-detail-body location-detail-body">
+        <div className={`neighbor-detail-body location-detail-body ${isEditing ? 'is-editing' : 'is-viewing'}`}>
           {isEditing ? (
             <LocationForm
               errors={errors}
@@ -3022,12 +4061,13 @@ function LocationForm({ errors, formData, onFieldChange }) {
 
 function SettingsTablePage({
   actionLabel,
+  cardKicker,
+  cardTitle,
   children,
   description,
   filterLabel,
   filterOptions,
   filterValue,
-  kicker,
   onAction,
   onFilterChange,
   onSearchChange,
@@ -3039,7 +4079,7 @@ function SettingsTablePage({
     <section className="settings-view" aria-labelledby={`settings-${title.toLowerCase()}-title`}>
       <header className="admin-topbar">
         <div>
-          <span className="section-kicker">{kicker}</span>
+          <span className="section-kicker">Configuración</span>
           <h1 id={`settings-${title.toLowerCase()}-title`}>{title}</h1>
           <p>{description}</p>
         </div>
@@ -3049,6 +4089,12 @@ function SettingsTablePage({
         </button>
       </header>
       <article className="admin-table-panel admin-table-featured settings-panel">
+        <div className="admin-panel-heading">
+          <div>
+            <span className="section-kicker">{cardKicker}</span>
+            <h2>{cardTitle}</h2>
+          </div>
+        </div>
         <div className={`admin-filters settings-filters${filterOptions ? '' : ' single-filter'}`}>
           <label>
             Buscar
@@ -3081,27 +4127,6 @@ function SettingsStatus({ state }) {
     <span className={`settings-status ${state === 'ACTIVO' ? 'is-active' : 'is-inactive'}`}>
       {state === 'ACTIVO' ? 'Activo' : 'Inactivo'}
     </span>
-  );
-}
-
-function SettingsRowActions({ isActive, label, onToggle }) {
-  return (
-    <span className="settings-row-actions">
-      <button aria-label={`Ver o editar ${label}`} className="table-icon-action is-detail" type="button">
-        <ViewIcon />
-      </button>
-      <button className="settings-toggle-action" type="button" onClick={onToggle}>
-        {isActive ? 'Desactivar' : 'Activar'}
-      </button>
-    </span>
-  );
-}
-
-function toggleSettingsItemState(items, itemId) {
-  return items.map((item) =>
-    item.id === itemId
-      ? { ...item, estado: item.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO' }
-      : item,
   );
 }
 
@@ -3493,7 +4518,7 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
   );
 }
 
-function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
+function EditEventView({ event, onBack, onRequestAction, onRequestDelete, onValidationIssue }) {
   const formRef = useRef(null);
   const initialCapacityMode = event.aforoMaximo === null ? 'none' : 'defined';
   const initialAudienceType =
@@ -3811,6 +4836,15 @@ function EditEventView({ event, onBack, onRequestAction, onValidationIssue }) {
           </section>
 
           <div className="event-form-actions">
+            {event.state === 'BORRADOR' && (
+              <button
+                className="admin-secondary-action event-delete-action"
+                type="button"
+                onClick={() => onRequestDelete(event)}
+              >
+                Eliminar evento
+              </button>
+            )}
             <button
               className="admin-secondary-action event-draft-action"
               type="button"
@@ -3858,6 +4892,34 @@ function ValidationIssueModal({ missingFields, onClose }) {
         <div className="modal-actions single-action">
           <button className="primary-button" type="button" onClick={onClose}>
             Revisar ficha
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function DeleteDraftEventModal({ event, onCancel, onConfirm }) {
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={onCancel}>
+      <section
+        aria-labelledby="delete-draft-event-title"
+        aria-modal="true"
+        className="confirm-modal event-delete-modal"
+        role="dialog"
+        onMouseDown={(mouseEvent) => mouseEvent.stopPropagation()}
+      >
+        <span className="section-kicker">Borrador</span>
+        <h2 id="delete-draft-event-title">Eliminar evento</h2>
+        <p>
+          ¿Deseas eliminar el evento "{event.title}"? Esta acción no se puede deshacer.
+        </p>
+        <div className="modal-actions">
+          <button className="back-button" type="button" onClick={onCancel}>
+            Cancelar
+          </button>
+          <button className="primary-button danger-action" type="button" onClick={onConfirm}>
+            Eliminar evento
           </button>
         </div>
       </section>

@@ -437,11 +437,21 @@ function getInitialPortalView() {
   return 'portal';
 }
 
+function getInitialSelectedEvent() {
+  const eventId = window.location.pathname.match(/^\/eventos\/([^/?#]+)$/)?.[1];
+
+  if (!eventId) {
+    return null;
+  }
+
+  return events.find((event) => String(event.id) === eventId) ?? null;
+}
+
 function PublicPortal() {
   const [currentView, setCurrentView] = useState(getInitialPortalView);
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(getInitialSelectedEvent);
   const [registration, setRegistration] = useState(emptyRegistration);
   const [isRegistered, setIsRegistered] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
