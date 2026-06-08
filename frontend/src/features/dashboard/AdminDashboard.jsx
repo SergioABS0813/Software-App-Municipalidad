@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import municipalLogo from '../../assets/images/municipalidad-logo.png';
+import PublicEventDetail from '../public-portal/PublicEventDetail';
 import { adminEvents, formatEventState } from './dashboardData';
 import NotificationMenu from './NotificationMenu';
 import './AdminDashboard.css';
@@ -1227,8 +1228,10 @@ function AdminDashboard({ onLogout, user }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function openPublishedEventInPortal(event) {
-    window.location.assign(`/eventos/${event.id}`);
+  function openPublishedEventPreview(event) {
+    setSelectedAdminEvent(event);
+    setCurrentAdminView('public-preview');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function runAdminEventTableAction(event) {
@@ -1248,8 +1251,8 @@ function AdminDashboard({ onLogout, user }) {
       return;
     }
 
-    if (actionConfig.type === 'portal') {
-      openPublishedEventInPortal(event);
+    if (actionConfig.type === 'preview') {
+      openPublishedEventPreview(event);
     }
   }
 
@@ -1490,6 +1493,15 @@ function AdminDashboard({ onLogout, user }) {
               setCurrentAdminView('dashboard');
             }}
           />
+        ) : currentAdminView === 'public-preview' && selectedAdminEvent ? (
+          <AdminPublicEventPreview
+            event={selectedAdminEvent}
+            onBack={() => {
+              setSelectedAdminEvent(null);
+              setCurrentAdminView('dashboard');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
         ) : currentAdminView === 'neighbors' ? (
           <NeighborAccountsPage adminUserName={adminUserName} />
         ) : currentAdminView === 'settings-users' ? (
@@ -1718,6 +1730,29 @@ function EventReviewStatusView({ event, onBack }) {
           </ul>
         </article>
       </section>
+    </section>
+  );
+}
+
+function AdminPublicEventPreview({ event, onBack }) {
+  function preventPreviewSubmit(submitEvent) {
+    submitEvent.preventDefault();
+  }
+
+  return (
+    <section className="admin-public-preview-view" aria-labelledby="admin-public-preview-title">
+      <header className="admin-public-preview-notice">
+        <span className="section-kicker">Vista previa</span>
+        <h1 id="admin-public-preview-title">Vista previa pública del evento</h1>
+        <p>Así se visualizará este evento en el portal ciudadano.</p>
+      </header>
+
+      <PublicEventDetail
+        backLabel="Volver al panel de eventos"
+        event={event}
+        onBack={onBack}
+        onSubmit={preventPreviewSubmit}
+      />
     </section>
   );
 }
@@ -2150,7 +2185,7 @@ function getAdminEventActionConfig(event) {
     };
   }
 
-  if (['EN_REVISION', 'OBSERVADO_EN_REVISION', 'APROBADO'].includes(event.state)) {
+  if (['EN_REVISION', 'APROBADO'].includes(event.state)) {
     return {
       icon: ClipboardCheckLineIcon,
       label: `Ver estado de revision de ${event.title}`,
@@ -2162,9 +2197,9 @@ function getAdminEventActionConfig(event) {
   if (event.state === 'PUBLICADO') {
     return {
       icon: ViewIcon,
-      label: `Ver ${event.title} en el portal ciudadano`,
-      tooltip: 'Ver en portal ciudadano',
-      type: 'portal',
+      label: `Ver vista previa publica de ${event.title}`,
+      tooltip: 'Ver vista previa pública',
+      type: 'preview',
     };
   }
 

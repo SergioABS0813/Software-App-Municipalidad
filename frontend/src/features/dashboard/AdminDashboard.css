@@ -4,7 +4,6 @@
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
   min-height: 100svh;
-  overflow-x: hidden;
   transition: grid-template-columns 0.22s ease;
 }
 
@@ -887,6 +886,11 @@
   gap: 18px;
 }
 
+#eventos-admin.admin-table-featured,
+#eventos-admin .events-management-table {
+  overflow: visible;
+}
+
 .admin-filters {
   display: grid;
   gap: 12px;
@@ -999,6 +1003,8 @@
   align-items: center;
   display: inline-flex;
   justify-content: center;
+  overflow: visible;
+  position: relative;
 }
 
 .event-action-empty {
@@ -2509,6 +2515,38 @@
   padding: 10px 12px;
 }
 
+.admin-public-preview-view {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-public-preview-notice {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 14px 36px rgba(10, 86, 194, 0.07);
+  display: grid;
+  gap: 6px;
+  padding: 18px 20px;
+}
+
+.admin-public-preview-notice h1,
+.admin-public-preview-notice p {
+  margin: 0;
+}
+
+.admin-public-preview-notice h1 {
+  color: var(--color-text-strong);
+  font-size: 1.35rem;
+  line-height: 1.15;
+}
+
+.admin-public-preview-notice p {
+  color: #526b85;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
 .table-icon-action {
   align-items: center;
   background: transparent;
@@ -3762,6 +3800,7 @@
     overflow: visible;
     padding: 24px;
     position: sticky;
+    top: 0;
   }
 
   .admin-shell.is-sidebar-collapsed .admin-sidebar {

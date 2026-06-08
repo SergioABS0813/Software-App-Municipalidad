@@ -1913,6 +1913,7 @@
     min-height: 100svh;
     overflow: visible;
     position: sticky;
+    top: 0;
   }
 }
 

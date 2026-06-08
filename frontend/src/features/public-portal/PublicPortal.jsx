@@ -4,6 +4,7 @@ import AdminDashboard from '../dashboard/AdminDashboard';
 import DirectivoDashboard from '../dashboard/DirectivoDashboard';
 import OperativoDashboard from '../dashboard/OperativoDashboard';
 import { eventCategories, events } from './data/events';
+import PublicEventDetail from './PublicEventDetail';
 import './PublicPortal.css';
 
 const institutionalUsers = [
@@ -119,38 +120,6 @@ function parseEventDateTime(event) {
   return eventDate;
 }
 
-function parseEventDurationMinutes(duration) {
-  const hoursMatch = duration?.match(/(\d+(?:[.,]\d+)?)\s*hora/i);
-  const minutesMatch = duration?.match(/(\d+)\s*min/i);
-  const hours = hoursMatch ? Number(hoursMatch[1].replace(',', '.')) : 0;
-  const minutes = minutesMatch ? Number(minutesMatch[1]) : 0;
-  const totalMinutes = hours * 60 + minutes;
-
-  return totalMinutes > 0 ? totalMinutes : null;
-}
-
-function formatEventClock(date) {
-  const hours24 = date.getHours();
-  const minutes = date.getMinutes();
-  const period = hours24 >= 12 ? 'p.m.' : 'a.m.';
-  const hours12 = hours24 % 12 || 12;
-
-  return `${hours12}:${String(minutes).padStart(2, '0')} ${period}`;
-}
-
-function getEventScheduleLabel(event) {
-  const startDate = parseEventDateTime(event);
-  const durationMinutes = parseEventDurationMinutes(event.duration);
-
-  if (!startDate || !durationMinutes) {
-    return `${event.date} · ${event.time}`;
-  }
-
-  const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
-
-  return `${event.date} · ${formatEventClock(startDate)} - ${formatEventClock(endDate)}`;
-}
-
 function getClosestStartingEvent(eventList) {
   const now = new Date();
   const sortedEvents = [...eventList].sort((firstEvent, secondEvent) => {
@@ -169,41 +138,6 @@ function getClosestStartingEvent(eventList) {
   });
 
   return sortedEvents[0] ?? null;
-}
-
-function getEventMapsUrl(event) {
-  const locationQuery = [event.address, event.venue].filter(Boolean).join(', ');
-
-  if (!locationQuery) {
-    return null;
-  }
-
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationQuery)}`;
-}
-
-const eventMaterialPriority = {
-  AFICHE: 0,
-  VIDEO: 1,
-};
-
-function getEventMaterialResources(event) {
-  const resources = Array.isArray(event.recursos)
-    ? event.recursos
-    : Array.isArray(event.resources)
-      ? event.resources
-      : [];
-
-  return resources
-    .map((resource) => ({
-      ...resource,
-      tipo_recurso: resource.tipo_recurso?.toUpperCase(),
-    }))
-    .filter((resource) => resource.tipo_recurso in eventMaterialPriority)
-    .sort(
-      (firstResource, secondResource) =>
-        eventMaterialPriority[firstResource.tipo_recurso] -
-        eventMaterialPriority[secondResource.tipo_recurso],
-    );
 }
 
 function getResourceUrl(resource) {
@@ -231,93 +165,6 @@ function getEventCoverUrl(event) {
 
 function getEventShortDescription(event) {
   return event.descripcion_breve || event.descripcion || event.summary || event.description || '';
-}
-
-function getOrderedTextItems(items = []) {
-  return items
-    .map((item, index) => ({
-      descripcion:
-        typeof item === 'string' ? item : item?.descripcion ?? item?.description ?? '',
-      orden: Number(item?.orden ?? index + 1),
-    }))
-    .filter((item) => item.descripcion.trim().length > 0)
-    .sort((firstItem, secondItem) => firstItem.orden - secondItem.orden)
-    .map((item) => item.descripcion);
-}
-
-function getEventAudienceLabel(event) {
-  const audienceType =
-    event.publico_tipo ?? (event.edad_minima || event.edad_maxima ? 'OBJETIVO' : 'GENERAL');
-
-  if (audienceType === 'OBJETIVO' && event.edad_minima !== null && event.edad_maxima !== null) {
-    return `${event.edad_minima}-${event.edad_maxima} años`;
-  }
-
-  return event.audience || 'Público general';
-}
-
-function getVideoEmbedUrl(url) {
-  if (!url) {
-    return null;
-  }
-
-  try {
-    const parsedUrl = new URL(url);
-    const host = parsedUrl.hostname.replace(/^www\./, '');
-
-    if (host === 'youtu.be') {
-      const videoId = parsedUrl.pathname.split('/').filter(Boolean)[0];
-      return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
-    }
-
-    if (host === 'youtube.com' || host === 'm.youtube.com') {
-      if (parsedUrl.pathname.startsWith('/embed/')) {
-        return url;
-      }
-
-      const videoId = parsedUrl.searchParams.get('v');
-      return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
-    }
-
-    if (host === 'vimeo.com') {
-      const videoId = parsedUrl.pathname.split('/').filter(Boolean)[0];
-      return videoId ? `https://player.vimeo.com/video/${videoId}` : null;
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-}
-
-function isDirectVideoUrl(url) {
-  return /\.(mp4|webm|ogg)(?:\?.*)?$/i.test(url);
-}
-
-function getAvailabilityState(spots) {
-  const availableSpots = Number(spots) || 0;
-
-  if (availableSpots <= 0) {
-    return {
-      isAvailable: false,
-      label: 'Sin cupos disponibles',
-      tone: 'empty',
-    };
-  }
-
-  if (availableSpots <= 5) {
-    return {
-      isAvailable: true,
-      label: `Últimos ${availableSpots} cupos`,
-      tone: 'low',
-    };
-  }
-
-  return {
-    isAvailable: true,
-    label: `${availableSpots} cupos`,
-    tone: 'available',
-  };
 }
 
 function getCurrentInternalPath() {
@@ -718,7 +565,7 @@ function PublicPortal() {
               onPrint={() => window.print()}
             />
           ) : (
-            <EventDetail
+            <PublicEventDetail
               event={selectedEvent}
               onBack={closeEventDetail}
               onSubmit={submitRegistration}
@@ -1776,36 +1623,11 @@ function CalendarClockIcon() {
   );
 }
 
-function MapPinIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" />
-      <path d="M12 10.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />
-    </svg>
-  );
-}
-
 function UsersIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24">
       <path d="M16 19v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V19" />
       <path d="M9.5 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM21 19v-1.2a3.5 3.5 0 0 0-2.7-3.4M16.5 4.4a3 3 0 0 1 0 5.8" />
-    </svg>
-  );
-}
-
-function BuildingIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M4 21h16M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2" />
-    </svg>
-  );
-}
-
-function ExternalLinkIcon() {
-  return (
-    <svg aria-hidden="true" className="reservation-external-icon" viewBox="0 0 24 24">
-      <path d="M14 4h6v6M10 14 20 4M20 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5" />
     </svg>
   );
 }
@@ -1957,282 +1779,6 @@ function AgendaSidebar() {
         ))}
       </section>
     </aside>
-  );
-}
-
-function EventMaterialSection({ event }) {
-  const materialResources = getEventMaterialResources(event);
-  const [activeMaterialType, setActiveMaterialType] = useState('AFICHE');
-
-  if (materialResources.length === 0) {
-    return null;
-  }
-
-  const availableTypes = materialResources.map((resource) => resource.tipo_recurso);
-  const hasMultipleResources = materialResources.length > 1;
-  const selectedType = availableTypes.includes(activeMaterialType)
-    ? activeMaterialType
-    : availableTypes[0];
-  const selectedResource =
-    materialResources.find((resource) => resource.tipo_recurso === selectedType) ??
-    materialResources[0];
-
-  return (
-    <section className="detail-section event-material-section">
-      <div className="section-heading compact">
-        <div>
-          <span className="section-kicker">Material del evento</span>
-          <h2>Afiche y contenido informativo</h2>
-        </div>
-      </div>
-
-      {hasMultipleResources && (
-        <div className="event-material-tabs" aria-label="Seleccionar material del evento">
-          {materialResources.map((resource) => (
-            <button
-              className={selectedType === resource.tipo_recurso ? 'active' : ''}
-              key={resource.recurso_id ?? resource.tipo_recurso}
-              type="button"
-              onClick={() => setActiveMaterialType(resource.tipo_recurso)}
-            >
-              {resource.tipo_recurso === 'AFICHE' ? 'Afiche oficial' : 'Video'}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <EventMaterialPreview resource={selectedResource} />
-    </section>
-  );
-}
-
-function EventMaterialPreview({ resource }) {
-  if (resource.tipo_recurso === 'AFICHE') {
-    return <EventPosterPreview resource={resource} />;
-  }
-
-  return <EventVideoPreview resource={resource} />;
-}
-
-function EventPosterPreview({ resource }) {
-  const posterUrl = getResourceUrl(resource);
-
-  return (
-    <div className="event-poster-preview">
-      <img alt={resource.nombre_archivo ?? 'Afiche oficial del evento'} src={posterUrl} />
-      <a href={posterUrl} rel="noopener noreferrer" target="_blank">
-        Ver afiche completo
-      </a>
-    </div>
-  );
-}
-
-function EventVideoPreview({ resource }) {
-  const videoUrl = getResourceUrl(resource);
-  const embedUrl = getVideoEmbedUrl(videoUrl);
-
-  if (embedUrl) {
-    return (
-      <div className="event-video-preview">
-        <iframe
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
-          src={embedUrl}
-          title={resource.nombre_archivo ?? 'Video del evento'}
-        />
-      </div>
-    );
-  }
-
-  if (isDirectVideoUrl(videoUrl)) {
-    return (
-      <div className="event-video-preview">
-        <video controls src={videoUrl}>
-          <a href={videoUrl} rel="noopener noreferrer" target="_blank">
-            Ver video
-          </a>
-        </video>
-      </div>
-    );
-  }
-
-  return (
-    <div className="event-video-link-card">
-      <strong>Video del evento</strong>
-      <p>Abre el contenido informativo en una nueva pestaña.</p>
-      <a href={videoUrl} rel="noopener noreferrer" target="_blank">
-        Ver video
-      </a>
-    </div>
-  );
-}
-
-function EventDetail({
-  event,
-  onBack,
-  onSubmit,
-}) {
-  const mapsUrl = getEventMapsUrl(event);
-  const scheduleLabel = getEventScheduleLabel(event);
-  const availabilityState = getAvailabilityState(event.spots);
-  const requirementItems = getOrderedTextItems(event.requisitos_evento ?? event.requirements);
-  const agendaItems = getOrderedTextItems(event.agenda_evento ?? event.agenda);
-  const audienceLabel = getEventAudienceLabel(event);
-
-  return (
-    <section className="detail-shell" aria-labelledby="event-detail-title">
-      <div className="detail-hero">
-        <div className={`detail-media media-${event.accent}`}>
-          {event.imageUrl ? (
-            <img alt="" src={event.imageUrl} />
-          ) : null}
-          <span>{event.category}</span>
-        </div>
-      </div>
-
-      <div className="detail-layout">
-        <div className="detail-content">
-          <div className="detail-heading">
-            <button className="detail-back-link" type="button" onClick={onBack}>
-              <span aria-hidden="true">←</span>
-              Volver a eventos
-            </button>
-
-            <h1 id="event-detail-title">{event.title}</h1>
-            <p>{getEventShortDescription(event)}</p>
-            <div className="detail-quick-meta" aria-label="Datos rápidos del evento">
-              <span>
-                <CalendarClockIcon />
-                {scheduleLabel}
-              </span>
-              {mapsUrl ? (
-                <a href={mapsUrl} rel="noopener noreferrer" target="_blank">
-                  <MapPinIcon />
-                  {event.venue}
-                </a>
-              ) : (
-                <span>
-                  <MapPinIcon />
-                  {event.venue}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="detail-main">
-            <section className="detail-section two-columns">
-              <div>
-                <span className="section-kicker">Antes de asistir</span>
-                <h2>Requisitos</h2>
-                <ul className="check-list">
-                  {requirementItems.map((requirement) => (
-                    <li key={requirement}>{requirement}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <span className="section-kicker">Programa</span>
-                <h2>Agenda prevista</h2>
-                <ol className="timeline-list">
-                  {agendaItems.map((agendaItem) => (
-                    <li key={agendaItem}>{agendaItem}</li>
-                  ))}
-                </ol>
-              </div>
-            </section>
-
-            <EventMaterialSection event={event} />
-          </div>
-        </div>
-
-        <aside className="reservation-card" aria-label="Reserva al evento">
-          <div className="reservation-card-header">
-            <span className="section-kicker">PREINSCRIPCIÓN</span>
-            <h2>Reserva tu participación</h2>
-          </div>
-
-          <div className={`reservation-availability ${availabilityState.tone}`}>
-            <strong>{availabilityState.label}</strong>
-            <span>
-              {availabilityState.isAvailable
-                ? 'Disponibles para este evento'
-                : 'No hay disponibilidad por ahora'}
-            </span>
-          </div>
-
-          <div className="reservation-info-list">
-            <div className="reservation-info-row is-muted-value">
-              <span className="reservation-icon">
-                <CalendarClockIcon />
-              </span>
-              <div className="reservation-info-text">
-                <span>Fecha y hora</span>
-                <strong>{scheduleLabel}</strong>
-              </div>
-            </div>
-
-            {mapsUrl ? (
-              <a
-                className="reservation-info-row reservation-location-link"
-                href={mapsUrl}
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                <span className="reservation-icon">
-                  <MapPinIcon />
-                </span>
-                <div className="reservation-info-text">
-                  <span>Ubicación</span>
-                  <strong>{event.venue}</strong>
-                  {event.address && <small>{event.address}</small>}
-                </div>
-                <ExternalLinkIcon />
-              </a>
-            ) : (
-              <div className="reservation-info-row">
-                <span className="reservation-icon">
-                  <MapPinIcon />
-                </span>
-                <div className="reservation-info-text">
-                  <span>Ubicación</span>
-                  <strong>{event.venue}</strong>
-                </div>
-              </div>
-            )}
-
-            <div className="reservation-info-row is-muted-value">
-              <span className="reservation-icon">
-                <UsersIcon />
-              </span>
-              <div className="reservation-info-text">
-                <span>Dirigido a</span>
-                <strong>{audienceLabel}</strong>
-              </div>
-            </div>
-
-            <div className="reservation-info-row is-muted-value">
-              <span className="reservation-icon">
-                <BuildingIcon />
-              </span>
-              <div className="reservation-info-text">
-                <span>Área responsable</span>
-                <strong>{event.organizer}</strong>
-              </div>
-            </div>
-          </div>
-
-          <form className="reservation-action" onSubmit={onSubmit}>
-            <button
-              className="primary-button reservation-button"
-              disabled={!availabilityState.isAvailable}
-              type="submit"
-            >
-              Reservar un lugar
-            </button>
-          </form>
-        </aside>
-      </div>
-    </section>
   );
 }
 
