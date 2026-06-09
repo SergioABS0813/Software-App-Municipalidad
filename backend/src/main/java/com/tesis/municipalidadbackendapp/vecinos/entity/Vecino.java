@@ -1,0 +1,58 @@
+package com.tesis.municipalidadbackendapp.vecinos.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.time.Instant;
+
+@Getter
+@Setter
+@Entity
+@Table(name = "vecino")
+public class Vecino {
+    @Id
+    @Column(name = "vecino_id", nullable = false)
+    private Integer id;
+
+    @Size(max = 45)
+    @Column(name = "nombres", length = 45)
+    private String nombres;
+
+    @Size(max = 45)
+    @Column(name = "apellidos", length = 45)
+    private String apellidos;
+
+    @Size(max = 45)
+    @Column(name = "dni", length = 45)
+    private String dni;
+
+    @Size(max = 45)
+    @Column(name = "email", length = 45)
+    private String email;
+
+    @Column(name = "tiempo_creado")
+    private Instant tiempoCreado;
+
+    @Column(name = "acepta_tratamiento_datos")
+    private Byte aceptaTratamientoDatos;
+
+    @Column(name = "fecha_nacimiento")
+    private Instant fechaNacimiento;
+
+    @Size(max = 45)
+    @Column(name = "password", length = 45)
+    private String password;
+
+    @Column(name = "fecha_aceptacion_datos")
+    private Instant fechaAceptacionDatos;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "estado_vecino_id", nullable = false)
+    private EstadoVecino estadoVecino;
+
+
+}

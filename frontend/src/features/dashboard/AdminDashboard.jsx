@@ -739,13 +739,10 @@ function getEventChecklist(event, options = {}) {
         hasValue(event.date) &&
         hasValue(event.time) &&
         isDateTimeAfter(event.date, event.time) &&
-        hasValue(event.registrationStart) &&
-        hasValue(event.registrationEnd) &&
-        isDateTimeAfter(event.registrationStart, event.registrationEnd) &&
         hasValue(event.publico_tipo) &&
         hasValidAudienceConfig(event) &&
         hasValidAforo(event),
-      completeLabel: 'Fechas e inscripción completas',
+      completeLabel: 'Fechas completas',
       pendingLabel: 'Falta programación o aforo',
     },
     {
@@ -812,14 +809,11 @@ function getCreationEventChecklist(event) {
         hasValue(event.date) &&
         hasValue(event.time) &&
         isDateTimeAfter(event.date, event.time) &&
-        hasValue(event.registrationStart) &&
-        hasValue(event.registrationEnd) &&
-        isDateTimeAfter(event.registrationStart, event.registrationEnd) &&
         hasValidAforo(event) &&
         hasValue(event.referenceCost) &&
         hasValue(event.publico_tipo) &&
         hasValidAudienceConfig(event),
-      completeLabel: 'Programación e inscripción completas',
+      completeLabel: 'Programación completa',
     },
     {
       complete: hasValue(event.ubicacion_id),
@@ -888,8 +882,6 @@ function getChecklistEventFromForm(form, event) {
     organizer: selectedArea?.nombre ?? '',
     publico_tipo: audienceType,
     referenceCost: getNamedFormValue(form, 'referenceCost'),
-    registrationEnd: getNamedFormValue(form, 'registrationEnd'),
-    registrationStart: getNamedFormValue(form, 'registrationStart'),
     resources: {
       ...event.resources,
       AFICHE: Boolean(event.resources?.AFICHE || hasNamedFile(form, 'poster')),
@@ -973,8 +965,6 @@ function getMissingReviewFields(form, existingEvent = null) {
     ['description', 'Descripción'],
     ['eventStart', 'Inicio o fecha del evento'],
     ['eventEnd', 'Fin u hora del evento'],
-    ['registrationStart', 'Inicio de inscripción'],
-    ['registrationEnd', 'Fin de inscripción'],
     ['referenceCost', 'Costo referencial'],
     ['ubicacion_id', 'Ubicación del evento'],
     ['agenda_evento_json', 'Agenda del evento'],
@@ -993,8 +983,6 @@ function getMissingReviewFields(form, existingEvent = null) {
   const maxAge = Number(getNamedFormValue(form, 'edad_maxima'));
   const eventStart = getNamedFormValue(form, 'eventStart');
   const eventEnd = getNamedFormValue(form, 'eventEnd');
-  const registrationStart = getNamedFormValue(form, 'registrationStart');
-  const registrationEnd = getNamedFormValue(form, 'registrationEnd');
 
   if (shortDescription.length > 255) {
     missingFields.push('Descripción breve de máximo 255 caracteres');
@@ -1002,14 +990,6 @@ function getMissingReviewFields(form, existingEvent = null) {
 
   if (hasValue(eventStart) && hasValue(eventEnd) && !isDateTimeAfter(eventStart, eventEnd)) {
     missingFields.push('Fin del evento posterior al inicio del evento');
-  }
-
-  if (
-    hasValue(registrationStart) &&
-    hasValue(registrationEnd) &&
-    !isDateTimeAfter(registrationStart, registrationEnd)
-  ) {
-    missingFields.push('Fin de inscripción posterior al inicio de inscripción');
   }
 
   if (!hasValidOrderedItems(parseOrderedEventItems(getNamedFormValue(form, 'agenda_evento_json')))) {
@@ -4387,7 +4367,7 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
           <article className="event-form-section" id="programacion">
             <div className="form-section-heading">
               <span className="section-kicker">Programación</span>
-              <h2>Fechas e inscripción</h2>
+              <h2>Fechas</h2>
             </div>
             <div className="form-grid">
               <label className="form-field">
@@ -4397,14 +4377,6 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
               <label className="form-field">
                 Fin del evento
                 <input name="eventEnd" type="datetime-local" />
-              </label>
-              <label className="form-field">
-                Inicio de inscripción
-                <input name="registrationStart" type="datetime-local" />
-              </label>
-              <label className="form-field">
-                Fin de inscripción
-                <input name="registrationEnd" type="datetime-local" />
               </label>
               <label className="form-field">
                 Costo referencial
@@ -4672,7 +4644,7 @@ function EditEventView({ event, onBack, onRequestAction, onRequestDelete, onVali
           <article className="event-form-section" id="programacion">
             <div className="form-section-heading">
               <span className="section-kicker">Programación</span>
-              <h2>Fechas e inscripción</h2>
+              <h2>Fechas</h2>
             </div>
             <div className="form-grid">
               <label className="form-field">
@@ -4688,22 +4660,6 @@ function EditEventView({ event, onBack, onRequestAction, onRequestDelete, onVali
                 <input
                   defaultValue={getEventEndDateTimeValue(event)}
                   name="eventEnd"
-                  type="datetime-local"
-                />
-              </label>
-              <label className="form-field">
-                Inicio de inscripción
-                <input
-                  defaultValue={event.registrationStart}
-                  name="registrationStart"
-                  type="datetime-local"
-                />
-              </label>
-              <label className="form-field">
-                Fin de inscripción
-                <input
-                  defaultValue={event.registrationEnd}
-                  name="registrationEnd"
                   type="datetime-local"
                 />
               </label>
