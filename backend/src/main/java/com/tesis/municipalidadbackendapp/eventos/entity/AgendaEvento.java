@@ -13,6 +13,7 @@ import lombok.Setter;
 public class AgendaEvento {
     @Id
     @Column(name = "agenda_evento_id", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Size(max = 45)

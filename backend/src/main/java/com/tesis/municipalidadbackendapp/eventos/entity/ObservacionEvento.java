@@ -16,6 +16,7 @@ import java.time.Instant;
 public class ObservacionEvento {
     @Id
     @Column(name = "observacion_evento_id", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Column(name = "observacion", columnDefinition = "TEXT")

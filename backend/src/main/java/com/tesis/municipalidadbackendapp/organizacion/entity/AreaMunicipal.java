@@ -13,6 +13,7 @@ import lombok.Setter;
 public class AreaMunicipal {
     @Id
     @Column(name = "area_municipal_id", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Size(max = 100)

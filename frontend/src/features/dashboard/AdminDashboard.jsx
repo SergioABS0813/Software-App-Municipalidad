@@ -3352,9 +3352,9 @@ function UserAreaCombobox({ onChange, value }) {
       }
     }
 
-    document.addEventListener('mousedown', closeOnOutsideClick);
+    document.addEventListener('mousedown', closeOnOutsideClick, true);
 
-    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
+    return () => document.removeEventListener('mousedown', closeOnOutsideClick, true);
   }, []);
 
   function selectArea(area) {

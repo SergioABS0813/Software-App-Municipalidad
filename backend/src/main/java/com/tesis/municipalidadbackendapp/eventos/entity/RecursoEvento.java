@@ -15,6 +15,7 @@ import java.time.Instant;
 public class RecursoEvento {
     @Id
     @Column(name = "recurso_id", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Size(max = 45)

@@ -15,6 +15,7 @@ import lombok.Setter;
 public class Asistencia {
     @Id
     @Column(name = "asistencia_id", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Size(max = 45)

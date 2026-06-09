@@ -12,6 +12,7 @@ import lombok.Setter;
 public class RequisitoEvento {
     @Id
     @Column(name = "requisito_evento_id", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Column(name = "descripcion", columnDefinition = "TEXT")

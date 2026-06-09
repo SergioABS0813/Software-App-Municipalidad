@@ -18,6 +18,7 @@ import java.time.Instant;
 public class Evento {
     @Id
     @Column(name = "evento_id", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Size(max = 100)

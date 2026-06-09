@@ -16,6 +16,7 @@ import java.time.Instant;
 public class CodigoQr {
     @Id
     @Column(name = "codigo_qr_id", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Size(max = 45)

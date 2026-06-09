@@ -14,6 +14,7 @@ import lombok.Setter;
 public class Valoracion {
     @Id
     @Column(name = "valoracion_id", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Size(max = 45)

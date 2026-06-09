@@ -15,6 +15,7 @@ import java.time.Instant;
 public class Vecino {
     @Id
     @Column(name = "vecino_id", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Size(max = 45)

@@ -16,6 +16,7 @@ import java.time.Instant;
 public class BitacoraAccion {
     @Id
     @Column(name = "bitacora_accion_id", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Size(max = 45)
@@ -26,8 +27,7 @@ public class BitacoraAccion {
     @Column(name = "entidad_afectada", length = 45)
     private String entidadAfectada;
 
-    @Size(max = 45)
-    @Column(name = "entidad_id", length = 45)
+    @Column(name = "entidad_id")
     private Integer entidadId;
 
     @Column(name = "fecha_hora")

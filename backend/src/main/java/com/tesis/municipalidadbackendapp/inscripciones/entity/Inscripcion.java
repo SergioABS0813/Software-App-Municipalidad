@@ -18,6 +18,7 @@ import java.time.Instant;
 public class Inscripcion {
     @Id
     @Column(name = "inscripcion_id", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Column(name = "fecha_inscripcion")

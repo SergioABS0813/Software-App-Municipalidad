@@ -14,17 +14,13 @@ import lombok.Setter;
 public class Usuario {
     @Id
     @Column(name = "usuario_id", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Size(max = 45)
     @NotNull
-    @Column(name = "nombres", nullable = false, length = 45)
-    private String nombres;
-
-    @Size(max = 45)
-    @NotNull
-    @Column(name = "apellidos", nullable = false, length = 45)
-    private String apellidos;
+    @Column(name = "nombre", nullable = false, length = 45)
+    private String nombre;
 
     @Size(max = 45)
     @Column(name = "dni", length = 45)
