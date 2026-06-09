@@ -43,8 +43,8 @@ public class Vecino {
     @Column(name = "fecha_nacimiento")
     private Instant fechaNacimiento;
 
-    @Size(max = 45)
-    @Column(name = "password", length = 45)
+    @Size(max = 100)
+    @Column(name = "password", length = 100)
     private String password;
 
     @Column(name = "fecha_aceptacion_datos")
