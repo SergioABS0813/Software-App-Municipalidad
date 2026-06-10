@@ -30,8 +30,8 @@ public class Usuario {
     @Column(name = "email", length = 45)
     private String email;
 
-    @Size(max = 100)
-    @Column(name = "password", length = 100)
+    @Size(max = 255)
+    @Column(name = "password", length = 255)
     private String password;
 
     @NotNull

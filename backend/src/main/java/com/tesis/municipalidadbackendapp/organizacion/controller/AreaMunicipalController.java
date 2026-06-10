@@ -1,5 +1,6 @@
 package com.tesis.municipalidadbackendapp.organizacion.controller;
 
+import com.tesis.municipalidadbackendapp.organizacion.dto.AreaMunicipalDto;
 import com.tesis.municipalidadbackendapp.organizacion.entity.AreaMunicipal;
 import com.tesis.municipalidadbackendapp.organizacion.service.AreaMunicipalService;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +18,7 @@ public class AreaMunicipalController {
     private final AreaMunicipalService areaMunicipalService;
 
     @GetMapping("obtener_areas_municipales")
-    public List<AreaMunicipal> obtenerAreasMunicipales(){
+    public List<AreaMunicipalDto> obtenerAreasMunicipales(){
         return areaMunicipalService.obtenerAreasMunicipales();
     }
 

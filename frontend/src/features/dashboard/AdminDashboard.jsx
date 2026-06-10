@@ -9,9 +9,9 @@ function getManagementStats(events) {
   return [
     {
       icon: CalendarCheckLineIcon,
-      label: 'Publicados',
+      label: 'Activos',
       tone: 'is-published',
-      trend: 'visibles en el portal',
+      trend: 'desde hoy',
       value: events.filter((event) => event.state === 'PUBLICADO').length,
     },
     {

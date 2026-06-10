@@ -19,12 +19,8 @@ public class Vecino {
     private Integer id;
 
     @Size(max = 45)
-    @Column(name = "nombres", length = 45)
-    private String nombres;
-
-    @Size(max = 45)
-    @Column(name = "apellidos", length = 45)
-    private String apellidos;
+    @Column(name = "nombre", length = 45)
+    private String nombre;
 
     @Size(max = 45)
     @Column(name = "dni", length = 45)
@@ -43,8 +39,8 @@ public class Vecino {
     @Column(name = "fecha_nacimiento")
     private Instant fechaNacimiento;
 
-    @Size(max = 100)
-    @Column(name = "password", length = 100)
+    @Size(max = 255)
+    @Column(name = "password", length = 255)
     private String password;
 
     @Column(name = "fecha_aceptacion_datos")

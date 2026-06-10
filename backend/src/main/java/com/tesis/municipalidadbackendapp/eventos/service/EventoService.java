@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,6 +42,25 @@ public class EventoService {
         )).toList();
     }
 
+    public Integer obtenerNumeroEventosActivosDesdeHoy() {
+        ZonedDateTime ahora = ZonedDateTime.now(ZoneId.of("America/Lima"));
+        return eventoRepository.countByEstadoEvento_CodigoAndFechaHoraFinGreaterThanEqual(
+                "PUBLICADO",
+                ahora
+        );
+    }
+
+    public Integer obtenerNumeroEventosBorradores(){
+        return eventoRepository.countByEstadoEventoCodigo("BORRADOR");
+    }
+
+    public Integer obtenerNumeroEventosParaRevision(){
+        return eventoRepository.countByEstadoEventoCodigo("PARA_REVISION");
+    }
+
+    public Integer obtenerNumeroEventosObservados(){
+        return eventoRepository.countByEstadoEventoCodigo("OBSERVADO");
+    }
 
     private Integer calcularCompletitud(Evento evento) {
         if (evento == null) {

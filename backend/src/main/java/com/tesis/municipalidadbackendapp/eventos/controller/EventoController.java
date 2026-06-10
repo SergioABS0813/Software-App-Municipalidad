@@ -24,6 +24,26 @@ public class EventoController {
         return eventoService.obtenerEventosPanelAdministrativo();
     }
 
+    @GetMapping("admin/card/activos_desde_hoy")
+    public Integer obtenerNumeroEventosActivosDesdeHoy() {
+        return eventoService.obtenerNumeroEventosActivosDesdeHoy();
+    }
+
+    @GetMapping("admin/card/borradores")
+    public Integer obtenerNumeroEventosBorradores(){
+        return eventoService.obtenerNumeroEventosBorradores();
+    }
+
+    @GetMapping("admin/card/para_revision")
+    public Integer obtenerNumeroEventosParaRevision(){
+        return eventoService.obtenerNumeroEventosParaRevision();
+    }
+
+    @GetMapping("admin/card/observados")
+    public Integer obtenerNumeroEventosObservados(){
+        return eventoService.obtenerNumeroEventosObservados();
+    }
+
 
 
 
