@@ -6,21 +6,28 @@ import municipalLogo from "../assets/municipalidad-logo.png";
 type LoginKcContext = Extract<KcContext, { pageId: "login.ftl" }>;
 
 function getBackToEventsUrl() {
+    const fallbackEventsUrl = "http://localhost:5173/eventos";
+
     if (typeof window === "undefined") {
-        return "/";
+        return fallbackEventsUrl;
     }
 
     const redirectUri = new URLSearchParams(window.location.search).get("redirect_uri");
 
     if (redirectUri === null) {
-        return "/";
+        return fallbackEventsUrl;
     }
 
     try {
         const url = new URL(redirectUri);
-        return `${url.origin}/`;
+
+        if (url.origin !== window.location.origin) {
+            return `${url.origin}/eventos`;
+        }
+
+        return fallbackEventsUrl;
     } catch {
-        return "/";
+        return fallbackEventsUrl;
     }
 }
 

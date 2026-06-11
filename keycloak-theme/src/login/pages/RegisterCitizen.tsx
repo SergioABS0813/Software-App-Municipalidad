@@ -27,25 +27,6 @@ const mockIdentities: Record<string, Identity> = {
     }
 };
 
-function getBackToEventsUrl() {
-    if (typeof window === "undefined") {
-        return "/";
-    }
-
-    const redirectUri = new URLSearchParams(window.location.search).get("redirect_uri");
-
-    if (redirectUri === null) {
-        return "/";
-    }
-
-    try {
-        const url = new URL(redirectUri);
-        return `${url.origin}/`;
-    } catch {
-        return "/";
-    }
-}
-
 export default function RegisterCitizen(props: {
     kcContext: RegisterKcContext;
     i18n: I18n;
@@ -66,7 +47,6 @@ export default function RegisterCitizen(props: {
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
     const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
     const [isReferenceVisible, setIsReferenceVisible] = useState(false);
-    const backToEventsUrl = getBackToEventsUrl();
 
     function updateDni(value: string) {
         setDni(value.replace(/\D/g, "").slice(0, 8));
@@ -175,11 +155,6 @@ export default function RegisterCitizen(props: {
                     method="post"
                     onSubmit={submitRegister}
                 >
-                    <a className="kc-detail-back-link kc-register-back-link" href={backToEventsUrl}>
-                        <span aria-hidden="true">←</span>
-                        Volver a eventos
-                    </a>
-
                     <div className="kc-login-title">
                         <span>Portal de eventos</span>
                         <h1 id="kc-register-title">Crear cuenta vecinal</h1>
@@ -395,11 +370,6 @@ export default function RegisterCitizen(props: {
 function ReactRegisterReference() {
     return (
         <section className="kc-login-card kc-register-card kc-react-reference-card" aria-label="Referencia React de crear cuenta">
-            <a className="kc-detail-back-link kc-register-back-link" href="#kc-register-title">
-                <span aria-hidden="true">←</span>
-                Volver a eventos
-            </a>
-
             <div className="kc-login-title">
                 <span>Portal de eventos</span>
                 <h2>Crear cuenta vecinal</h2>
