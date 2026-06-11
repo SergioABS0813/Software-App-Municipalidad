@@ -17,6 +17,10 @@ public class Usuario {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
+    @Size(max=100)
+    @Column(name = "keycloak_id", length = 100)
+    private String keycloakId;
+
     @Size(max = 45)
     @NotNull
     @Column(name = "nombre", nullable = false, length = 45)
@@ -29,10 +33,6 @@ public class Usuario {
     @Size(max = 45)
     @Column(name = "email", length = 45)
     private String email;
-
-    @Size(max = 255)
-    @Column(name = "password", length = 255)
-    private String password;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

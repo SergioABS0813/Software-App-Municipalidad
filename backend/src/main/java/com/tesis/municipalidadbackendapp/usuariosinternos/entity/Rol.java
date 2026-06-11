@@ -19,5 +19,9 @@ public class Rol {
     @Column(name = "nombre", length = 45)
     private String nombre;
 
+    @Size(max=45)
+    @Column(name="codigo", length = 45)
+    private String codigo;
+
 
 }

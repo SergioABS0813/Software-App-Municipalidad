@@ -18,6 +18,10 @@ public class Vecino {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
+    @Size(max = 100)
+    @Column(name = "keycloak_id", length = 100)
+    private String keycloakId;
+
     @Size(max = 45)
     @Column(name = "nombre", length = 45)
     private String nombre;
@@ -38,10 +42,6 @@ public class Vecino {
 
     @Column(name = "fecha_nacimiento")
     private Instant fechaNacimiento;
-
-    @Size(max = 255)
-    @Column(name = "password", length = 255)
-    private String password;
 
     @Column(name = "fecha_aceptacion_datos")
     private Instant fechaAceptacionDatos;
