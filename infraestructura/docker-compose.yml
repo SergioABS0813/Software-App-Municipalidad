@@ -1,0 +1,33 @@
+services:
+  #frontend:
+    #build: ../frontend
+  #backend:
+    #build: ../backend
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.6.3 #imagen de keycloak
+    container_name: keycloak
+    command: start-dev
+    ports:
+      - "7000:8080"
+    volumes:
+      - ./keycloak/keycloak.conf:/opt/keycloak/conf/keycloak.conf #Origen (PC) - DESTINO (Contenedor)
+      - ../keycloak-theme/dist_keycloak:/opt/keycloak/providers #Themes generados por Keycloakify
+    environment:
+      - KC_DB_USERNAME=${KC_DB_USERNAME}
+      - KC_DB_PASSWORD=${KC_DB_PASSWORD}
+      - KC_BOOTSTRAP_ADMIN_USERNAME=${KC_BOOTSTRAP_ADMIN_USERNAME}
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=${KC_BOOTSTRAP_ADMIN_PASSWORD}
+    depends_on:
+      - postgres-keycloak
+  postgres-keycloak:
+    image: postgres:17
+    container_name: postgres-keycloak
+    environment:
+      - POSTGRES_DB=keycloak
+      - POSTGRES_USER=${KC_DB_USERNAME}
+      - POSTGRES_PASSWORD=${KC_DB_PASSWORD}
+    volumes:
+      - postgres_keycloak_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_keycloak_data:

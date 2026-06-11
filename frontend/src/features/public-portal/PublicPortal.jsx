@@ -3,6 +3,13 @@ import municipalLogo from '../../assets/images/municipalidad-logo.png';
 import AdminDashboard from '../dashboard/AdminDashboard';
 import DirectivoDashboard from '../dashboard/DirectivoDashboard';
 import OperativoDashboard from '../dashboard/OperativoDashboard';
+import keycloak, {
+  getKeycloakUser,
+  initKeycloak,
+  loginWithKeycloak,
+  logoutFromKeycloak,
+  registerWithKeycloak,
+} from '../auth/keycloak';
 import { eventCategories, events } from './data/events';
 import PublicEventDetail from './PublicEventDetail';
 import './PublicPortal.css';
@@ -209,6 +216,7 @@ function clearCitizenSession() {
   try {
     localStorage.removeItem(citizenAuthTokenKey);
     localStorage.removeItem(citizenAuthStorageKey);
+    sessionStorage.removeItem('postLoginRedirect');
   } catch {
     // La sesion mock solo mejora la experiencia visual del frontend.
   }
@@ -266,7 +274,7 @@ function getSafeEventsOriginPath() {
 
 function getInitialPortalView() {
   if (window.location.pathname === '/login') {
-    return 'login';
+    return 'portal';
   }
 
   if (window.location.pathname === '/registro') {
@@ -307,6 +315,40 @@ function PublicPortal() {
   const [authenticatedUser, setAuthenticatedUser] = useState(readStoredCitizenUser);
   const [detailOriginPath, setDetailOriginPath] = useState(eventsListPath);
   const [loginNotice, setLoginNotice] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+
+    initKeycloak()
+      .then((authenticated) => {
+        if (!isMounted) {
+          return;
+        }
+
+        if (authenticated) {
+          const user = getKeycloakUser();
+
+          if (user) {
+            openInstitutionalDashboard(user);
+          }
+
+          return;
+        }
+
+        if (window.location.pathname === '/login') {
+          void loginWithKeycloak(
+            sessionStorage.getItem('postLoginRedirect') ?? eventsListPath,
+          );
+        }
+      })
+      .catch((error) => {
+        console.error('No se pudo inicializar Keycloak', error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredEvents = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -409,37 +451,24 @@ function PublicPortal() {
 
     setIsLoginRequiredOpen(false);
     setLoginNotice('');
-    setCurrentView('login');
     setIsConfirmOpen(false);
-    window.history.pushState(
-      {
-        action: 'reservar',
-        redirectTo,
-      },
-      '',
-      '/login',
-    );
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    void loginWithKeycloak(redirectTo);
   }
 
   function openLogin(notice = '') {
     setLoginNotice(typeof notice === 'string' ? notice : '');
-    setCurrentView('login');
     setSelectedEvent(null);
     setIsConfirmOpen(false);
     setIsLoginRequiredOpen(false);
-    window.history.pushState(null, '', '/login');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    void loginWithKeycloak(getCurrentInternalPath());
   }
 
   function openRegister() {
     setLoginNotice('');
-    setCurrentView('register');
     setSelectedEvent(null);
     setIsConfirmOpen(false);
     setIsLoginRequiredOpen(false);
-    window.history.pushState(null, '', '/registro');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    void registerWithKeycloak(getCurrentInternalPath());
   }
 
   function openRecoverPassword() {
@@ -471,12 +500,16 @@ function PublicPortal() {
     setLoginNotice('');
     window.history.pushState(null, '', eventsListPath);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    if (keycloak.authenticated) {
+      void logoutFromKeycloak();
+    }
   }
 
   function openInstitutionalDashboard(user) {
     if (user.role === 'VECINO') {
       const citizenUser = saveCitizenSession(user);
-      const redirectTo = window.history.state?.redirectTo ?? eventsListPath;
+      const redirectTo = sessionStorage.getItem('postLoginRedirect') ?? eventsListPath;
       const redirectEventId = redirectTo.match(/^\/eventos\/(.+)$/)?.[1];
       const redirectEvent = events.find((event) => String(event.id) === redirectEventId);
 
@@ -487,6 +520,7 @@ function PublicPortal() {
       setIsConfirmOpen(false);
       setIsLoginRequiredOpen(false);
       window.history.pushState(null, '', redirectTo);
+      sessionStorage.removeItem('postLoginRedirect');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -503,6 +537,7 @@ function PublicPortal() {
     setCurrentView(viewByRole[user.role] ?? 'admin');
     setSelectedEvent(null);
     setIsConfirmOpen(false);
+    sessionStorage.removeItem('postLoginRedirect');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
