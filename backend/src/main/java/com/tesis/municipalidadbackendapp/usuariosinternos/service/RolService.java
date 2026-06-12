@@ -1,5 +1,6 @@
 package com.tesis.municipalidadbackendapp.usuariosinternos.service;
 
+import com.tesis.municipalidadbackendapp.usuariosinternos.dto.RolConfiguracionDto;
 import com.tesis.municipalidadbackendapp.usuariosinternos.entity.Rol;
 import com.tesis.municipalidadbackendapp.usuariosinternos.repository.RolRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,8 +13,11 @@ import java.util.List;
 public class RolService {
     private final RolRepository rolRepository;
 
-    public List<Rol> findAll() {
-        return rolRepository.findAll();
+    public List<RolConfiguracionDto> findAll() {
+        return rolRepository.findAll().stream().map(rol -> new RolConfiguracionDto(
+                rol.getId(),
+                rol.getNombre()
+        )).toList();
     }
 
     public Rol findById(Integer id) {

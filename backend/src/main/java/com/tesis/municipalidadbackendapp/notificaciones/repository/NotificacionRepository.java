@@ -7,11 +7,11 @@ import java.util.List;
 
 public interface NotificacionRepository extends JpaRepository<Notificacion,Integer> {
 
-    List<Notificacion> findByUsuario_IdOrderByFechaCreacionDesc(Integer usuarioId);
+    List<Notificacion> findByUsuarioDestino_IdOrderByFechaCreacionDesc(Integer usuarioId);
 
-    List<Notificacion> findByUsuario_IdAndLeidaFalseOrderByFechaCreacionDesc(Integer usuarioId);
+    List<Notificacion> findByUsuarioDestino_IdAndLeidaFalseOrderByFechaCreacionDesc(Integer usuarioId);
 
-    Integer countByUsuario_Id(Integer usuarioId);
+    Integer countByUsuarioDestino_Id(Integer usuarioId);
 
-    Integer countByUsuario_IdAndLeidaFalse(Integer usuarioId);
+    Integer countByUsuarioDestino_IdAndLeidaFalse(Integer usuarioId);
 }

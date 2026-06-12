@@ -13,6 +13,7 @@ import keycloak, {
 import { eventCategories, events } from './data/events';
 import PublicEventDetail from './PublicEventDetail';
 import './PublicPortal.css';
+import api from '../../services/api/api';
 
 const institutionalUsers = [
   {

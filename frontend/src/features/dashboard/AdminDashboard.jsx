@@ -4,6 +4,7 @@ import PublicEventDetail from '../public-portal/PublicEventDetail';
 import { adminEvents, formatEventState } from './dashboardData';
 import NotificationMenu from './NotificationMenu';
 import './AdminDashboard.css';
+import {getUsuariosInternos, getRolesUsuariosInternos, guardarUsuarioInterno} from '../../services/dashboardService';
 
 function getManagementStats(events) {
   return [
@@ -2827,27 +2828,97 @@ function NeighborAccountActionModal({ action, reason, onCancel, onConfirm, onRea
 }
 
 function SettingsUsersPage() {
+
+  // >>>>>>>>>>> Estados de SettingsUsersPage <<<<<<<<<<<<<<<<
   const [searchValue, setSearchValue] = useState('');
   const [roleFilter, setRoleFilter] = useState('Todos');
-  const [users, setUsers] = useState(settingsUsers);
+  const [roleOptions, setRoleOptions] = useState(['Todos']);
+  const [roleCatalog, setRoleCatalog] = useState([]);
+  const [usersReloadKey, setUsersReloadKey] = useState(0);
+  const [usersPage, setUsersPage] = useState({
+    number: 0,
+    size: 10,
+    totalElements: 0,
+    totalPages: 0,
+  });
+  //settingsUsers
+  const [users, setUsers] = useState([]);
   const [userModalMode, setUserModalMode] = useState(null);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [userFormData, setUserFormData] = useState(getEmptyUserFormData());
   const [userFormErrors, setUserFormErrors] = useState({});
   const [identityLookupNotice, setIdentityLookupNotice] = useState('');
   const [passwordResetNotice, setPasswordResetNotice] = useState('');
+
+  useEffect(()=>{
+    async function loadUsuariosInternos() {
+      const data = await getUsuariosInternos({
+        texto: searchValue,
+        page: usersPage.number,
+        size: usersPage.size,
+      });
+      const usuarios = data.content.map((usuario) => ({
+        id: usuario.id,
+        nombre: usuario.nombre,
+        correo: usuario.email,
+        rolId: usuario.rolConfiguracionDto?.id,
+        rol: usuario.rolConfiguracionDto?.codigo ?? usuario.rolConfiguracionDto?.nombre,
+        estado: usuario.activo === 1 ? 'ACTIVO' : 'INACTIVO',
+      }));
+      setUsers(usuarios);
+      setUsersPage((currentPage) => ({
+        ...currentPage,
+        number: data.number,
+        size: data.size,
+        totalElements: data.totalElements,
+        totalPages: data.totalPages,
+      }));
+    }
+
+    loadUsuariosInternos();
+  }, [searchValue, usersPage.number, usersPage.size, usersReloadKey]);
+
+  useEffect(()=>{
+
+    async function loadRolesUsuariosInternos(){
+      const data = await getRolesUsuariosInternos();
+      const roles = data.map((rol) => rol.codigo);
+
+      setRoleCatalog(data);
+      setRoleOptions(['Todos', ...roles]);
+
+    }
+
+    loadRolesUsuariosInternos();
+  }, []);
+
   const selectedUser = users.find((user) => user.id === selectedUserId) ?? null;
   const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      searchValue.trim().length === 0 ||
-      [user.nombre, user.correo, user.rol]
-        .join(' ')
-        .toLowerCase()
-        .includes(searchValue.trim().toLowerCase());
     const matchesRole = roleFilter === 'Todos' || user.rol === roleFilter;
 
-    return matchesSearch && matchesRole;
+    return matchesRole;
   });
+
+  const handleSearchChange = (value) => {
+    setSearchValue(value);
+    setUsersPage((currentPage) => ({ ...currentPage, number: 0 }));
+  };
+
+  const goToPreviousUsersPage = () => {
+    setUsersPage((currentPage) => ({
+      ...currentPage,
+      number: Math.max(0, currentPage.number - 1),
+    }));
+  };
+
+  const goToNextUsersPage = () => {
+    setUsersPage((currentPage) => ({
+      ...currentPage,
+      number: currentPage.number + 1 >= currentPage.totalPages
+        ? currentPage.number
+        : currentPage.number + 1,
+    }));
+  };
 
   const closeUserModal = () => {
     setUserModalMode(null);
@@ -2876,7 +2947,7 @@ function SettingsUsersPage() {
     setUserModalMode('edit');
   };
 
-  const saveUser = () => {
+  const saveUser = async () => {
     const errors = validateUserForm(userFormData, userModalMode);
 
     if (Object.keys(errors).length > 0) {
@@ -2906,13 +2977,22 @@ function SettingsUsersPage() {
       notifyUserAccountChanges(normalizedUser, changedFields);
       registerUserAuditLog('UPDATE_INTERNAL_USER', selectedUser.id, changedFields);
     } else {
-      setUsers((currentUsers) => [
-        ...currentUsers,
-        {
-          ...normalizedUser,
-          id: Math.max(0, ...currentUsers.map((user) => user.id)) + 1,
-        },
-      ]);
+      try {
+        await guardarUsuarioInterno({
+          dni: userFormData.dni.trim(),
+          nombre: userFormData.nombre.trim(),
+          email: userFormData.correo.trim(),
+          areaMunicipalId: Number(userFormData.areaId),
+          rolId: Number(userFormData.rolId),
+        });
+        setUsersPage((currentPage) => ({ ...currentPage, number: 0 }));
+        setUsersReloadKey((currentKey) => currentKey + 1);
+      } catch (error) {
+        setUserFormErrors({
+          general: error.response?.data?.message ?? 'No se pudo guardar el usuario.',
+        });
+        return;
+      }
     }
 
     closeUserModal();
@@ -2941,18 +3021,17 @@ function SettingsUsersPage() {
     <>
       <SettingsTablePage
         actionLabel="Nuevo usuario"
-        cardKicker="Configuración"
         cardTitle="Usuarios internos"
         description="Administra las cuentas internas del sistema municipal."
         filterLabel="Rol"
-        filterOptions={['Todos', 'Administrador', 'Directivo', 'Operativo']}
+        filterOptions={roleOptions}
         filterValue={roleFilter}
         searchPlaceholder="Nombre, correo o rol"
         searchValue={searchValue}
         title="Usuarios"
         onAction={openCreateUserModal}
         onFilterChange={setRoleFilter}
-        onSearchChange={setSearchValue}
+        onSearchChange={handleSearchChange}
       >
         <div className="admin-table settings-table settings-users-table">
           <div className="admin-table-row admin-table-head">
@@ -2960,23 +3039,45 @@ function SettingsUsersPage() {
           </div>
           {filteredUsers.map((user) => (
             <div className="admin-table-row" key={user.id}>
-              <span><strong>{user.nombre}</strong><small>Usuario interno</small></span>
+              <span><strong>{user.nombre}</strong></span>
               <span>{user.correo}</span>
               <span>{user.rol}</span>
               <SettingsStatus state={user.estado} />
               <span className="settings-row-actions settings-user-actions">
                 <button
-                  aria-label={`Ver o editar usuario ${user.nombre}`}
+                  aria-label={`Editar usuario ${user.nombre}`}
                   className="table-icon-action is-detail neighbor-detail-action settings-user-detail-action"
-                  data-tooltip="Ver/editar usuario"
-            type="button"
-            onClick={() => openEditUserModal(user)}
-          >
-            <ViewIcon />
+                  data-tooltip="Editar usuario"
+                  type="button"
+                  onClick={() => openEditUserModal(user)}
+                >
+                  <EditIcon />
                 </button>
               </span>
             </div>
           ))}
+        </div>
+        <div className="settings-pagination">
+          <button
+            className="back-button"
+            type="button"
+            disabled={usersPage.number === 0}
+            onClick={goToPreviousUsersPage}
+          >
+            Anterior
+          </button>
+          <span>
+            Página {usersPage.totalPages === 0 ? 0 : usersPage.number + 1} de {usersPage.totalPages}
+            {' '}· {usersPage.totalElements} usuarios
+          </span>
+          <button
+            className="back-button"
+            type="button"
+            disabled={usersPage.number + 1 >= usersPage.totalPages}
+            onClick={goToNextUsersPage}
+          >
+            Siguiente
+          </button>
         </div>
       </SettingsTablePage>
 
@@ -2987,6 +3088,7 @@ function SettingsUsersPage() {
           identityNotice={identityLookupNotice}
           mode={userModalMode}
           passwordResetNotice={passwordResetNotice}
+          roles={roleCatalog}
           user={selectedUser}
           onClose={closeUserModal}
           onFieldChange={(field, value) => {
@@ -3003,7 +3105,7 @@ function SettingsUsersPage() {
                 nombre: identity.nombreCompleto,
               }));
               setUserFormErrors((current) => ({ ...current, identityVerified: undefined }));
-              setIdentityLookupNotice(`Identidad verificada: ${identity.nombreCompleto}`);
+              setIdentityLookupNotice(`Nombre encontrado: ${identity.nombreCompleto}`);
             } else {
               setUserFormData((current) => ({ ...current, identityVerified: false, nombre: '' }));
               setIdentityLookupNotice('No se encontraron datos para el DNI ingresado.');
@@ -3030,13 +3132,12 @@ function getEmptyUserFormData() {
   return {
     area: '',
     areaId: '',
-    confirmarPassword: '',
     correo: '',
     dni: '',
     identityVerified: false,
     nombre: '',
-    password: '',
     rol: '',
+    rolId: '',
   };
 }
 
@@ -3044,13 +3145,12 @@ function getUserFormData(user) {
   return {
     area: user?.area ?? '',
     areaId: user?.areaId ? String(user.areaId) : '',
-    confirmarPassword: '',
     correo: user?.correo ?? '',
     dni: user?.dni ?? '',
     identityVerified: Boolean(user?.nombre),
     nombre: user?.nombre ?? '',
-    password: '',
     rol: user?.rol ?? '',
+    rolId: user?.rolId ? String(user.rolId) : '',
   };
 }
 
@@ -3064,7 +3164,7 @@ function validateUserForm(formData, mode) {
   }
 
   if (isCreating && (!formData.identityVerified || !formData.nombre.trim())) {
-    errors.identityVerified = 'Verifique la identidad con un DNI válido antes de guardar.';
+    errors.identityVerified = 'Debe buscar y validar el DNI antes de crear el usuario.';
   }
 
   if (!formData.correo.trim()) {
@@ -3073,24 +3173,12 @@ function validateUserForm(formData, mode) {
     errors.correo = 'Ingrese un correo electrónico válido.';
   }
 
-  if (!formData.rol) {
+  if (!formData.rolId) {
     errors.rol = 'Seleccione un rol.';
   }
 
   if (!formData.areaId) {
     errors.areaId = 'Seleccione un área municipal.';
-  }
-
-  if (isCreating && !formData.password) {
-    errors.password = 'Ingrese una contraseña.';
-  }
-
-  if (isCreating && !formData.confirmarPassword) {
-    errors.confirmarPassword = 'Confirme la contraseña.';
-  }
-
-  if (formData.password && formData.password !== formData.confirmarPassword) {
-    errors.confirmarPassword = 'Las contraseñas no coinciden.';
   }
 
   return errors;
@@ -3144,13 +3232,14 @@ function UserFormModal({
   onSave,
   onToggleState,
   passwordResetNotice,
+  roles = [],
   user,
 }) {
   const isEditing = mode === 'edit';
   const identityMessage =
     identityNotice ||
     (formData.identityVerified && formData.nombre
-      ? `Identidad verificada: ${formData.nombre}`
+      ? `Nombre encontrado: ${formData.nombre}`
       : '');
 
   return (
@@ -3236,11 +3325,18 @@ function UserFormModal({
 
             <label className="form-field">
               Rol
-              <select value={formData.rol} onChange={(event) => onFieldChange('rol', event.target.value)}>
+              <select
+                value={formData.rolId}
+                onChange={(event) => {
+                  const selectedRole = roles.find((role) => String(role.id) === event.target.value);
+                  onFieldChange('rolId', event.target.value);
+                  onFieldChange('rol', selectedRole?.codigo ?? '');
+                }}
+              >
                 <option value="">Seleccionar rol</option>
-                <option value="Administrador">Administrador</option>
-                <option value="Directivo">Directivo</option>
-                <option value="Operativo">Operativo</option>
+                {roles.map((role) => (
+                  <option key={role.id} value={role.id}>{role.codigo}</option>
+                ))}
               </select>
               {errors.rol && <small className="form-error">{errors.rol}</small>}
             </label>
@@ -3275,29 +3371,17 @@ function UserFormModal({
             )}
 
             {!isEditing && (
-              <>
-                <label className="form-field">
-                  Password
-                  <input
-                    placeholder="Ingrese una contraseña"
-                    type="password"
-                    value={formData.password}
-                    onChange={(event) => onFieldChange('password', event.target.value)}
-                  />
-                  {errors.password && <small className="form-error">{errors.password}</small>}
-                </label>
-
-                <label className="form-field">
-                  Confirmar password
-                  <input
-                    type="password"
-                    value={formData.confirmarPassword}
-                    onChange={(event) => onFieldChange('confirmarPassword', event.target.value)}
-                  />
-                  {errors.confirmarPassword && <small className="form-error">{errors.confirmarPassword}</small>}
-                </label>
-              </>
+              <div className="user-activation-notice span-2">
+                <span className="user-audit-icon">
+                  <InfoLineIcon />
+                </span>
+                <span>
+                  Al guardar el usuario, se enviará automáticamente un correo de activación para que establezca su contraseña e ingrese al sistema.
+                </span>
+              </div>
             )}
+
+            {errors.general && <small className="form-error span-2">{errors.general}</small>}
           </div>
         </div>
 
@@ -4106,7 +4190,7 @@ function SettingsTablePage({
       <article className="admin-table-panel admin-table-featured settings-panel">
         <div className="admin-panel-heading">
           <div>
-            <span className="section-kicker">{cardKicker}</span>
+            {cardKicker && <span className="section-kicker">{cardKicker}</span>}
             <h2>{cardTitle}</h2>
           </div>
         </div>

@@ -1,5 +1,6 @@
 package com.tesis.municipalidadbackendapp.usuariosinternos.controller;
 
+import com.tesis.municipalidadbackendapp.usuariosinternos.dto.RolConfiguracionDto;
 import com.tesis.municipalidadbackendapp.usuariosinternos.entity.Rol;
 import com.tesis.municipalidadbackendapp.usuariosinternos.service.RolService;
 import lombok.RequiredArgsConstructor;
@@ -16,8 +17,8 @@ public class RolController {
 
     private final RolService rolService;
 
-    @GetMapping("find_all")
-    public List<Rol> findAll() {
+    @GetMapping("admin/find_all")
+    public List<RolConfiguracionDto> findAll() {
         return rolService.findAll();
     }
 

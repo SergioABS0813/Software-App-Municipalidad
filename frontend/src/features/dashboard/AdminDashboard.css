@@ -1680,11 +1680,16 @@
 
 .settings-view {
   display: grid;
-  gap: 16px;
+  gap: 22px;
+  min-width: 0;
+  width: 100%;
 }
 
 .settings-panel {
+  display: grid;
+  gap: 20px;
   overflow: hidden;
+  width: 100%;
 }
 
 .settings-filters {
@@ -1727,13 +1732,11 @@
   color: #334f6b;
   font-size: 0.95rem;
   font-weight: 760;
+  line-height: 1.25;
 }
 
-.settings-users-table .admin-table-row > span:nth-child(1) small {
-  color: #6c8198;
-  font-size: 0.78rem;
-  font-weight: 550;
-  line-height: 1.35;
+.settings-users-table .admin-table-head > span:nth-child(5) {
+  text-align: center;
 }
 
 .settings-user-actions {
@@ -1742,6 +1745,27 @@
 
 .settings-user-detail-action {
   justify-self: center;
+}
+
+.settings-pagination {
+  align-items: center;
+  color: #526b85;
+  display: flex;
+  font-size: 0.88rem;
+  font-weight: 650;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.settings-pagination .back-button {
+  min-height: 36px;
+  padding: 0 14px;
+}
+
+.settings-pagination .back-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .user-detail-modal {
@@ -1831,7 +1855,8 @@
   color: #c2410c;
 }
 
-.user-audit-notice {
+.user-audit-notice,
+.user-activation-notice {
   align-items: flex-start;
   background: #edf8fd;
   border: 1px solid #cce8f5;

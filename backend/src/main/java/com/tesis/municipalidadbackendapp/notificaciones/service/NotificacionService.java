@@ -18,11 +18,11 @@ public class NotificacionService {
     public NotificacionesPanelDto obtenerPanelNotificaciones(Integer usuarioId, boolean soloNoLeidas) {
 
         List<Notificacion> notificaciones = soloNoLeidas
-                ? notificacionRepository.findByUsuario_IdAndLeidaFalseOrderByFechaCreacionDesc(usuarioId)
-                : notificacionRepository.findByUsuario_IdOrderByFechaCreacionDesc(usuarioId);
+                ? notificacionRepository.findByUsuarioDestino_IdAndLeidaFalseOrderByFechaCreacionDesc(usuarioId)
+                : notificacionRepository.findByUsuarioDestino_IdOrderByFechaCreacionDesc(usuarioId);
 
-        Integer total = notificacionRepository.countByUsuario_Id(usuarioId);
-        Integer noLeidas = notificacionRepository.countByUsuario_IdAndLeidaFalse(usuarioId);
+        Integer total = notificacionRepository.countByUsuarioDestino_Id(usuarioId);
+        Integer noLeidas = notificacionRepository.countByUsuarioDestino_IdAndLeidaFalse(usuarioId);
 
         List<NotificacionResponseDto> notificacionesDTO = notificaciones.stream()
                 .map(this::mapToDTO)
