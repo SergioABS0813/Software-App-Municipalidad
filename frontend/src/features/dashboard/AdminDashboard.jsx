@@ -6,11 +6,13 @@ import NotificationMenu from './NotificationMenu';
 import './AdminDashboard.css';
 import {
   actualizarEstadoUbicacionConfiguracion,
+  eliminarCategoriaConfiguracion,
   eliminarUbicacionConfiguracion,
   getCategoriasConfiguracion,
   getUbicacionesConfiguracion,
   getUsuariosInternos,
   getRolesUsuariosInternos,
+  guardarCategoria,
   guardarUsuarioInterno,
   guardarUbicacionConfiguracion,
 } from '../../services/dashboardService';
@@ -3616,6 +3618,8 @@ function SettingsCategoriesPage() {
   const [categoryToDelete, setCategoryToDelete] = useState(null);
   const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false);
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [categoriesReloadKey, setCategoriesReloadKey] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -3664,7 +3668,7 @@ function SettingsCategoriesPage() {
     return () => {
       isMounted = false;
     };
-  }, [searchValue, categoriesPage.number]);
+  }, [searchValue, categoriesPage.number, categoriesReloadKey]);
 
   const handleCategorySearchChange = (value) => {
     setSearchValue(value);
@@ -3700,7 +3704,7 @@ function SettingsCategoriesPage() {
     setIsCategoryFormOpen(true);
   };
 
-  const saveCategory = () => {
+  const saveCategory = async () => {
     const normalizedName = categoryFormValue.trim();
 
     if (!normalizedName) {
@@ -3708,22 +3712,33 @@ function SettingsCategoriesPage() {
       return;
     }
 
-    const hasDuplicate = categories.some((category) => category.nombre === normalizedName);
+    if (normalizedName.length > 45) {
+      setCategoryFormError('El nombre de la categoría no debe exceder los 45 caracteres.');
+      return;
+    }
+
+    const hasDuplicate = categories.some(
+      (category) => category.nombre.toLowerCase() === normalizedName.toLowerCase(),
+    );
 
     if (hasDuplicate) {
       setCategoryFormError('Ya existe una categoría con ese nombre.');
       return;
     }
 
-    setCategories((current) => [
-      ...current,
-      {
-        eventosAsociados: 0,
-        id: Math.max(0, ...current.map((category) => category.id)) + 1,
-        nombre: normalizedName,
-      },
-    ]);
-    closeCategoryForm();
+    setIsSavingCategory(true);
+
+    try {
+      await guardarCategoria({ nombre: normalizedName });
+      setCategoriesPage((currentPage) => ({ ...currentPage, number: 0 }));
+      setCategoriesReloadKey((currentKey) => currentKey + 1);
+      setCategoryNotice('Categoría registrada correctamente.');
+      closeCategoryForm();
+    } catch (error) {
+      setCategoryFormError(error.response?.data?.message ?? 'No se pudo guardar la categoría.');
+    } finally {
+      setIsSavingCategory(false);
+    }
   };
 
   const requestCategoryDelete = (category) => {
@@ -3738,13 +3753,23 @@ function SettingsCategoriesPage() {
     setCategoryToDelete(category);
   };
 
-  const confirmCategoryDelete = () => {
+  const confirmCategoryDelete = async () => {
     if (!categoryToDelete) {
       return;
     }
 
-    setCategories((current) => current.filter((category) => category.id !== categoryToDelete.id));
-    setCategoryToDelete(null);
+    try {
+      await eliminarCategoriaConfiguracion(categoryToDelete.id);
+      setCategoryToDelete(null);
+      setCategoriesPage((currentPage) => ({ ...currentPage, number: 0 }));
+      setCategoriesReloadKey((currentKey) => currentKey + 1);
+      setCategoryNotice('Categoría eliminada correctamente.');
+    } catch (error) {
+      setCategoryToDelete(null);
+      setCategoryNotice(
+        error.response?.data?.message ?? 'No se pudo eliminar la categoría.',
+      );
+    }
   };
 
   return (
@@ -3815,6 +3840,7 @@ function SettingsCategoriesPage() {
       {isCategoryFormOpen && (
         <CategoryFormModal
           error={categoryFormError}
+          isSaving={isSavingCategory}
           value={categoryFormValue}
           onCancel={closeCategoryForm}
           onSave={saveCategory}
@@ -3836,7 +3862,7 @@ function SettingsCategoriesPage() {
   );
 }
 
-function CategoryFormModal({ error, onCancel, onSave, onValueChange, value }) {
+function CategoryFormModal({ error, isSaving, onCancel, onSave, onValueChange, value }) {
   return (
     <div className="modal-backdrop category-modal-backdrop" role="presentation" onMouseDown={onCancel}>
       <section
@@ -3852,6 +3878,7 @@ function CategoryFormModal({ error, onCancel, onSave, onValueChange, value }) {
           Nombre de categoría
           <input
             autoFocus
+            maxLength={45}
             type="text"
             value={value}
             onChange={(event) => onValueChange(event.target.value)}
@@ -3859,11 +3886,11 @@ function CategoryFormModal({ error, onCancel, onSave, onValueChange, value }) {
           {error && <small className="form-error">{error}</small>}
         </label>
         <div className="modal-actions">
-          <button className="back-button" type="button" onClick={onCancel}>
+          <button className="back-button" type="button" disabled={isSaving} onClick={onCancel}>
             Cancelar
           </button>
-          <button className="primary-button" type="button" onClick={onSave}>
-            Guardar categoría
+          <button className="primary-button" type="button" disabled={isSaving} onClick={onSave}>
+            {isSaving ? 'Guardando...' : 'Guardar categoría'}
           </button>
         </div>
       </section>

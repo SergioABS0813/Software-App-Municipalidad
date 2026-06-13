@@ -17,4 +17,6 @@ public interface EventoRepository extends JpaRepository<Evento, Integer> {
 
     Long countByUbicacionId(Integer ubicacionId);
 
+    Long countByCategoriaId(Integer categoriaId);
+
 }

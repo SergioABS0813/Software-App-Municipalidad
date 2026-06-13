@@ -58,3 +58,8 @@ export async function guardarCategoria(categoria){
     const response = await api.post("categoria/admin/guardar_categoria", categoria);
     return response.data
 }
+
+export async function eliminarCategoriaConfiguracion(id){
+    const response = await api.delete(`categoria/admin/${id}`);
+    return response.data
+}

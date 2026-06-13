@@ -10,6 +10,7 @@ import com.tesis.municipalidadbackendapp.usuariosinternos.entity.Usuario;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -45,5 +46,14 @@ public class CategoriaController {
         return categoriaService.guardarCategoria(request, usuario, httpServletRequest);
     }
 
+    @DeleteMapping("admin/{id}")
+    public ResponseEntity<Void> eliminarCategoria(
+            @PathVariable Integer id,
+            HttpServletRequest httpServletRequest
+    ){
+        Usuario usuario = usuarioAutenticadoService.obtenerUsuarioAutenticado();
+        categoriaService.eliminarCategoria(id, usuario, httpServletRequest);
+        return ResponseEntity.noContent().build();
+    }
 
 }
