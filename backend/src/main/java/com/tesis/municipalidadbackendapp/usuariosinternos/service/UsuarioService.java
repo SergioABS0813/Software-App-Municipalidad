@@ -8,6 +8,7 @@ import com.tesis.municipalidadbackendapp.usuariosinternos.dto.UsuarioConfiguraci
 import com.tesis.municipalidadbackendapp.usuariosinternos.dto.UsuarioRequest;
 import com.tesis.municipalidadbackendapp.usuariosinternos.dto.UsuarioResponse;
 import com.tesis.municipalidadbackendapp.usuariosinternos.dto.UsuarioResponseVerDto;
+import com.tesis.municipalidadbackendapp.usuariosinternos.dto.UsuarioUpdateRequest;
 import com.tesis.municipalidadbackendapp.usuariosinternos.entity.Rol;
 import com.tesis.municipalidadbackendapp.usuariosinternos.entity.Usuario;
 import com.tesis.municipalidadbackendapp.usuariosinternos.repository.UsuarioRepository;
@@ -28,11 +29,15 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class UsuarioService {
+    private static final int MAX_EMAIL_LENGTH = 45;
+    private static final String EMAIL_PATTERN = "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$";
+
     private final UsuarioRepository usuarioRepository;
     private final AreaMunicipalService areaMunicipalService;
     private final RolService rolService;
     private final BitacoraAccionService bitacoraAccionService;
     private final KeycloakAdminService keycloakAdminService;
+    private final UsuarioNotificacionService usuarioNotificacionService;
 
     @Transactional
     public UsuarioResponse guardarUsuario(UsuarioRequest usuarioRequest, HttpServletRequest httpServletRequest, Usuario usuarioAutenticado) {
@@ -146,15 +151,18 @@ public class UsuarioService {
                 .toList();
     }
 
-    public Page<UsuarioConfiguracionDto> buscarUsuariosInternos(String texto, int page, int size) {
+    public Page<UsuarioConfiguracionDto> buscarUsuariosInternos(String texto, Integer rolId, int page, int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("nombre").ascending());
-        return usuarioRepository.buscarPorNombreCorreoORol(texto, pageable)
+        return usuarioRepository.buscarPorNombreCorreoORol(texto, rolId, pageable)
                 .map(this::mapToUsuarioConfiguracionDto);
     }
 
     public UsuarioResponseVerDto obtenerUsuarioInternoPorId(Integer id) {
         Usuario usuario = usuarioRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Usuario no encontrado"
+                ));
 
         return new UsuarioResponseVerDto(
                 usuario.getDni(),
@@ -166,12 +174,103 @@ public class UsuarioService {
         );
     }
 
+    @Transactional
+    public UsuarioResponseVerDto actualizarUsuarioInterno(
+            Integer id,
+            UsuarioUpdateRequest request,
+            Usuario usuarioAutenticado,
+            HttpServletRequest httpServletRequest
+    ) {
+        Usuario usuario = obtenerUsuarioEditable(id);
+        validarDatosEdicionUsuario(request, id);
+
+        AreaMunicipal areaMunicipal = areaMunicipalService.obtenerAreaMunicipalporId(request.areaMunicipalId());
+        if (areaMunicipal == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Area municipal no encontrada");
+        }
+
+        Rol rolNuevo = rolService.findById(request.rolId());
+        if (rolNuevo == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rol no encontrado");
+        }
+
+        String emailAnterior = usuario.getEmail();
+        String rolAnteriorKeycloak = obtenerNombreRolKeycloak(usuario.getRol());
+        String rolNuevoKeycloak = obtenerNombreRolKeycloak(rolNuevo);
+        String emailNuevo = request.email().trim();
+        boolean cambioCorreo = !emailAnterior.equalsIgnoreCase(emailNuevo);
+        boolean cambioArea = !usuario.getAreaMunicipal().getId().equals(areaMunicipal.getId());
+        boolean cambioRol = !usuario.getRol().getId().equals(rolNuevo.getId());
+
+        if (cambioCorreo) {
+            keycloakAdminService.actualizarCorreoUsuario(usuario.getKeycloakId(), usuario.getNombre(), emailNuevo);
+        }
+
+        if (cambioRol) {
+            keycloakAdminService.actualizarRolUsuario(usuario.getKeycloakId(), rolAnteriorKeycloak, rolNuevoKeycloak);
+        }
+
+        usuario.setEmail(emailNuevo);
+        usuario.setAreaMunicipal(areaMunicipal);
+        usuario.setRol(rolNuevo);
+        Usuario guardado = usuarioRepository.save(usuario);
+
+        if (cambioCorreo) {
+            usuarioNotificacionService.notificarCorreoAccesoSeleccionado(emailNuevo, guardado.getNombre());
+            usuarioNotificacionService.notificarCorreoAnteriorReemplazado(emailAnterior, emailNuevo, guardado.getNombre());
+        }
+
+        registrarActualizacionUsuario(guardado, usuarioAutenticado, httpServletRequest, cambioCorreo, cambioArea, cambioRol);
+        return mapToUsuarioResponseVerDto(guardado);
+    }
+
+    @Transactional
+    public UsuarioResponseVerDto actualizarEstadoUsuarioInterno(
+            Integer id,
+            String estado,
+            Usuario usuarioAutenticado,
+            HttpServletRequest httpServletRequest
+    ) {
+        Usuario usuario = obtenerUsuarioEditable(id);
+        if (estado == null || (!"ACTIVO".equalsIgnoreCase(estado) && !"INACTIVO".equalsIgnoreCase(estado))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de usuario invalido");
+        }
+
+        boolean activar = !"INACTIVO".equalsIgnoreCase(estado);
+        Byte nuevoActivo = activar ? (byte) 1 : (byte) 0;
+
+        if (!nuevoActivo.equals(usuario.getActivo())) {
+            keycloakAdminService.actualizarEstadoUsuario(usuario.getKeycloakId(), activar);
+            usuario.setActivo(nuevoActivo);
+            usuarioRepository.save(usuario);
+
+            bitacoraAccionService.guardarAccion(
+                    activar ? "ACTIVAR_USUARIO_INTERNO" : "DESACTIVAR_USUARIO_INTERNO",
+                    "USUARIO",
+                    usuario.getId(),
+                    (activar ? "Se activo" : "Se desactivo") + " el usuario interno: " + usuario.getNombre(),
+                    usuarioAutenticado,
+                    httpServletRequest
+            );
+        }
+
+        return mapToUsuarioResponseVerDto(usuario);
+    }
+
+    @Transactional
     public Usuario obtenerPorKeycloakId(String keycloakId) {
-        return usuarioRepository.findByKeycloakId(keycloakId)
+        Usuario usuario = usuarioRepository.findByKeycloakId(keycloakId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.FORBIDDEN,
                         "Usuario no registrado en el sistema"
                 ));
+
+        if (usuario.getActivo() == null || usuario.getActivo() == 0) {
+            usuario.setActivo((byte) 1);
+            return usuarioRepository.save(usuario);
+        }
+
+        return usuario;
     }
 
     private UsuarioConfiguracionDto mapToUsuarioConfiguracionDto(Usuario usuario) {
@@ -179,8 +278,103 @@ public class UsuarioService {
                 usuario.getId(),
                 usuario.getNombre(),
                 usuario.getEmail(),
-                new RolConfiguracionDto(usuario.getRol().getId(), usuario.getRol().getNombre()),
+                new RolConfiguracionDto(
+                        usuario.getRol().getId(),
+                        usuario.getRol().getCodigo() != null && !usuario.getRol().getCodigo().isBlank()
+                                ? usuario.getRol().getCodigo()
+                                : usuario.getRol().getNombre()
+                ),
                 usuario.getActivo()
+        );
+    }
+
+    private Usuario obtenerUsuarioEditable(Integer id) {
+        return usuarioRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Usuario no encontrado"
+                ));
+    }
+
+    private void validarDatosEdicionUsuario(UsuarioUpdateRequest request, Integer usuarioId) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Los datos del usuario son requeridos");
+        }
+
+        if (request.email() == null || request.email().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El correo es obligatorio");
+        }
+
+        if (request.areaMunicipalId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El area municipal es obligatoria");
+        }
+
+        if (request.rolId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El rol es obligatorio");
+        }
+
+        String email = request.email().trim();
+
+        if (email.length() > MAX_EMAIL_LENGTH) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "El correo no debe exceder los " + MAX_EMAIL_LENGTH + " caracteres"
+            );
+        }
+
+        if (!email.matches(EMAIL_PATTERN)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ingrese un correo electronico valido");
+        }
+
+        if (usuarioRepository.existsByEmailAndIdNot(email, usuarioId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe un usuario con ese correo");
+        }
+    }
+
+    private UsuarioResponseVerDto mapToUsuarioResponseVerDto(Usuario usuario) {
+        return new UsuarioResponseVerDto(
+                usuario.getDni(),
+                usuario.getNombre(),
+                usuario.getActivo(),
+                usuario.getEmail(),
+                usuario.getAreaMunicipal().getId(),
+                usuario.getRol().getId()
+        );
+    }
+
+    private void registrarActualizacionUsuario(
+            Usuario usuario,
+            Usuario usuarioAutenticado,
+            HttpServletRequest httpServletRequest,
+            boolean cambioCorreo,
+            boolean cambioArea,
+            boolean cambioRol
+    ) {
+        if (!cambioCorreo && !cambioArea && !cambioRol) {
+            return;
+        }
+
+        StringBuilder detalle = new StringBuilder("Se actualizo el usuario interno: ")
+                .append(usuario.getNombre())
+                .append(". Campos modificados: ");
+
+        if (cambioCorreo) {
+            detalle.append("correo ");
+        }
+        if (cambioArea) {
+            detalle.append("area ");
+        }
+        if (cambioRol) {
+            detalle.append("rol ");
+        }
+
+        bitacoraAccionService.guardarAccion(
+                "ACTUALIZAR_USUARIO_INTERNO",
+                "USUARIO",
+                usuario.getId(),
+                detalle.toString().trim(),
+                usuarioAutenticado,
+                httpServletRequest
         );
     }
 }

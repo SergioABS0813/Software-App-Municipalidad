@@ -5,11 +5,17 @@ import { adminEvents, formatEventState } from './dashboardData';
 import NotificationMenu from './NotificationMenu';
 import './AdminDashboard.css';
 import {
+  actualizarEstadoUsuarioInterno,
   actualizarEstadoUbicacionConfiguracion,
+  actualizarContactoCuentaVecinal,
+  actualizarUsuarioInterno,
   eliminarCategoriaConfiguracion,
   eliminarUbicacionConfiguracion,
+  getCuentaVecinalDetalle,
+  getCuentasVecinales,
   getCategoriasConfiguracion,
   getUbicacionesConfiguracion,
+  getUsuarioInternoDetalle,
   getUsuariosInternos,
   getRolesUsuariosInternos,
   guardarCategoria,
@@ -174,79 +180,10 @@ const areasMunicipales = [
 
 const eventOrganizerAreas = areasMunicipales.filter((area) => area.organizar_eventos === true);
 
-const initialNeighborAccounts = [
-  {
-    id: 1,
-    dni: '12345678',
-    nombres: 'Sergio André',
-    apellidos: 'Bustamante Villanueva',
-    nombreCompleto: 'Sergio André Bustamante Villanueva',
-    correo: 'vecino@gmail.com',
-    celular: '987654321',
-    fechaNacimiento: '1998-04-16',
-    estado: 'ACTIVO',
-    fechaRegistro: '2026-06-01',
-    fechaConfirmacionCorreo: '2026-06-01',
-    inscripciones: [
-      {
-        asistencia: 'Pendiente',
-        codigoInscripcion: 'EC-1-PERFIL',
-        estadoInscripcion: 'Confirmada',
-        evento: 'Festival Cultural Barrial',
-        fechaEvento: 'Sáb, 08 jun',
-      },
-      {
-        asistencia: 'Validada',
-        codigoInscripcion: 'EC-2-5678',
-        estadoInscripcion: 'Confirmada',
-        evento: 'Taller de Marinera',
-        fechaEvento: 'Mié, 12 jun',
-      },
-      {
-        asistencia: 'Pendiente',
-        codigoInscripcion: 'EC-5-5678',
-        estadoInscripcion: 'Confirmada',
-        evento: 'Voluntariado Local',
-        fechaEvento: 'Vie, 21 jun',
-      },
-    ],
-  },
-  {
-    id: 2,
-    dni: '87654321',
-    nombres: 'María Fernanda',
-    apellidos: 'López Ramos',
-    nombreCompleto: 'María Fernanda López Ramos',
-    correo: 'maria@gmail.com',
-    celular: '999888777',
-    fechaNacimiento: '2001-09-20',
-    estado: 'PENDIENTE_CONFIRMACION',
-    fechaRegistro: '2026-06-02',
-    fechaConfirmacionCorreo: '',
-    inscripciones: [],
-  },
-  {
-    id: 3,
-    dni: '11223344',
-    nombres: 'Carlos Alberto',
-    apellidos: 'Ruiz Medina',
-    nombreCompleto: 'Carlos Alberto Ruiz Medina',
-    correo: 'carlos@gmail.com',
-    celular: '988776655',
-    fechaNacimiento: '1985-02-10',
-    estado: 'BLOQUEADO',
-    fechaRegistro: '2026-05-28',
-    fechaConfirmacionCorreo: '2026-05-28',
-    motivoBloqueo: 'Uso indebido de reservas',
-    inscripciones: [],
-  },
-];
-
 const neighborStatusOptions = [
   { label: 'Todos', value: 'TODOS' },
   { label: 'Activo', value: 'ACTIVO' },
   { label: 'Pendiente de confirmación', value: 'PENDIENTE_CONFIRMACION' },
-  { label: 'Bloqueado', value: 'BLOQUEADO' },
   { label: 'Inactivo', value: 'INACTIVO' },
 ];
 
@@ -410,7 +347,6 @@ function getUserInitials(name) {
 function getNeighborStateLabel(state) {
   const labels = {
     ACTIVO: 'Activo',
-    BLOQUEADO: 'Bloqueado',
     INACTIVO: 'Inactivo',
     PENDIENTE_CONFIRMACION: 'Pendiente',
   };
@@ -421,7 +357,6 @@ function getNeighborStateLabel(state) {
 function getNeighborStateTone(state) {
   const tones = {
     ACTIVO: 'neighbor-active',
-    BLOQUEADO: 'neighbor-blocked',
     INACTIVO: 'neighbor-inactive',
     PENDIENTE_CONFIRMACION: 'neighbor-pending',
   };
@@ -2474,8 +2409,52 @@ function MunicipalAreaCombobox({ defaultAreaId = '', defaultAreaName = '', onAre
   );
 }
 
+function mapNeighborAccountFromApi(neighbor) {
+  return {
+    id: neighbor.id,
+    dni: neighbor.dni ?? '',
+    nombres: neighbor.nombreCompleto ?? '',
+    apellidos: '',
+    nombreCompleto: neighbor.nombreCompleto ?? '',
+    correo: neighbor.correo ?? '',
+    celular: '',
+    fechaNacimiento: '',
+    estado: neighbor.estado ?? 'INACTIVO',
+    fechaRegistro: '',
+    inscripciones: [],
+  };
+}
+
+function mapNeighborDetailFromApi(neighbor) {
+  return {
+    id: neighbor.id,
+    dni: neighbor.dni ?? '',
+    nombres: neighbor.nombreCompleto ?? '',
+    apellidos: '',
+    nombreCompleto: neighbor.nombreCompleto ?? '',
+    correo: neighbor.correo ?? '',
+    celular: neighbor.celular ?? '',
+    fechaNacimiento: neighbor.fechaNacimiento || 'No registrado',
+    estado: neighbor.estado ?? 'INACTIVO',
+    fechaRegistro: neighbor.fechaRegistro || 'No registrado',
+    inscripciones: (neighbor.inscripciones ?? []).map((registration) => ({
+      asistencia: registration.asistencia ?? 'Pendiente',
+      codigoInscripcion: registration.codigoInscripcion ?? '',
+      estadoInscripcion: registration.estadoInscripcion ?? 'Registrada',
+      evento: registration.evento ?? '',
+      fechaEvento: registration.fechaEvento ?? '',
+    })),
+  };
+}
+
 function NeighborAccountsPage({ adminUserName }) {
-  const [neighbors, setNeighbors] = useState(initialNeighborAccounts);
+  const [neighbors, setNeighbors] = useState([]);
+  const [neighborsPage, setNeighborsPage] = useState({
+    number: 0,
+    size: 5,
+    totalElements: 0,
+    totalPages: 0,
+  });
   const [searchValue, setSearchValue] = useState('');
   const [stateFilterValue, setStateFilterValue] = useState('TODOS');
   const [selectedNeighbor, setSelectedNeighbor] = useState(null);
@@ -2484,29 +2463,107 @@ function NeighborAccountsPage({ adminUserName }) {
   const [actionModal, setActionModal] = useState(null);
   const [actionReason, setActionReason] = useState('');
   const [notice, setNotice] = useState('');
-  const modalNeighbor = selectedNeighbor
-    ? neighbors.find((neighbor) => neighbor.id === selectedNeighbor.id) ?? selectedNeighbor
-    : null;
-  const filteredNeighbors = useMemo(() => {
-    const normalizedSearch = searchValue.trim().toLowerCase();
+  const [listNotice, setListNotice] = useState('');
+  const [isLoadingNeighbors, setIsLoadingNeighbors] = useState(false);
+  const [isLoadingNeighborDetail, setIsLoadingNeighborDetail] = useState(false);
+  const modalNeighbor = useMemo(() => {
+    if (!selectedNeighbor) {
+      return null;
+    }
 
-    return neighbors.filter((neighbor) => {
-      const matchesState = stateFilterValue === 'TODOS' || neighbor.estado === stateFilterValue;
-      const matchesSearch =
-        normalizedSearch.length === 0 ||
-        [neighbor.dni, neighbor.nombreCompleto, neighbor.correo]
-          .join(' ')
-          .toLowerCase()
-          .includes(normalizedSearch);
+    return {
+      ...(neighbors.find((neighbor) => neighbor.id === selectedNeighbor.id) ?? {}),
+      ...selectedNeighbor,
+    };
+  }, [neighbors, selectedNeighbor]);
 
-      return matchesState && matchesSearch;
-    });
-  }, [neighbors, searchValue, stateFilterValue]);
+  useEffect(() => {
+    let ignoreResponse = false;
 
-  function openNeighborDetailModal(neighbor) {
-    setSelectedNeighbor(neighbor);
+    async function loadCuentasVecinales() {
+      setIsLoadingNeighbors(true);
+      setListNotice('');
+
+      try {
+        const data = await getCuentasVecinales({
+          texto: searchValue,
+          estado: stateFilterValue === 'TODOS' ? '' : stateFilterValue,
+          page: neighborsPage.number,
+        });
+
+        if (ignoreResponse) {
+          return;
+        }
+
+        setNeighbors(data.content.map(mapNeighborAccountFromApi));
+        setNeighborsPage((currentPage) => ({
+          ...currentPage,
+          number: data.number,
+          size: data.size,
+          totalElements: data.totalElements,
+          totalPages: data.totalPages,
+        }));
+      } catch (error) {
+        if (ignoreResponse) {
+          return;
+        }
+
+        setNeighbors([]);
+        setListNotice(error.response?.data?.message ?? 'No se pudieron cargar las cuentas vecinales.');
+      } finally {
+        if (!ignoreResponse) {
+          setIsLoadingNeighbors(false);
+        }
+      }
+    }
+
+    loadCuentasVecinales();
+
+    return () => {
+      ignoreResponse = true;
+    };
+  }, [searchValue, stateFilterValue, neighborsPage.number]);
+
+  const handleSearchChange = (value) => {
+    setSearchValue(value);
+    setNeighborsPage((currentPage) => ({ ...currentPage, number: 0 }));
+  };
+
+  const handleStateFilterChange = (value) => {
+    setStateFilterValue(value);
+    setNeighborsPage((currentPage) => ({ ...currentPage, number: 0 }));
+  };
+
+  const goToPreviousNeighborsPage = () => {
+    setNeighborsPage((currentPage) => ({
+      ...currentPage,
+      number: Math.max(0, currentPage.number - 1),
+    }));
+  };
+
+  const goToNextNeighborsPage = () => {
+    setNeighborsPage((currentPage) => ({
+      ...currentPage,
+      number: currentPage.number + 1 >= currentPage.totalPages
+        ? currentPage.number
+        : currentPage.number + 1,
+    }));
+  };
+
+  async function openNeighborDetailModal(neighbor) {
+    setIsLoadingNeighborDetail(true);
     setEditingContact(false);
     setNotice('');
+    setListNotice('');
+
+    try {
+      const detail = await getCuentaVecinalDetalle(neighbor.id);
+      setSelectedNeighbor(mapNeighborDetailFromApi(detail));
+    } catch (error) {
+      setListNotice(error.response?.data?.message ?? 'No se pudo cargar el detalle de la cuenta vecinal.');
+    } finally {
+      setIsLoadingNeighborDetail(false);
+    }
   }
 
   // function closeNeighborDetailModal() {
@@ -2562,7 +2619,7 @@ function NeighborAccountsPage({ adminUserName }) {
     setNotice('');
   }
 
-  function saveContactEdit() {
+  async function saveContactEdit() {
     if (!modalNeighbor) {
       return;
     }
@@ -2572,16 +2629,32 @@ function NeighborAccountsPage({ adminUserName }) {
       return;
     }
 
-    setNeighbors((currentNeighbors) =>
-      currentNeighbors.map((neighbor) =>
-        neighbor.id === modalNeighbor.id
-          ? { ...neighbor, celular: contactDraft.celular.trim(), correo: contactDraft.correo.trim() }
-          : neighbor,
-      ),
-    );
-    // TODO: registrar acción en bitácora_accion y persistir contacto en Spring Boot.
-    setEditingContact(false);
-    setNotice('Contacto actualizado correctamente.');
+    try {
+      const detail = await actualizarContactoCuentaVecinal(modalNeighbor.id, {
+        correo: contactDraft.correo.trim(),
+        celular: contactDraft.celular.trim(),
+      });
+      const updatedNeighbor = mapNeighborDetailFromApi(detail);
+
+      setSelectedNeighbor(updatedNeighbor);
+      setNeighbors((currentNeighbors) =>
+        currentNeighbors.map((neighbor) =>
+          neighbor.id === updatedNeighbor.id
+            ? {
+              ...neighbor,
+              correo: updatedNeighbor.correo,
+              celular: updatedNeighbor.celular,
+              estado: updatedNeighbor.estado,
+              nombreCompleto: updatedNeighbor.nombreCompleto,
+            }
+            : neighbor,
+        ),
+      );
+      setEditingContact(false);
+      setNotice('Contacto actualizado correctamente. Se notificó al vecino por correo.');
+    } catch (error) {
+      setNotice(error.response?.data?.message ?? 'No se pudo actualizar el contacto.');
+    }
   }
 
   function confirmAccountAction() {
@@ -2589,8 +2662,8 @@ function NeighborAccountsPage({ adminUserName }) {
       return;
     }
 
-    if (actionModal === 'block' && !actionReason.trim()) {
-      setNotice('Indica el motivo del bloqueo.');
+    if ((actionModal === 'deactivate' || actionModal === 'reactivate') && !actionReason.trim()) {
+      setNotice('Indica el motivo de la acción.');
       return;
     }
 
@@ -2607,13 +2680,13 @@ function NeighborAccountsPage({ adminUserName }) {
           return neighbor;
         }
 
-        if (actionModal === 'block') {
+        if (actionModal === 'deactivate') {
           return {
             ...neighbor,
-            estado: 'BLOQUEADO',
-            fechaBloqueo: new Date().toISOString(),
-            motivoBloqueo: actionReason.trim(),
-            usuarioAdminBloqueo: adminUserName,
+            estado: 'INACTIVO',
+            fechaDesactivacion: new Date().toISOString(),
+            motivoDesactivacion: actionReason.trim(),
+            usuarioAdminDesactivacion: adminUserName,
           };
         }
 
@@ -2631,7 +2704,7 @@ function NeighborAccountsPage({ adminUserName }) {
       }),
     );
     // TODO: registrar acción en bitácora_accion.
-    setNotice(actionModal === 'block' ? 'Cuenta bloqueada correctamente.' : 'Cuenta reactivada correctamente.');
+    setNotice(actionModal === 'deactivate' ? 'Cuenta desactivada correctamente.' : 'Cuenta reactivada correctamente.');
     setActionModal(null);
   }
 
@@ -2659,23 +2732,43 @@ function NeighborAccountsPage({ adminUserName }) {
               <input
                 placeholder="DNI, nombre o correo"
                 value={searchValue}
-                onChange={(event) => setSearchValue(event.target.value)}
+                onChange={(event) => handleSearchChange(event.target.value)}
               />
             </label>
             <label>
               Estado
-              <select value={stateFilterValue} onChange={(event) => setStateFilterValue(event.target.value)}>
+              <select value={stateFilterValue} onChange={(event) => handleStateFilterChange(event.target.value)}>
                 {neighborStatusOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
             </label>
           </div>
+          {listNotice && <p className="settings-inline-notice">{listNotice}</p>}
           <div className="admin-table neighbor-table">
             <div className="admin-table-row admin-table-head">
-              <span>Vecino</span><span>Estado</span><span>Acción</span>
+              <span>Vecino</span><span>Estado</span><span>Editar</span>
             </div>
-            {filteredNeighbors.map((neighbor) => (
+            {isLoadingNeighbors && (
+              <div className="admin-table-row">
+                <span className="neighbor-person-cell">
+                  <strong>Cargando cuentas vecinales...</strong>
+                </span>
+                <span />
+                <span />
+              </div>
+            )}
+            {!isLoadingNeighbors && neighbors.length === 0 && (
+              <div className="admin-table-row">
+                <span className="neighbor-person-cell">
+                  <strong>No se encontraron cuentas vecinales.</strong>
+                  <small>Prueba con otro nombre, DNI, correo o estado.</small>
+                </span>
+                <span />
+                <span />
+              </div>
+            )}
+            {!isLoadingNeighbors && neighbors.map((neighbor) => (
               <div className="admin-table-row" key={neighbor.id}>
                 <span className="neighbor-person-cell">
                   <strong>{neighbor.nombreCompleto}</strong>
@@ -2686,16 +2779,39 @@ function NeighborAccountsPage({ adminUserName }) {
                   {getNeighborStateLabel(neighbor.estado)}
                 </span>
                 <button
-                  aria-label={`Ver o editar información de ${neighbor.nombreCompleto}`}
+                  aria-label={`Editar información de ${neighbor.nombreCompleto}`}
                   className="table-icon-action is-detail neighbor-detail-action"
-                  data-tooltip="Ver/editar información"
+                  data-tooltip="Editar información"
+                  disabled={isLoadingNeighborDetail}
                   type="button"
                   onClick={() => openNeighborDetailModal(neighbor)}
                 >
-                  <ViewIcon />
+                  <EditIcon />
                 </button>
               </div>
             ))}
+          </div>
+          <div className="settings-pagination">
+            <button
+              className="back-button"
+              type="button"
+              disabled={neighborsPage.number === 0}
+              onClick={goToPreviousNeighborsPage}
+            >
+              Anterior
+            </button>
+            <span>
+              Página {neighborsPage.totalPages === 0 ? 0 : neighborsPage.number + 1} de {neighborsPage.totalPages}
+              {' '}· {neighborsPage.totalElements} cuentas
+            </span>
+            <button
+              className="back-button"
+              type="button"
+              disabled={neighborsPage.number + 1 >= neighborsPage.totalPages}
+              onClick={goToNextNeighborsPage}
+            >
+              Siguiente
+            </button>
           </div>
         </article>
 
@@ -2749,8 +2865,8 @@ function NeighborDetailModal({
     neighbor.estado === 'PENDIENTE_CONFIRMACION'
       ? { action: 'resend', label: 'Reenviar confirmación' }
       : neighbor.estado === 'ACTIVO'
-        ? { action: 'block', label: 'Bloquear cuenta' }
-        : neighbor.estado === 'BLOQUEADO'
+        ? { action: 'deactivate', label: 'Desactivar cuenta' }
+        : neighbor.estado === 'INACTIVO'
           ? { action: 'reactivate', label: 'Reactivar cuenta' }
           : null;
 
@@ -2795,11 +2911,18 @@ function NeighborDetailModal({
             <div><dt>DNI</dt><dd>{neighbor.dni}</dd></div>
             <div><dt>Fecha de nacimiento</dt><dd>{neighbor.fechaNacimiento}</dd></div>
             <div><dt>Fecha de registro</dt><dd>{neighbor.fechaRegistro}</dd></div>
-            <div><dt>Confirmación de correo</dt><dd>{neighbor.fechaConfirmacionCorreo || 'Pendiente'}</dd></div>
           </dl>
           <section className="neighbor-contact-section">
             <div className="neighbor-section-heading">
               <h3>Contacto</h3>
+            </div>
+            <div className="user-audit-notice">
+              <span className="user-audit-icon">
+                <InfoLineIcon />
+              </span>
+              <span>
+                Si actualizas el correo o celular del vecino, se enviará una notificación al correo registrado.
+              </span>
             </div>
             {editingContact ? (
               <div className="neighbor-contact-form">
@@ -2854,7 +2977,7 @@ function NeighborDetailModal({
               {contextualAction && (
                 <button
                   className={
-                    contextualAction.action === 'block'
+                    contextualAction.action === 'deactivate'
                       ? 'neighbor-primary-action is-danger'
                       : 'neighbor-primary-action'
                   }
@@ -2873,10 +2996,10 @@ function NeighborDetailModal({
 }
 
 function NeighborAccountActionModal({ action, reason, onCancel, onConfirm, onReasonChange }) {
-  const isBlock = action === 'block';
+  const isDeactivate = action === 'deactivate';
   const isReactivate = action === 'reactivate';
-  const title = isBlock
-    ? 'Bloquear cuenta vecinal'
+  const title = isDeactivate
+    ? 'Desactivar cuenta vecinal'
     : isReactivate
       ? 'Reactivar cuenta vecinal'
       : 'Reenviar correo de confirmación';
@@ -2890,14 +3013,14 @@ function NeighborAccountActionModal({ action, reason, onCancel, onConfirm, onRea
           <p>Se reenviará el correo de confirmación al vecino.</p>
         ) : (
           <label className="neighbor-action-reason">
-            {isBlock ? 'Indica el motivo del bloqueo de la cuenta vecinal.' : 'Indica el motivo de la reactivación de la cuenta vecinal.'}
+            {isDeactivate ? 'Indica el motivo de la desactivación de la cuenta vecinal.' : 'Indica el motivo de la reactivación de la cuenta vecinal.'}
             <textarea rows={4} value={reason} onChange={(event) => onReasonChange(event.target.value)} />
           </label>
         )}
         <div className="modal-actions">
           <button className="back-button" type="button" onClick={onCancel}>Cancelar</button>
           <button className="primary-button" type="button" onClick={onConfirm}>
-            {isBlock ? 'Bloquear cuenta' : isReactivate ? 'Reactivar cuenta' : 'Reenviar correo'}
+            {isDeactivate ? 'Desactivar cuenta' : isReactivate ? 'Reactivar cuenta' : 'Reenviar correo'}
           </button>
         </div>
       </section>
@@ -2909,8 +3032,8 @@ function SettingsUsersPage() {
 
   // >>>>>>>>>>> Estados de SettingsUsersPage <<<<<<<<<<<<<<<<
   const [searchValue, setSearchValue] = useState('');
-  const [roleFilter, setRoleFilter] = useState('Todos');
-  const [roleOptions, setRoleOptions] = useState(['Todos']);
+  const [roleFilter, setRoleFilter] = useState('');
+  const [roleOptions, setRoleOptions] = useState([{ label: 'Todos', value: '' }]);
   const [roleCatalog, setRoleCatalog] = useState([]);
   const [usersReloadKey, setUsersReloadKey] = useState(0);
   const [usersPage, setUsersPage] = useState({
@@ -2927,11 +3050,13 @@ function SettingsUsersPage() {
   const [userFormErrors, setUserFormErrors] = useState({});
   const [identityLookupNotice, setIdentityLookupNotice] = useState('');
   const [passwordResetNotice, setPasswordResetNotice] = useState('');
+  const [userNotice, setUserNotice] = useState('');
 
   useEffect(()=>{
     async function loadUsuariosInternos() {
       const data = await getUsuariosInternos({
         texto: searchValue,
+        rolId: roleFilter,
         page: usersPage.number,
         size: usersPage.size,
       });
@@ -2940,7 +3065,7 @@ function SettingsUsersPage() {
         nombre: usuario.nombre,
         correo: usuario.email,
         rolId: usuario.rolConfiguracionDto?.id,
-        rol: usuario.rolConfiguracionDto?.codigo ?? usuario.rolConfiguracionDto?.nombre,
+        rol: usuario.rolConfiguracionDto?.codigo ?? '',
         estado: usuario.activo === 1 ? 'ACTIVO' : 'INACTIVO',
       }));
       setUsers(usuarios);
@@ -2954,16 +3079,21 @@ function SettingsUsersPage() {
     }
 
     loadUsuariosInternos();
-  }, [searchValue, usersPage.number, usersPage.size, usersReloadKey]);
+  }, [searchValue, roleFilter, usersPage.number, usersPage.size, usersReloadKey]);
 
   useEffect(()=>{
 
     async function loadRolesUsuariosInternos(){
       const data = await getRolesUsuariosInternos();
-      const roles = data.map((rol) => rol.codigo);
 
       setRoleCatalog(data);
-      setRoleOptions(['Todos', ...roles]);
+      setRoleOptions([
+        { label: 'Todos', value: '' },
+        ...data.map((rol) => ({
+          label: rol.codigo,
+          value: String(rol.id),
+        })),
+      ]);
 
     }
 
@@ -2971,14 +3101,13 @@ function SettingsUsersPage() {
   }, []);
 
   const selectedUser = users.find((user) => user.id === selectedUserId) ?? null;
-  const filteredUsers = users.filter((user) => {
-    const matchesRole = roleFilter === 'Todos' || user.rol === roleFilter;
-
-    return matchesRole;
-  });
-
   const handleSearchChange = (value) => {
     setSearchValue(value);
+    setUsersPage((currentPage) => ({ ...currentPage, number: 0 }));
+  };
+
+  const handleRoleFilterChange = (value) => {
+    setRoleFilter(value);
     setUsersPage((currentPage) => ({ ...currentPage, number: 0 }));
   };
 
@@ -3016,13 +3145,22 @@ function SettingsUsersPage() {
     setUserModalMode('create');
   };
 
-  const openEditUserModal = (user) => {
-    setSelectedUserId(user.id);
-    setUserFormData(getUserFormData(user));
+  const openEditUserModal = async (user) => {
     setUserFormErrors({});
     setIdentityLookupNotice('');
     setPasswordResetNotice('');
-    setUserModalMode('edit');
+    setUserNotice('');
+
+    try {
+      const userDetail = await getUsuarioInternoDetalle(user.id);
+      const detailedUser = mapInternalUserDetailToFormUser(user, userDetail, roleCatalog);
+
+      setSelectedUserId(user.id);
+      setUserFormData(getUserFormData(detailedUser));
+      setUserModalMode('edit');
+    } catch (error) {
+      setUserNotice(error.response?.data?.message ?? 'No se pudo cargar la información del usuario.');
+    }
   };
 
   const saveUser = async () => {
@@ -3045,15 +3183,19 @@ function SettingsUsersPage() {
     };
 
     if (userModalMode === 'edit' && selectedUser) {
-      const changedFields = getChangedUserFields(selectedUser, normalizedUser);
-
-      setUsers((currentUsers) =>
-        currentUsers.map((user) =>
-          user.id === selectedUser.id ? { ...user, ...normalizedUser } : user,
-        ),
-      );
-      notifyUserAccountChanges(normalizedUser, changedFields);
-      registerUserAuditLog('UPDATE_INTERNAL_USER', selectedUser.id, changedFields);
+      try {
+        await actualizarUsuarioInterno(selectedUser.id, {
+          email: normalizedUser.correo,
+          areaMunicipalId: normalizedUser.areaId,
+          rolId: Number(userFormData.rolId),
+        });
+        setUsersReloadKey((currentKey) => currentKey + 1);
+      } catch (error) {
+        setUserFormErrors({
+          general: error.response?.data?.message ?? 'No se pudo actualizar el usuario.',
+        });
+        return;
+      }
     } else {
       try {
         await guardarUsuarioInterno({
@@ -3076,23 +3218,22 @@ function SettingsUsersPage() {
     closeUserModal();
   };
 
-  const toggleUserState = () => {
+  const toggleUserState = async () => {
     if (!selectedUser) {
       return;
     }
 
     const nextState = selectedUser.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
 
-    setUsers((currentUsers) =>
-      currentUsers.map((user) =>
-        user.id === selectedUser.id
-          ? { ...user, estado: nextState }
-          : user,
-      ),
-    );
-    notifyUserAccountChanges({ ...selectedUser, estado: nextState }, ['estado']);
-    registerUserAuditLog('TOGGLE_INTERNAL_USER_STATE', selectedUser.id, ['estado']);
-    closeUserModal();
+    try {
+      await actualizarEstadoUsuarioInterno(selectedUser.id, nextState);
+      setUsersReloadKey((currentKey) => currentKey + 1);
+      closeUserModal();
+    } catch (error) {
+      setUserFormErrors({
+        general: error.response?.data?.message ?? 'No se pudo actualizar el estado del usuario.',
+      });
+    }
   };
 
   return (
@@ -3108,14 +3249,15 @@ function SettingsUsersPage() {
         searchValue={searchValue}
         title="Usuarios"
         onAction={openCreateUserModal}
-        onFilterChange={setRoleFilter}
+        onFilterChange={handleRoleFilterChange}
         onSearchChange={handleSearchChange}
       >
+        {userNotice && <p className="settings-inline-notice">{userNotice}</p>}
         <div className="admin-table settings-table settings-users-table">
           <div className="admin-table-row admin-table-head">
             <span>Usuario</span><span>Correo</span><span>Rol</span><span>Estado</span><span>Acción</span>
           </div>
-          {filteredUsers.map((user) => (
+          {users.map((user) => (
             <div className="admin-table-row" key={user.id}>
               <span><strong>{user.nombre}</strong></span>
               <span>{user.correo}</span>
@@ -3229,6 +3371,23 @@ function getUserFormData(user) {
     nombre: user?.nombre ?? '',
     rol: user?.rol ?? '',
     rolId: user?.rolId ? String(user.rolId) : '',
+  };
+}
+
+function mapInternalUserDetailToFormUser(tableUser, detail, roles) {
+  const role = roles.find((currentRole) => String(currentRole.id) === String(detail.rolId));
+  const area = getMunicipalAreaById(detail.areaMunicipalId);
+
+  return {
+    ...tableUser,
+    area: area?.nombre ?? tableUser?.area ?? '',
+    areaId: detail.areaMunicipalId,
+    correo: detail.email ?? tableUser?.correo ?? '',
+    dni: detail.dni ?? tableUser?.dni ?? '',
+    estado: detail.activo === 1 ? 'ACTIVO' : 'INACTIVO',
+    nombre: detail.nombre ?? tableUser?.nombre ?? '',
+    rol: role?.codigo ?? tableUser?.rol ?? '',
+    rolId: detail.rolId,
   };
 }
 
@@ -4927,9 +5086,16 @@ function SettingsTablePage({
             <label>
               {filterLabel}
               <select value={filterValue} onChange={(event) => onFilterChange(event.target.value)}>
-                {filterOptions.map((option) => (
-                  <option key={option}>{option}</option>
-                ))}
+                {filterOptions.map((option) => {
+                  const optionValue = typeof option === 'object' ? option.value : option;
+                  const optionLabel = typeof option === 'object' ? option.label : option;
+
+                  return (
+                    <option key={optionValue || optionLabel} value={optionValue}>
+                      {optionLabel}
+                    </option>
+                  );
+                })}
               </select>
             </label>
           )}

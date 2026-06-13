@@ -17,17 +17,22 @@ public interface UsuarioRepository extends JpaRepository<Usuario,Integer> {
 
     boolean existsByEmail(String email);
 
+    boolean existsByEmailAndIdNot(String email, Integer id);
+
     @Query("""
         SELECT u
         FROM Usuario u
-        WHERE (:texto IS NULL OR :texto = ''
+        WHERE (:rolId IS NULL OR u.rol.id = :rolId)
+        AND (:texto IS NULL OR :texto = ''
             OR LOWER(u.nombre) LIKE LOWER(CONCAT('%', :texto, '%'))
             OR LOWER(u.email) LIKE LOWER(CONCAT('%', :texto, '%'))
             OR LOWER(u.rol.nombre) LIKE LOWER(CONCAT('%', :texto, '%'))
+            OR LOWER(u.rol.codigo) LIKE LOWER(CONCAT('%', :texto, '%'))
         )
     """)
     Page<Usuario> buscarPorNombreCorreoORol(
             @Param("texto") String texto,
+            @Param("rolId") Integer rolId,
             Pageable pageable
     );
 

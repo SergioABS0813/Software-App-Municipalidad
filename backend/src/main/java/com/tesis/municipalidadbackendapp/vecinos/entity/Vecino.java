@@ -35,7 +35,7 @@ public class Vecino {
     private String email;
 
     @Column(name = "tiempo_creado")
-    private Instant tiempoCreado;
+    private Instant fechaCreado;
 
     @Column(name = "acepta_tratamiento_datos")
     private Byte aceptaTratamientoDatos;
@@ -45,6 +45,9 @@ public class Vecino {
 
     @Column(name = "fecha_aceptacion_datos")
     private Instant fechaAceptacionDatos;
+
+    @Column(name="celular", length = 15)
+    private String celular;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

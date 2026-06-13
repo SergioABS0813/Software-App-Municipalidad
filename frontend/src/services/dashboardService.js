@@ -1,10 +1,15 @@
 import api from './api/api';
 
 // ADMIN
-export async function getUsuariosInternos({ texto = '', page = 0, size = 10 } = {}){
+export async function getUsuariosInternos({ texto = '', rolId = '', page = 0, size = 10 } = {}){
     const response = await api.get("usuario/admin/obtener_usuarios_internos", {
-        params: { texto, page, size },
+        params: { texto, rolId: rolId || undefined, page, size },
     });
+    return response.data;
+}
+
+export async function getUsuarioInternoDetalle(id){
+    const response = await api.get(`usuario/admin/obtener_usuario_interno/${id}`);
     return response.data;
 }
 
@@ -13,8 +18,36 @@ export async function guardarUsuarioInterno(usuario){
     return response.data;
 }
 
+export async function actualizarUsuarioInterno(id, usuario){
+    const response = await api.put(`usuario/admin/${id}`, usuario);
+    return response.data;
+}
+
+export async function actualizarEstadoUsuarioInterno(id, estado){
+    const response = await api.patch(`usuario/admin/${id}/estado`, { estado });
+    return response.data;
+}
+
 export async function getRolesUsuariosInternos(){
     const response = await api.get("rol/admin/find_all");
+    return response.data
+}
+
+export async function getCuentasVecinales({ texto = '', estado = '', page = 0 } = {}){
+    const response = await api.get("vecino/admin/cuentas_vecinales", {
+        params: { texto, estado: estado || undefined, page },
+    });
+    return response.data
+}
+
+export async function getCuentaVecinalDetalle(id){
+    const response = await api.get(`vecino/admin/cuentas_vecinales/${id}`);
+    console.log(response.data)
+    return response.data
+}
+
+export async function actualizarContactoCuentaVecinal(id, contacto){
+    const response = await api.put(`vecino/admin/cuentas_vecinales/${id}/contacto`, contacto);
     return response.data
 }
 
@@ -47,9 +80,9 @@ export async function eliminarUbicacionConfiguracion(id){
     return response.data
 }
 
-export async function buscarUsuariosInternos({ texto = '', page = 0, size = 10 } = {}){
+export async function buscarUsuariosInternos({ texto = '', rolId = '', page = 0, size = 10 } = {}){
     const response = await api.get("usuario/admin/buscar_usuarios_internos", {
-        params: { texto, page, size },
+        params: { texto, rolId: rolId || undefined, page, size },
     });
     return response.data
 }

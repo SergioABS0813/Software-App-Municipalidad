@@ -81,11 +81,6 @@ export default function Login(props: {
                                 placeholder="Ingrese su correo electrónico"
                                 aria-invalid={messagesPerField.existsError("username")}
                             />
-                            {messagesPerField.existsError("username") && (
-                                <span className="kc-login-error">
-                                    {messagesPerField.get("username")}
-                                </span>
-                            )}
                         </label>
                     )}
 
@@ -111,11 +106,6 @@ export default function Login(props: {
                                 {isPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
                             </button>
                         </span>
-                        {messagesPerField.existsError("password") && (
-                            <span className="kc-login-error">
-                                {messagesPerField.get("password")}
-                            </span>
-                        )}
                     </label>
 
                     <div className="kc-login-options">
