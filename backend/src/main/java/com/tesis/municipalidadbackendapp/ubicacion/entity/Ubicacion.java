@@ -17,16 +17,16 @@ public class Ubicacion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Size(max = 45)
-    @Column(name = "nombre", length = 45)
+    @Size(max = 100)
+    @Column(name = "nombre", length = 100)
     private String nombre;
 
-    @Size(max = 45)
-    @Column(name = "direccion", length = 45)
+    @Size(max = 100)
+    @Column(name = "direccion", length = 100)
     private String direccion;
 
-    @Size(max = 45)
-    @Column(name = "referencia", length = 45)
+    @Size(max = 100)
+    @Column(name = "referencia", length = 100)
     private String referencia;
 
     @Column(name = "latitud", precision = 10)

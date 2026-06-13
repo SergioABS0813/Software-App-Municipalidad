@@ -29,7 +29,7 @@ export default function InfoMessage(props: {
     const { advancedMsgStr } = i18n;
     const { actionUri, message, messageHeader, requiredActions, skipLink, url } = kcContext;
     const backToEventsUrl = getBackToEventsUrl(kcContext);
-    const title = messageHeader ? advancedMsgStr(messageHeader) : "Revisa tu correo";
+    const title = requiredActions ? "Verificacion de cuenta" : messageHeader ? advancedMsgStr(messageHeader) : "Verificacion de cuenta";
     let summary = message.summary?.trim() ?? "";
 
     if (requiredActions) {
@@ -60,7 +60,7 @@ export default function InfoMessage(props: {
                     </div>
 
                     <p
-                        className="kc-recover-password-note"
+                        className="kc-info-message-panel"
                         dangerouslySetInnerHTML={{ __html: kcSanitize(summary) }}
                     />
 
@@ -71,8 +71,8 @@ export default function InfoMessage(props: {
                     )}
 
                     {!skipLink && !actionUri && (
-                        <a className="kc-login-submit" href={url.loginUrl}>
-                            Volver a iniciar sesión
+                        <a className="kc-login-submit" href={backToEventsUrl || url.loginUrl}>
+                            Ingresar a la plataforma
                         </a>
                     )}
                 </section>

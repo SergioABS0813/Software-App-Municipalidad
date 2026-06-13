@@ -1,6 +1,7 @@
 package com.tesis.municipalidadbackendapp.eventos.service;
 
 import com.tesis.municipalidadbackendapp.bitacora.service.BitacoraAccionService;
+import com.tesis.municipalidadbackendapp.eventos.dto.CategoriaConfiguracionDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.CategoriaRequest;
 import com.tesis.municipalidadbackendapp.eventos.dto.CategoriaResponse;
 import com.tesis.municipalidadbackendapp.eventos.entity.Categoria;
@@ -8,8 +9,10 @@ import com.tesis.municipalidadbackendapp.eventos.repository.CategoriaRepository;
 import com.tesis.municipalidadbackendapp.usuariosinternos.entity.Usuario;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.GetMapping;
 
 import java.util.List;
 
@@ -23,6 +26,11 @@ public class CategoriaService {
 
     public List<Categoria> obtenerCategorias(){
         return categoriaRepository.findAll();
+    }
+
+    public Page<CategoriaConfiguracionDto> obtenerCategoriasConfiguracion(String texto, int page) {
+        PageRequest pageable = PageRequest.of(page, 5, Sort.by("nombre").ascending());
+        return categoriaRepository.findAllConfiguracion(texto, pageable);
     }
 
     public CategoriaResponse guardarCategoria(CategoriaRequest request, Usuario usuario, HttpServletRequest httpServletRequest){

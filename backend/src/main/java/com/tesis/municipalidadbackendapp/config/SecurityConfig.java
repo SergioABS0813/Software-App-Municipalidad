@@ -45,7 +45,9 @@ public class SecurityConfig {
                         .requestMatchers("/public/**").permitAll() // Permitir acceso a las rutas de autenticación sin autenticación
                         .requestMatchers("/api/admin/**").hasRole("ADMINISTRADOR") // Solo los usuarios con rol ADMIN pueden acceder a estas rutas
                         .requestMatchers("/api/area_municipal/**").hasRole("DIRECTIVO") // Solo los usuarios con rol DIRECTIVO pueden acceder a estas rutas
+                        .requestMatchers("/api/categoria/admin/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/categoria/**").hasRole("OPERATIVO") // Solo los usuarios con rol DIRECTIVO pueden acceder a estas rutas
+                        .requestMatchers("/api/ubicacion/admin/**").hasRole("ADMINISTRADOR")
                         .anyRequest().authenticated() // Requerir autenticación para cualquier otra ruta
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2

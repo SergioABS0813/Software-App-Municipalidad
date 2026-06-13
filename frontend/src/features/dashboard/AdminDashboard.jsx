@@ -4,7 +4,16 @@ import PublicEventDetail from '../public-portal/PublicEventDetail';
 import { adminEvents, formatEventState } from './dashboardData';
 import NotificationMenu from './NotificationMenu';
 import './AdminDashboard.css';
-import {getUsuariosInternos, getRolesUsuariosInternos, guardarUsuarioInterno} from '../../services/dashboardService';
+import {
+  actualizarEstadoUbicacionConfiguracion,
+  eliminarUbicacionConfiguracion,
+  getCategoriasConfiguracion,
+  getUbicacionesConfiguracion,
+  getUsuariosInternos,
+  getRolesUsuariosInternos,
+  guardarUsuarioInterno,
+  guardarUbicacionConfiguracion,
+} from '../../services/dashboardService';
 
 function getManagementStats(events) {
   return [
@@ -447,6 +456,73 @@ function getSettingsLocationMapsUrl(location) {
   }
 
   return `https://www.google.com/maps/search/?api=1&query=${location.latitud},${location.longitud}`;
+}
+
+const LOCATION_DEFAULT_COORDINATES = {
+  latitud: -12.0774,
+  longitud: -77.0837,
+};
+const LOCATION_MAP_ZOOM = 16;
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
+let googleMapsScriptPromise = null;
+
+function parseLocationCoordinate(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const parsedValue = Number(value);
+  return Number.isFinite(parsedValue) ? parsedValue : null;
+}
+
+function getLocationCoordinates(location) {
+  const latitud = parseLocationCoordinate(location?.latitud);
+  const longitud = parseLocationCoordinate(location?.longitud);
+
+  if (latitud === null || longitud === null) {
+    return null;
+  }
+
+  return { latitud, longitud };
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getGoogleMapsApi() {
+  if (window.google?.maps?.places) {
+    return Promise.resolve(window.google.maps);
+  }
+
+  if (!GOOGLE_MAPS_API_KEY) {
+    return Promise.reject(new Error('Google Maps API key no configurada.'));
+  }
+
+  if (!googleMapsScriptPromise) {
+    googleMapsScriptPromise = new Promise((resolve, reject) => {
+      const existingScript = document.querySelector('script[data-google-maps-loader="true"]');
+
+      if (existingScript) {
+        existingScript.addEventListener('load', () => resolve(window.google.maps), { once: true });
+        existingScript.addEventListener('error', reject, { once: true });
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.async = true;
+      script.defer = true;
+      script.dataset.googleMapsLoader = 'true';
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(
+        GOOGLE_MAPS_API_KEY,
+      )}&libraries=places&language=es&region=PE`;
+      script.onload = () => resolve(window.google.maps);
+      script.onerror = () => reject(new Error('No se pudo cargar Google Maps.'));
+      document.head.appendChild(script);
+    });
+  }
+
+  return googleMapsScriptPromise;
 }
 
 function getVideoPreviewEmbedUrl(url) {
@@ -3528,14 +3604,88 @@ function UserAreaCombobox({ onChange, value }) {
 function SettingsCategoriesPage() {
   const [searchValue, setSearchValue] = useState('');
   const [categories, setCategories] = useState(settingsCategories);
+  const [categoriesPage, setCategoriesPage] = useState({
+    number: 0,
+    size: 5,
+    totalElements: 0,
+    totalPages: 0,
+  });
   const [categoryFormValue, setCategoryFormValue] = useState('');
   const [categoryFormError, setCategoryFormError] = useState('');
   const [categoryNotice, setCategoryNotice] = useState('');
   const [categoryToDelete, setCategoryToDelete] = useState(null);
   const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false);
-  const filteredCategories = categories.filter((category) =>
-    category.nombre.toLowerCase().includes(searchValue.trim().toLowerCase()),
-  );
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    setIsLoadingCategories(true);
+    getCategoriasConfiguracion({
+      texto: searchValue,
+      page: categoriesPage.number,
+    })
+      .then((data) => {
+        if (!isMounted) {
+          return;
+        }
+
+        const mappedCategories = Array.isArray(data.content)
+          ? data.content.map((category) => ({
+              eventosAsociados: Number(category.eventosAsociados ?? 0),
+              id: category.id,
+              nombre: category.nombre ?? '',
+            }))
+          : [];
+
+        setCategories(mappedCategories);
+        setCategoriesPage((currentPage) => ({
+          ...currentPage,
+          number: data.number ?? 0,
+          size: data.size ?? 5,
+          totalElements: data.totalElements ?? 0,
+          totalPages: data.totalPages ?? 0,
+        }));
+        setCategoryNotice('');
+      })
+      .catch((error) => {
+        console.error('No se pudieron cargar las categorías', error);
+
+        if (isMounted) {
+          setCategoryNotice('No se pudieron cargar las categorías registradas.');
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingCategories(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [searchValue, categoriesPage.number]);
+
+  const handleCategorySearchChange = (value) => {
+    setSearchValue(value);
+    setCategoriesPage((currentPage) => ({ ...currentPage, number: 0 }));
+  };
+
+  const goToPreviousCategoriesPage = () => {
+    setCategoriesPage((currentPage) => ({
+      ...currentPage,
+      number: Math.max(0, currentPage.number - 1),
+    }));
+  };
+
+  const goToNextCategoriesPage = () => {
+    setCategoriesPage((currentPage) => ({
+      ...currentPage,
+      number: currentPage.number + 1 >= currentPage.totalPages
+        ? currentPage.number
+        : currentPage.number + 1,
+    }));
+  };
 
   const closeCategoryForm = () => {
     setCategoryFormValue('');
@@ -3608,14 +3758,15 @@ function SettingsCategoriesPage() {
         searchValue={searchValue}
         title="Categorías"
         onAction={openCategoryForm}
-        onSearchChange={setSearchValue}
+        onSearchChange={handleCategorySearchChange}
       >
         {categoryNotice && <p className="settings-inline-notice">{categoryNotice}</p>}
+        {isLoadingCategories && <p className="settings-inline-notice">Cargando categorías...</p>}
         <div className="admin-table settings-table settings-categories-table">
           <div className="admin-table-row admin-table-head">
             <span>Categoría</span><span>Eventos asociados</span><span>Acción</span>
           </div>
-          {filteredCategories.map((category) => (
+          {categories.map((category) => (
             <div className="admin-table-row" key={category.id}>
               <span><strong>{category.nombre}</strong></span>
               <span className="category-events-count">{category.eventosAsociados}</span>
@@ -3636,6 +3787,28 @@ function SettingsCategoriesPage() {
               </span>
             </div>
           ))}
+        </div>
+        <div className="settings-pagination">
+          <button
+            className="back-button"
+            type="button"
+            disabled={categoriesPage.number === 0}
+            onClick={goToPreviousCategoriesPage}
+          >
+            Anterior
+          </button>
+          <span>
+            Página {categoriesPage.totalPages === 0 ? 0 : categoriesPage.number + 1} de {categoriesPage.totalPages}
+            {' '}· {categoriesPage.totalElements} categorías
+          </span>
+          <button
+            className="back-button"
+            type="button"
+            disabled={categoriesPage.number + 1 >= categoriesPage.totalPages}
+            onClick={goToNextCategoriesPage}
+          >
+            Siguiente
+          </button>
         </div>
       </SettingsTablePage>
 
@@ -3702,7 +3875,7 @@ function CategoryDeleteModal({ category, onCancel, onConfirm }) {
   return (
     <div className="modal-backdrop category-modal-backdrop" role="presentation" onMouseDown={onCancel}>
       <section
-        className="confirm-modal category-modal category-delete-modal"
+        className="confirm-modal category-modal category-delete-modal location-delete-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="category-delete-title"
@@ -3729,20 +3902,96 @@ function CategoryDeleteModal({ category, onCancel, onConfirm }) {
 function SettingsLocationsPage() {
   const [searchValue, setSearchValue] = useState('');
   const [locations, setLocations] = useState(settingsLocations);
+  const [locationsPage, setLocationsPage] = useState({
+    number: 0,
+    size: 5,
+    totalElements: 0,
+    totalPages: 0,
+  });
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [locationModalMode, setLocationModalMode] = useState(null);
+  const [locationToDelete, setLocationToDelete] = useState(null);
   const [locationFormData, setLocationFormData] = useState(getEmptyLocationFormData());
   const [locationFormErrors, setLocationFormErrors] = useState({});
+  const [locationNotice, setLocationNotice] = useState('');
+  const [isLoadingLocations, setIsLoadingLocations] = useState(false);
+  const [locationsReloadKey, setLocationsReloadKey] = useState(0);
   const isLocationModalOpen = Boolean(locationModalMode);
-  const filteredLocations = locations.filter((location) => {
-    return (
-      searchValue.trim().length === 0 ||
-      [location.nombre, location.direccion, location.referencia]
-        .join(' ')
-        .toLowerCase()
-        .includes(searchValue.trim().toLowerCase())
-    );
-  });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    setIsLoadingLocations(true);
+    getUbicacionesConfiguracion({
+      texto: searchValue,
+      page: locationsPage.number,
+    })
+      .then((data) => {
+        if (!isMounted) {
+          return;
+        }
+
+        const mappedLocations = Array.isArray(data.content)
+          ? data.content.map((location) => ({
+              direccion: location.direccion ?? '',
+              estado: location.activo === 1 ? 'ACTIVO' : 'INACTIVO',
+              eventosAsociados: Number(location.eventosAsociados ?? 0),
+              id: location.id,
+              latitud: location.latitud ?? '',
+              longitud: location.longitud ?? '',
+              nombre: location.nombre ?? '',
+              referencia: location.referencia ?? '',
+            }))
+          : [];
+
+        setLocations(mappedLocations);
+        setLocationsPage((currentPage) => ({
+          ...currentPage,
+          number: data.number ?? 0,
+          size: data.size ?? 5,
+          totalElements: data.totalElements ?? 0,
+          totalPages: data.totalPages ?? 0,
+        }));
+        setLocationNotice('');
+      })
+      .catch((error) => {
+        console.error('No se pudieron cargar las ubicaciones', error);
+
+        if (isMounted) {
+          setLocationNotice('No se pudieron cargar las ubicaciones registradas.');
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingLocations(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [searchValue, locationsPage.number, locationsReloadKey]);
+
+  const handleLocationSearchChange = (value) => {
+    setSearchValue(value);
+    setLocationsPage((currentPage) => ({ ...currentPage, number: 0 }));
+  };
+
+  const goToPreviousLocationsPage = () => {
+    setLocationsPage((currentPage) => ({
+      ...currentPage,
+      number: Math.max(0, currentPage.number - 1),
+    }));
+  };
+
+  const goToNextLocationsPage = () => {
+    setLocationsPage((currentPage) => ({
+      ...currentPage,
+      number: currentPage.number + 1 >= currentPage.totalPages
+        ? currentPage.number
+        : currentPage.number + 1,
+    }));
+  };
 
   const closeLocationModal = () => {
     setLocationModalMode(null);
@@ -3790,7 +4039,7 @@ function SettingsLocationsPage() {
     setLocationModalMode('edit');
   };
 
-  const saveLocation = () => {
+  const saveLocation = async () => {
     const errors = validateLocationForm(locationFormData);
 
     if (Object.keys(errors).length > 0) {
@@ -3801,17 +4050,24 @@ function SettingsLocationsPage() {
     const normalizedLocation = normalizeLocationFromForm(locationFormData, selectedLocation);
 
     if (locationModalMode === 'create') {
-      const nextLocation = {
-        ...normalizedLocation,
-        aforoReferencial: '',
-        id: Math.max(0, ...locations.map((location) => location.id)) + 1,
-        tipo: 'No especificado',
-      };
+      try {
+        await guardarUbicacionConfiguracion({
+          direccion: normalizedLocation.direccion,
+          estado: normalizedLocation.estado,
+          latitud: normalizedLocation.latitud === '' ? null : Number(normalizedLocation.latitud),
+          longitud: normalizedLocation.longitud === '' ? null : Number(normalizedLocation.longitud),
+          nombre: normalizedLocation.nombre,
+          referencia: normalizedLocation.referencia,
+        });
 
-      setLocations((current) => [...current, nextLocation]);
-      setSelectedLocation(nextLocation);
-      setLocationModalMode('detail');
-      setLocationFormErrors({});
+        setLocationsPage((currentPage) => ({ ...currentPage, number: 0 }));
+        setLocationsReloadKey((currentKey) => currentKey + 1);
+        setLocationNotice('Ubicación registrada correctamente.');
+        closeLocationModal();
+      } catch (error) {
+        setLocationFormErrors(getLocationBackendErrors(error));
+      }
+
       return;
     }
 
@@ -3832,19 +4088,65 @@ function SettingsLocationsPage() {
     setLocationFormErrors({});
   };
 
-  const toggleSelectedLocationState = () => {
+  const toggleSelectedLocationState = async () => {
     if (!selectedLocation) {
       return;
     }
 
     const nextState = selectedLocation.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
-    const updatedLocation = { ...selectedLocation, estado: nextState };
 
-    setLocations((current) =>
-      current.map((location) => (location.id === selectedLocation.id ? updatedLocation : location)),
-    );
-    setSelectedLocation(updatedLocation);
-    setLocationFormData(getLocationFormData(updatedLocation));
+    try {
+      const updatedLocationResponse = await actualizarEstadoUbicacionConfiguracion(
+        selectedLocation.id,
+        nextState,
+      );
+      const updatedLocation = {
+        ...selectedLocation,
+        estado: updatedLocationResponse.activo === 1 ? 'ACTIVO' : 'INACTIVO',
+      };
+
+      setLocations((current) =>
+        current.map((location) => (location.id === selectedLocation.id ? updatedLocation : location)),
+      );
+      setSelectedLocation(updatedLocation);
+      setLocationFormData(getLocationFormData(updatedLocation));
+      setLocationsReloadKey((currentKey) => currentKey + 1);
+    } catch (error) {
+      setLocationFormErrors({
+        general: error.response?.data?.message ?? 'No se pudo actualizar el estado de la ubicación.',
+      });
+    }
+  };
+
+  const requestLocationDelete = (location) => {
+    if (location.eventosAsociados > 0) {
+      setLocationNotice(
+        `No se puede eliminar la ubicación ${location.nombre} porque tiene eventos asociados.`,
+      );
+      return;
+    }
+
+    setLocationNotice('');
+    setLocationToDelete(location);
+  };
+
+  const confirmLocationDelete = async () => {
+    if (!locationToDelete) {
+      return;
+    }
+
+    try {
+      await eliminarUbicacionConfiguracion(locationToDelete.id);
+      setLocationToDelete(null);
+      setLocationsPage((currentPage) => ({ ...currentPage, number: 0 }));
+      setLocationsReloadKey((currentKey) => currentKey + 1);
+      setLocationNotice('Ubicación eliminada correctamente.');
+    } catch (error) {
+      setLocationToDelete(null);
+      setLocationNotice(
+        error.response?.data?.message ?? 'No se pudo eliminar la ubicación.',
+      );
+    }
   };
 
   return (
@@ -3858,16 +4160,27 @@ function SettingsLocationsPage() {
         searchValue={searchValue}
         title="Ubicaciones"
         onAction={openLocationCreate}
-        onSearchChange={setSearchValue}
+        onSearchChange={handleLocationSearchChange}
       >
+        {locationNotice && <p className="settings-inline-notice">{locationNotice}</p>}
+        {isLoadingLocations && <p className="settings-inline-notice">Cargando ubicaciones...</p>}
         <div className="admin-table settings-table settings-locations-table">
           <div className="admin-table-row admin-table-head">
-            <span>Ubicación</span><span>Dirección</span><span>Estado</span><span>Acción</span>
+            <span>Ubicación</span><span>Dirección</span><span>Estado</span><span>Detalle</span>
           </div>
-          {filteredLocations.map((location) => (
+          {locations.map((location) => (
             <div className="admin-table-row" key={location.id}>
-              <span><strong>{location.nombre}</strong><small>{location.referencia}</small></span>
-              <span>{location.direccion}</span>
+              <span>
+                <strong aria-label={location.nombre} title={location.nombre}>
+                  {location.nombre}
+                </strong>
+                <small aria-label={location.referencia} title={location.referencia}>
+                  {location.referencia}
+                </small>
+              </span>
+              <span aria-label={location.direccion} title={location.direccion}>
+                {location.direccion}
+              </span>
               <SettingsStatus state={location.estado} />
               <span className="settings-row-actions">
                 <button
@@ -3879,9 +4192,44 @@ function SettingsLocationsPage() {
                 >
                   <ViewIcon />
                 </button>
+                <button
+                  aria-label={`Eliminar ubicación ${location.nombre}`}
+                  className="table-icon-action is-detail neighbor-detail-action category-delete-action"
+                  data-tooltip={
+                    location.eventosAsociados === 0
+                      ? 'Eliminar ubicación'
+                      : 'No se puede eliminar porque tiene eventos asociados'
+                  }
+                  type="button"
+                  onClick={() => requestLocationDelete(location)}
+                >
+                  <TrashIcon />
+                </button>
               </span>
             </div>
           ))}
+        </div>
+        <div className="settings-pagination">
+          <button
+            className="back-button"
+            type="button"
+            disabled={locationsPage.number === 0}
+            onClick={goToPreviousLocationsPage}
+          >
+            Anterior
+          </button>
+          <span>
+            Página {locationsPage.totalPages === 0 ? 0 : locationsPage.number + 1} de {locationsPage.totalPages}
+            {' '}· {locationsPage.totalElements} ubicaciones
+          </span>
+          <button
+            className="back-button"
+            type="button"
+            disabled={locationsPage.number + 1 >= locationsPage.totalPages}
+            onClick={goToNextLocationsPage}
+          >
+            Siguiente
+          </button>
         </div>
       </SettingsTablePage>
 
@@ -3898,7 +4246,74 @@ function SettingsLocationsPage() {
           onToggleState={toggleSelectedLocationState}
         />
       )}
+
+      {locationToDelete && (
+        <LocationDeleteModal
+          location={locationToDelete}
+          onCancel={() => setLocationToDelete(null)}
+          onConfirm={confirmLocationDelete}
+        />
+      )}
     </>
+  );
+}
+
+function getLocationBackendErrors(error) {
+  const message = error.response?.data?.message ?? 'No se pudo guardar la ubicación.';
+  const normalizedMessage = message.toLowerCase();
+
+  if (normalizedMessage.includes('nombre')) {
+    return { nombre: message };
+  }
+
+  if (normalizedMessage.includes('dirección') || normalizedMessage.includes('direccion')) {
+    return { direccion: message };
+  }
+
+  if (normalizedMessage.includes('referencia')) {
+    return { referencia: message };
+  }
+
+  if (normalizedMessage.includes('latitud')) {
+    return { latitud: message };
+  }
+
+  if (normalizedMessage.includes('longitud')) {
+    return { longitud: message };
+  }
+
+  if (normalizedMessage.includes('coordenadas')) {
+    return { latitud: message, longitud: message };
+  }
+
+  return { general: message };
+}
+
+function LocationDeleteModal({ location, onCancel, onConfirm }) {
+  return (
+    <div className="modal-backdrop category-modal-backdrop" role="presentation" onMouseDown={onCancel}>
+      <section
+        className="confirm-modal category-modal category-delete-modal location-delete-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="location-delete-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <span className="section-kicker">Configuración</span>
+        <h2 id="location-delete-title">Eliminar ubicación</h2>
+        <p>
+          ¿Deseas eliminar la ubicación "{location.nombre}"? Esta acción no se puede deshacer.
+        </p>
+        <div className="modal-actions">
+          <button className="back-button" type="button" onClick={onCancel}>
+            Cancelar
+          </button>
+          <button className="primary-button danger-action" type="button" onClick={onConfirm}>
+            Eliminar ubicación
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -3912,6 +4327,8 @@ function getEmptyLocationFormData() {
     referencia: '',
   };
 }
+
+const LOCATION_TEXT_MAX_LENGTH = 100;
 
 function getLocationFormData(location) {
   return {
@@ -3929,18 +4346,49 @@ function validateLocationForm(formData) {
 
   if (!formData.nombre.trim()) {
     errors.nombre = 'Ingrese el nombre de la ubicación.';
+  } else if (formData.nombre.trim().length > LOCATION_TEXT_MAX_LENGTH) {
+    errors.nombre = `El nombre no debe exceder los ${LOCATION_TEXT_MAX_LENGTH} caracteres.`;
   }
 
   if (!formData.direccion.trim()) {
     errors.direccion = 'Ingrese la dirección de la ubicación.';
+  } else if (formData.direccion.trim().length > LOCATION_TEXT_MAX_LENGTH) {
+    errors.direccion = `La dirección no debe exceder los ${LOCATION_TEXT_MAX_LENGTH} caracteres.`;
   }
 
-  if (formData.latitud.trim() && Number.isNaN(Number(formData.latitud))) {
+  if (formData.referencia.trim().length > LOCATION_TEXT_MAX_LENGTH) {
+    errors.referencia = `La referencia no debe exceder los ${LOCATION_TEXT_MAX_LENGTH} caracteres.`;
+  }
+
+  const latitud = parseLocationCoordinate(formData.latitud);
+  const longitud = parseLocationCoordinate(formData.longitud);
+
+  if (!formData.latitud.trim()) {
+    errors.latitud = 'La latitud es obligatoria. Ajusta el marcador en el mapa.';
+  } else if (latitud === null) {
     errors.latitud = 'La latitud debe ser numérica.';
+  } else if (latitud < -90 || latitud > 90) {
+    errors.latitud = 'La latitud debe estar entre -90 y 90.';
   }
 
-  if (formData.longitud.trim() && Number.isNaN(Number(formData.longitud))) {
+  if (!formData.longitud.trim()) {
+    errors.longitud = 'La longitud es obligatoria. Ajusta el marcador en el mapa.';
+  } else if (longitud === null) {
     errors.longitud = 'La longitud debe ser numérica.';
+  } else if (longitud < -180 || longitud > 180) {
+    errors.longitud = 'La longitud debe estar entre -180 y 180.';
+  }
+
+  if (
+    latitud !== null &&
+    longitud !== null &&
+    latitud >= -82.5 &&
+    latitud <= -68.5 &&
+    longitud >= -18.5 &&
+    longitud <= 0.5
+  ) {
+    errors.latitud = 'Las coordenadas parecen invertidas. Ajusta el marcador en el mapa.';
+    errors.longitud = 'Las coordenadas parecen invertidas. Ajusta el marcador en el mapa.';
   }
 
   return errors;
@@ -3959,6 +4407,239 @@ function normalizeLocationFromForm(formData, baseLocation = {}) {
     referencia: formData.referencia.trim(),
     tipo: safeBaseLocation.tipo ?? 'No especificado',
   };
+}
+
+function LocationCoordinatePicker({ errors, formData, onFieldChange }) {
+  const mapRef = useRef(null);
+  const autocompleteInputRef = useRef(null);
+  const googleMapRef = useRef(null);
+  const googleMarkerRef = useRef(null);
+  const googleGeocoderRef = useRef(null);
+  const autocompleteRef = useRef(null);
+  const currentCoordinates = getLocationCoordinates(formData);
+  const [mapNotice, setMapNotice] = useState('');
+  const [isSearchingLocation, setIsSearchingLocation] = useState(false);
+  const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
+  const [googleMapsError, setGoogleMapsError] = useState('');
+
+  const updateCoordinates = useCallback((latitud, longitud) => {
+    const safeLatitud = clamp(latitud, -90, 90);
+    const safeLongitud = clamp(longitud, -180, 180);
+
+    onFieldChange('latitud', safeLatitud.toFixed(6));
+    onFieldChange('longitud', safeLongitud.toFixed(6));
+  }, [onFieldChange]);
+
+  const moveMapMarker = useCallback((latitud, longitud, notice = '') => {
+    const nextPosition = { lat: latitud, lng: longitud };
+
+    if (googleMapRef.current) {
+      googleMapRef.current.setCenter(nextPosition);
+      googleMapRef.current.setZoom(LOCATION_MAP_ZOOM);
+    }
+
+    if (googleMarkerRef.current) {
+      googleMarkerRef.current.setPosition(nextPosition);
+    }
+
+    updateCoordinates(latitud, longitud);
+
+    if (notice) {
+      setMapNotice(notice);
+    }
+  }, [updateCoordinates]);
+
+  useEffect(() => {
+    if (!mapRef.current) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    getGoogleMapsApi()
+      .then((maps) => {
+        if (!isMounted || !mapRef.current) {
+          return;
+        }
+
+        const initialCoordinates = currentCoordinates ?? LOCATION_DEFAULT_COORDINATES;
+        const initialPosition = {
+          lat: initialCoordinates.latitud,
+          lng: initialCoordinates.longitud,
+        };
+
+        const map = new maps.Map(mapRef.current, {
+          center: initialPosition,
+          clickableIcons: false,
+          fullscreenControl: false,
+          mapTypeControl: false,
+          streetViewControl: false,
+          zoom: LOCATION_MAP_ZOOM,
+        });
+
+        const marker = new maps.Marker({
+          draggable: true,
+          map,
+          position: initialPosition,
+          title: 'Ubicación seleccionada',
+        });
+
+        googleMapRef.current = map;
+        googleMarkerRef.current = marker;
+        googleGeocoderRef.current = new maps.Geocoder();
+
+        marker.addListener('dragend', () => {
+          const position = marker.getPosition();
+          if (position) {
+            updateCoordinates(position.lat(), position.lng());
+            setMapNotice('Coordenadas actualizadas desde el marcador.');
+          }
+        });
+
+        map.addListener('click', (event) => {
+          if (event.latLng) {
+            moveMapMarker(
+              event.latLng.lat(),
+              event.latLng.lng(),
+              'Coordenadas actualizadas desde el mapa.',
+            );
+          }
+        });
+
+        if (autocompleteInputRef.current) {
+          autocompleteRef.current = new maps.places.Autocomplete(autocompleteInputRef.current, {
+            componentRestrictions: { country: 'pe' },
+            fields: ['geometry', 'name', 'formatted_address'],
+          });
+
+          autocompleteRef.current.addListener('place_changed', () => {
+            const place = autocompleteRef.current.getPlace();
+            const location = place.geometry?.location;
+
+            if (!location) {
+              setMapNotice('Selecciona una opción del buscador de Google Maps.');
+              return;
+            }
+
+            moveMapMarker(
+              location.lat(),
+              location.lng(),
+              'Punto seleccionado. Puedes mover el marcador para ajustar la ubicación exacta.',
+            );
+          });
+        }
+
+        setIsGoogleMapsReady(true);
+
+        if (!currentCoordinates) {
+          updateCoordinates(initialCoordinates.latitud, initialCoordinates.longitud);
+        }
+      })
+      .catch((error) => {
+        console.error(error);
+        if (isMounted) {
+          setGoogleMapsError(
+            'Configura VITE_GOOGLE_MAPS_API_KEY para usar Google Maps y Places Autocomplete.',
+          );
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currentCoordinates || !googleMarkerRef.current || !googleMapRef.current) {
+      return;
+    }
+
+    const nextPosition = {
+      lat: currentCoordinates.latitud,
+      lng: currentCoordinates.longitud,
+    };
+
+    googleMarkerRef.current.setPosition(nextPosition);
+    googleMapRef.current.setCenter(nextPosition);
+  }, [currentCoordinates?.latitud, currentCoordinates?.longitud]);
+
+  const searchLocationOnMap = async () => {
+    const query = [formData.nombre, formData.direccion, 'San Miguel Lima Perú']
+      .map((value) => value?.trim())
+      .filter(Boolean)
+      .join(', ');
+
+    if (!query) {
+      setMapNotice('Ingresa un nombre o dirección para buscar el punto.');
+      return;
+    }
+
+    if (!googleGeocoderRef.current) {
+      setMapNotice('Google Maps todavía se está cargando.');
+      return;
+    }
+
+    setIsSearchingLocation(true);
+    setMapNotice('');
+
+    googleGeocoderRef.current.geocode(
+      {
+        address: query,
+        componentRestrictions: { country: 'PE' },
+      },
+      (results, status) => {
+        setIsSearchingLocation(false);
+        const firstResult = Array.isArray(results) ? results[0] : null;
+
+        if (status !== 'OK' || !firstResult?.geometry?.location) {
+          setMapNotice('No se encontró un punto para esa búsqueda. Ajusta el marcador manualmente.');
+          return;
+        }
+
+        const location = firstResult.geometry.location;
+
+        moveMapMarker(
+          location.lat(),
+          location.lng(),
+          'Punto encontrado. Puedes mover el marcador para ajustar la ubicación exacta.',
+        );
+      },
+    );
+  };
+
+  return (
+    <div className="location-coordinate-picker">
+      <div className="location-map-toolbar">
+        <p>Mueve el marcador en el mapa para ajustar la ubicación exacta.</p>
+        <button
+          className="neighbor-secondary-action"
+          type="button"
+          disabled={isSearchingLocation}
+          onClick={searchLocationOnMap}
+        >
+          {isSearchingLocation ? 'Buscando...' : 'Buscar en mapa'}
+        </button>
+      </div>
+      <input
+        ref={autocompleteInputRef}
+        className="location-google-search"
+        disabled={!isGoogleMapsReady}
+        placeholder="Buscar en Google Maps por nombre o dirección"
+        type="search"
+      />
+      <div
+        ref={mapRef}
+        className="location-google-map"
+        role="application"
+        aria-label="Selector de coordenadas con Google Maps"
+      />
+      {(googleMapsError || mapNotice || errors.latitud || errors.longitud) && (
+        <small className={errors.latitud || errors.longitud ? 'form-error' : 'location-map-notice'}>
+          {errors.latitud || errors.longitud || googleMapsError || mapNotice}
+        </small>
+      )}
+    </div>
+  );
 }
 
 function LocationDetailModal({
@@ -4009,6 +4690,7 @@ function LocationDetailModal({
         </header>
 
         <div className={`neighbor-detail-body location-detail-body ${isEditing ? 'is-editing' : 'is-viewing'}`}>
+          {errors.general && <p className="settings-inline-notice">{errors.general}</p>}
           {isEditing ? (
             <LocationForm
               errors={errors}
@@ -4047,13 +4729,19 @@ function LocationDetailModal({
           <section className="location-map-card" aria-label="Previsualización de ubicación en mapa">
             <div className="neighbor-section-heading">
               <h3>Mapa</h3>
-              {mapsUrl && (
+              {!isEditing && mapsUrl && (
                 <a href={mapsUrl} target="_blank" rel="noreferrer">
                   Abrir en Google Maps
                 </a>
               )}
             </div>
-            {mapEmbedUrl ? (
+            {isEditing ? (
+              <LocationCoordinatePicker
+                errors={errors}
+                formData={formData}
+                onFieldChange={updateField}
+              />
+            ) : mapEmbedUrl ? (
               <iframe
                 src={mapEmbedUrl}
                 title={`Mapa de ${visibleLocation?.nombre || 'ubicación'}`}
@@ -4106,6 +4794,7 @@ function LocationForm({ errors, formData, onFieldChange }) {
       <label className="form-field">
         Nombre
         <input
+          maxLength={LOCATION_TEXT_MAX_LENGTH}
           value={formData.nombre}
           onChange={(event) => onFieldChange('nombre', event.target.value)}
         />
@@ -4124,6 +4813,7 @@ function LocationForm({ errors, formData, onFieldChange }) {
       <label className="form-field span-2">
         Dirección
         <input
+          maxLength={LOCATION_TEXT_MAX_LENGTH}
           value={formData.direccion}
           onChange={(event) => onFieldChange('direccion', event.target.value)}
         />
@@ -4132,16 +4822,18 @@ function LocationForm({ errors, formData, onFieldChange }) {
       <label className="form-field span-2">
         Referencia
         <input
+          maxLength={LOCATION_TEXT_MAX_LENGTH}
           value={formData.referencia}
           onChange={(event) => onFieldChange('referencia', event.target.value)}
         />
+        {errors.referencia && <small className="form-error">{errors.referencia}</small>}
       </label>
       <label className="form-field">
         Latitud
         <input
           inputMode="decimal"
+          readOnly
           value={formData.latitud}
-          onChange={(event) => onFieldChange('latitud', event.target.value)}
         />
         {errors.latitud && <small className="form-error">{errors.latitud}</small>}
       </label>
@@ -4149,8 +4841,8 @@ function LocationForm({ errors, formData, onFieldChange }) {
         Longitud
         <input
           inputMode="decimal"
+          readOnly
           value={formData.longitud}
-          onChange={(event) => onFieldChange('longitud', event.target.value)}
         />
         {errors.longitud && <small className="form-error">{errors.longitud}</small>}
       </label>

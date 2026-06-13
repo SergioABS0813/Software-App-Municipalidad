@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
@@ -20,6 +21,8 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class KeycloakAdminService {
+    private static final List<String> ACTIVACION_USUARIO_INTERNO_ACTIONS = List.of("UPDATE_PASSWORD");
+
     private final KeycloakAdminProperties properties;
     private final RestClient.Builder restClientBuilder;
 
@@ -33,7 +36,7 @@ public class KeycloakAdminService {
                 "firstName", nombre,
                 "enabled", true,
                 "emailVerified", false,
-                "requiredActions", List.of("UPDATE_PASSWORD", "VERIFY_EMAIL")
+                "requiredActions", ACTIVACION_USUARIO_INTERNO_ACTIONS
         );
 
         try {
@@ -110,10 +113,22 @@ public class KeycloakAdminService {
     private void enviarCorreoAccionesRequeridas(RestClient restClient, String token, String keycloakId, String email) {
         try {
             restClient.put()
-                    .uri("/admin/realms/{realm}/users/{userId}/execute-actions-email", properties.getRealm(), keycloakId)
+                    .uri(uriBuilder -> {
+                        var builder = uriBuilder.path("/admin/realms/{realm}/users/{userId}/execute-actions-email");
+
+                        if (StringUtils.hasText(properties.getActivationClientId())) {
+                            builder.queryParam("client_id", properties.getActivationClientId());
+                        }
+
+                        if (StringUtils.hasText(properties.getActivationRedirectUri())) {
+                            builder.queryParam("redirect_uri", properties.getActivationRedirectUri());
+                        }
+
+                        return builder.build(properties.getRealm(), keycloakId);
+                    })
                     .header(HttpHeaders.AUTHORIZATION, bearer(token))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(List.of("UPDATE_PASSWORD", "VERIFY_EMAIL"))
+                    .body(ACTIVACION_USUARIO_INTERNO_ACTIONS)
                     .retrieve()
                     .toBodilessEntity();
 

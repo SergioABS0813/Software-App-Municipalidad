@@ -14,4 +14,6 @@ public class KeycloakAdminProperties {
     private String realm;
     private String clientId;
     private String clientSecret;
+    private String activationClientId;
+    private String activationRedirectUri;
 }

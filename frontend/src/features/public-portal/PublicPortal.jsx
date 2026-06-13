@@ -534,11 +534,17 @@ function PublicPortal() {
       DIRECTIVO: 'directivo',
       OPERATIVO: 'operativo',
     };
+    const pathByRole = {
+      ADMINISTRADOR: '/admin',
+      DIRECTIVO: '/directivo',
+      OPERATIVO: '/operativo',
+    };
 
     setCurrentView(viewByRole[user.role] ?? 'admin');
     setSelectedEvent(null);
     setIsConfirmOpen(false);
     sessionStorage.removeItem('postLoginRedirect');
+    window.history.replaceState(null, '', pathByRole[user.role] ?? '/admin');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 

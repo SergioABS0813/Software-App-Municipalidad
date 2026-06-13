@@ -286,6 +286,26 @@ input {
     gap: 20px;
 }
 
+.kc-info-message-panel {
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0)),
+        linear-gradient(135deg, var(--kc-brand-primary), var(--kc-brand-secondary));
+    border: 1px solid rgba(255, 255, 255, 0.38);
+    border-radius: 8px;
+    box-shadow: 0 18px 34px rgba(10, 86, 194, 0.16);
+    color: #ffffff;
+    font-size: 0.98rem;
+    font-weight: 850;
+    line-height: 1.48;
+    margin: 2px 0 4px;
+    padding: 18px 20px;
+    text-align: center;
+}
+
+.kc-info-message-panel strong {
+    color: #ffffff;
+}
+
 .kc-react-reference-card {
     background: #ffffff;
     border: 1px dashed rgba(10, 86, 194, 0.3);
@@ -520,6 +540,97 @@ input {
     pointer-events: none;
 }
 
+.kc-update-password-form-side {
+    grid-template-rows: auto 1fr;
+    padding-bottom: 42px;
+}
+
+.kc-update-password-card {
+    align-self: start;
+    gap: 16px;
+    margin-top: clamp(52px, 9vh, 94px);
+    max-width: 420px;
+}
+
+.kc-update-password-card .kc-login-title {
+    margin-bottom: 2px;
+}
+
+.kc-update-password-card .kc-login-title h1 {
+    max-width: 360px;
+}
+
+.kc-update-password-card .kc-login-title p {
+    color: #5f7185;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    max-width: 390px;
+}
+
+.kc-update-password-required {
+    background: #f7fbff;
+    border: 1px solid rgba(10, 86, 194, 0.13);
+    border-radius: 10px;
+    box-shadow: 0 12px 24px rgba(23, 50, 77, 0.05);
+    display: grid;
+    gap: 8px;
+    margin: 0 0 2px;
+    padding: 14px 16px;
+}
+
+.kc-update-password-required > span {
+    color: var(--kc-text-muted);
+    font-size: 0.72rem;
+    font-weight: 850;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.kc-update-password-required strong {
+    align-items: center;
+    color: var(--kc-text-strong);
+    display: inline-flex;
+    font-size: 0.94rem;
+    font-weight: 800;
+    gap: 9px;
+}
+
+.kc-update-password-required strong span {
+    align-items: center;
+    background: rgba(10, 86, 194, 0.1);
+    border-radius: 999px;
+    color: var(--kc-brand-primary);
+    display: inline-flex;
+    flex: 0 0 auto;
+    font-size: 0.8rem;
+    height: 22px;
+    justify-content: center;
+    width: 22px;
+}
+
+.kc-update-password-session {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    color: var(--kc-text);
+    padding: 0;
+}
+
+.kc-update-password-actions {
+    display: grid;
+    gap: 10px;
+}
+
+.kc-update-password-primary {
+    border-radius: 10px;
+    box-shadow: 0 16px 30px rgba(10, 86, 194, 0.22);
+    min-height: 52px;
+}
+
+.kc-update-password-primary:hover {
+    box-shadow: 0 18px 34px rgba(10, 86, 194, 0.28);
+}
+
 @media (max-width: 860px) {
     .kc-login-shell {
         grid-template-columns: 1fr;
@@ -540,6 +651,10 @@ input {
     .kc-dni-search-control {
         grid-template-columns: 1fr;
     }
+
+    .kc-update-password-card {
+        margin-top: 42px;
+    }
 }
 
 @media (max-width: 460px) {
@@ -550,5 +665,9 @@ input {
     .kc-login-options {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .kc-update-password-card {
+        margin-top: 30px;
     }
 }
