@@ -33,9 +33,10 @@ public class CategoriaController {
     @GetMapping("admin/configuracion")
     public Page<CategoriaConfiguracionDto> obtenerCategoriasConfiguracion(
             @RequestParam(required = false) String texto,
-            @RequestParam(defaultValue = "0") int page
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size
     ){
-        return categoriaService.obtenerCategoriasConfiguracion(texto, page);
+        return categoriaService.obtenerCategoriasConfiguracion(texto, page, size);
     }
 
     @PostMapping("admin/guardar_categoria")

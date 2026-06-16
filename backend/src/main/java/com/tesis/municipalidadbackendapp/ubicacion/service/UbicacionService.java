@@ -31,8 +31,9 @@ public class UbicacionService {
     private final UbicacionRepository ubicacionRepository;
     private final EventoRepository eventoRepository;
 
-    public Page<UbicacionConfiguracionDto> obtenerUbicacionesConfiguracion(String texto, int page) {
-        PageRequest pageable = PageRequest.of(page, 5, Sort.by("nombre").ascending());
+    public Page<UbicacionConfiguracionDto> obtenerUbicacionesConfiguracion(String texto, int page, int size) {
+        int pageSize = Math.max(1, Math.min(size, 200));
+        PageRequest pageable = PageRequest.of(page, pageSize, Sort.by("nombre").ascending());
         return ubicacionRepository.findAllConfiguracion(texto, pageable);
     }
 

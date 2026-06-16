@@ -9,16 +9,25 @@ function BellIcon() {
   );
 }
 
-export default function NotificationMenu({ notifications }) {
+export default function NotificationMenu({
+  notifications,
+  totalCount,
+  unreadCount,
+  onFilterChange,
+  onNotificationOpen,
+  onNotificationRead,
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState('all');
   const [readNotificationIds, setReadNotificationIds] = useState([]);
+  const [pendingReadIds, setPendingReadIds] = useState([]);
   const menuRef = useRef(null);
   const items = notifications.map((notification) => ({
     ...notification,
     unread: notification.unread && !readNotificationIds.includes(notification.id),
   }));
-  const unreadCount = items.filter((notification) => notification.unread).length;
+  const resolvedUnreadCount = unreadCount ?? items.filter((notification) => notification.unread).length;
+  const resolvedTotalCount = totalCount ?? items.length;
   const visibleNotifications =
     filter === 'unread'
       ? items.filter((notification) => notification.unread)
@@ -42,25 +51,49 @@ export default function NotificationMenu({ notifications }) {
     };
   }, [isOpen]);
 
-  function markAsRead(notificationId) {
+  function selectFilter(nextFilter) {
+    setFilter(nextFilter);
+    onFilterChange?.(nextFilter);
+  }
+
+  async function markAsRead(notification) {
+    if (!notification?.id || pendingReadIds.includes(notification.id)) {
+      return;
+    }
+
     setReadNotificationIds((currentIds) =>
-      currentIds.includes(notificationId)
+      currentIds.includes(notification.id)
         ? currentIds
-        : [...currentIds, notificationId],
+        : [...currentIds, notification.id],
     );
+    setPendingReadIds((currentIds) => [...currentIds, notification.id]);
+
+    try {
+      await onNotificationRead?.(notification);
+    } finally {
+      setPendingReadIds((currentIds) =>
+        currentIds.filter((currentId) => currentId !== notification.id),
+      );
+    }
+  }
+
+  async function openNotification(notification) {
+    await markAsRead(notification);
+    setIsOpen(false);
+    onNotificationOpen?.(notification);
   }
 
   return (
     <div className="notification-menu" ref={menuRef}>
       <button
         aria-expanded={isOpen}
-        aria-label={`${unreadCount} notificaciones sin leer`}
+        aria-label={`${resolvedUnreadCount} notificaciones sin leer`}
         className="notification-button"
         type="button"
         onClick={() => setIsOpen((currentOpen) => !currentOpen)}
       >
         <BellIcon />
-        <span>{unreadCount}</span>
+        {resolvedUnreadCount > 0 && <span>{resolvedUnreadCount}</span>}
       </button>
       {isOpen && (
         <div className="notification-dropdown" role="menu">
@@ -71,35 +104,37 @@ export default function NotificationMenu({ notifications }) {
                 aria-selected={filter === 'all'}
                 className={filter === 'all' ? 'active' : ''}
                 type="button"
-                onClick={() => setFilter('all')}
+                onClick={() => selectFilter('all')}
               >
                 Todas
-                <span>{items.length}</span>
+                <span>{resolvedTotalCount}</span>
               </button>
               <button
                 aria-selected={filter === 'unread'}
                 className={filter === 'unread' ? 'active' : ''}
                 type="button"
-                onClick={() => setFilter('unread')}
+                onClick={() => selectFilter('unread')}
               >
                 No leídas
-                <span>{unreadCount}</span>
+                <span>{resolvedUnreadCount}</span>
               </button>
             </div>
           </div>
           <div className="notification-list">
-            {visibleNotifications.map((notification) => (
+            {visibleNotifications.length === 0 ? (
+              <p className="notification-empty">Sin notificaciones.</p>
+            ) : visibleNotifications.map((notification) => (
               <article
-                aria-label={`Marcar como leída: ${notification.type}`}
-                className="notification-item"
+                aria-label={`Abrir notificación: ${notification.title ?? notification.type}`}
+                className={`notification-item ${notification.unread ? 'is-unread' : 'is-read'}`}
                 key={notification.id}
                 role="button"
                 tabIndex={0}
-                onClick={() => markAsRead(notification.id)}
+                onClick={() => openNotification(notification)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    markAsRead(notification.id);
+                    openNotification(notification);
                   }
                 }}
               >
@@ -108,11 +143,14 @@ export default function NotificationMenu({ notifications }) {
                 </span>
                 <div>
                   <span className="notification-item-heading">
-                    <strong>{notification.type}</strong>
+                    <strong>{notification.title ?? notification.type}</strong>
                     {notification.time && <time>{notification.time}</time>}
                   </span>
                   <p>{notification.message}</p>
                 </div>
+                {notification.unread && (
+                  <span aria-hidden="true" className="notification-unread-indicator" />
+                )}
               </article>
             ))}
           </div>

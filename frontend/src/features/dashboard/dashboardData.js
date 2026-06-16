@@ -134,6 +134,7 @@ const eventStateLabels = {
   CERRADO: 'Cerrado',
   EN_CURSO: 'En curso',
   EN_REVISION: 'Para revisión',
+  PARA_REVISION: 'Para revisión',
   FINALIZADO: 'Finalizado',
   OBSERVADO: 'Observado',
   OBSERVADO_EN_REVISION: 'Reenviado',

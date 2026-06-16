@@ -18,7 +18,7 @@ public class BitacoraAccionService {
     private final BitacoraAccionRepository bitacoraAccionRepository;
 
 
-    public void guardarAccion(String accion, String entidadAfectada, Integer entidadId, String detalle, Usuario usuario, HttpServletRequest request) {
+    public BitacoraAccion guardarAccion(String accion, String entidadAfectada, Integer entidadId, String detalle, Usuario usuario, HttpServletRequest request) {
         BitacoraAccion bitacoraAccion = new BitacoraAccion();
         bitacoraAccion.setAccion(accion);
         bitacoraAccion.setEntidadAfectada(entidadAfectada);
@@ -29,7 +29,7 @@ public class BitacoraAccionService {
         bitacoraAccion.setDetalle(detalle);
         bitacoraAccion.setUsuario(usuario);
 
-        bitacoraAccionRepository.save(bitacoraAccion);
+        return bitacoraAccionRepository.save(bitacoraAccion);
     }
 
     private String obtenerIpOrigen(HttpServletRequest request) {

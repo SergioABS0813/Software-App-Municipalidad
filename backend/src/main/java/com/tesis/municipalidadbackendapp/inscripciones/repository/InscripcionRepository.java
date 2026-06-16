@@ -17,4 +17,19 @@ public interface InscripcionRepository extends JpaRepository<Inscripcion, Intege
         ORDER BY i.fechaInscripcion DESC
     """)
     List<Inscripcion> findDetalleByVecinoId(@Param("vecinoId") Integer vecinoId);
+
+    @Query("""
+        SELECT DISTINCT i
+        FROM Inscripcion i
+        JOIN FETCH i.evento e
+        JOIN FETCH i.vecino v
+        JOIN Asistencia a ON a.inscripcion = i
+        LEFT JOIN ValoracionEvento valoracion ON valoracion.inscripcion = i
+        WHERE e.id = :eventoId
+          AND upper(a.estado) = 'VALIDADA'
+          AND valoracion.id IS NULL
+          AND v.email IS NOT NULL
+          AND trim(v.email) <> ''
+    """)
+    List<Inscripcion> findElegiblesParaValoracion(@Param("eventoId") Integer eventoId);
 }

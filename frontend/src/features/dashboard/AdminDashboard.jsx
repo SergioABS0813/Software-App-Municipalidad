@@ -8,19 +8,26 @@ import {
   actualizarEstadoUsuarioInterno,
   actualizarEstadoUbicacionConfiguracion,
   actualizarContactoCuentaVecinal,
+  actualizarEventoGestion,
   actualizarUsuarioInterno,
   eliminarCategoriaConfiguracion,
+  eliminarEventoGestion,
   eliminarUbicacionConfiguracion,
   getCuentaVecinalDetalle,
   getCuentasVecinales,
   getCategoriasConfiguracion,
+  getEstadosEventoGestion,
+  getEventosGestion,
   getUbicacionesConfiguracion,
+  getNotificacionesAdministrador,
   getUsuarioInternoDetalle,
   getUsuariosInternos,
   getRolesUsuariosInternos,
   guardarCategoria,
+  guardarEventoGestion,
   guardarUsuarioInterno,
   guardarUbicacionConfiguracion,
+  marcarNotificacionComoLeida,
 } from '../../services/dashboardService';
 
 function getManagementStats(events) {
@@ -45,7 +52,7 @@ function getManagementStats(events) {
       tone: 'is-review',
       trend: 'pendientes del directivo',
       value: events.filter((event) =>
-        ['EN_REVISION', 'OBSERVADO_EN_REVISION'].includes(event.state),
+        ['EN_REVISION', 'PARA_REVISION', 'OBSERVADO_EN_REVISION'].includes(event.state),
       ).length,
     },
     {
@@ -97,8 +104,6 @@ const adminNotifications = [
   },
 ];
 
-const stateOptions = ['Todos', ...new Set(adminEvents.map((event) => event.state))];
-const categoryOptions = ['Todas', ...new Set(adminEvents.map((event) => event.category))];
 const eventFormSections = [
   { id: 'datos-generales', label: 'Datos generales' },
   { id: 'programacion', label: 'Programación' },
@@ -107,6 +112,257 @@ const eventFormSections = [
   { id: 'ubicacion', label: 'Ubicación' },
   { id: 'recursos', label: 'Recursos' },
 ];
+const UNCATEGORIZED_FILTER_VALUE = '__SIN_CATEGORIA__';
+
+function formatNotificationTime(value) {
+  if (!value) {
+    return '';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat('es-PE', {
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'short',
+  }).format(date);
+}
+
+function mapAdminNotificationFromApi(notification) {
+  return {
+    id: notification.id,
+    message: notification.mensaje ?? notification.message ?? '',
+    title: notification.titulo ?? notification.title ?? notification.tipo ?? '',
+    time: formatNotificationTime(notification.fechaCreacion),
+    type: notification.tipo ?? notification.type ?? '',
+    unread: !(notification.leida ?? notification.read ?? false),
+    urlDestino: notification.urlDestino ?? notification.destinationUrl ?? '',
+  };
+}
+
+function formatManagementDateTime(value) {
+  if (!value) {
+    return '';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat('es-PE', {
+    day: '2-digit',
+    hour: 'numeric',
+    minute: '2-digit',
+    month: 'short',
+    weekday: 'short',
+  }).format(date);
+}
+
+function formatManagementTime(value) {
+  if (!value) {
+    return '';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat('es-PE', {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function formatManagementDuration(startValue, endValue) {
+  if (!startValue || !endValue) {
+    return '';
+  }
+
+  const startDate = new Date(startValue);
+  const endDate = new Date(endValue);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate <= startDate) {
+    return '';
+  }
+
+  const totalMinutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0 && minutes > 0) {
+    return `${hours} h ${minutes} min`;
+  }
+
+  return hours > 0 ? `${hours} h` : `${minutes} min`;
+}
+
+function mapManagementEventFromApi(event) {
+  const pendingItems = Array.isArray(event.alertas)
+    ? event.alertas.map((alerta) => alerta?.mensaje).filter(Boolean)
+    : [];
+  const categoryName = event.categoria?.nombre ?? '';
+  const resourceItems = Array.isArray(event.recursos) ? event.recursos : [];
+  const videoResource = resourceItems.find((resource) => resource?.tipoRecurso === 'VIDEO');
+
+  return {
+    id: event.id,
+    title: event.titulo ?? 'Evento sin titulo',
+    descripcion_breve: event.descripcionBreve ?? '',
+    description: event.descripcion ?? '',
+    date: formatManagementDateTime(event.fechaHoraInicio),
+    eventEnd: event.fechaHoraFin ?? '',
+    eventStart: event.fechaHoraInicio ?? '',
+    time: formatManagementTime(event.fechaHoraFin),
+    duration: formatManagementDuration(event.fechaHoraInicio, event.fechaHoraFin),
+    venue: event.ubicacionNombre ?? 'Ubicacion pendiente',
+    state: event.estadoCodigo ?? 'BORRADOR',
+    organizer: event.areaMunicipalNombre ?? '',
+    area_municipal_id: event.areaMunicipalId ?? '',
+    category: categoryName,
+    categoria_id: event.categoria?.id ?? '',
+    ubicacion_id: event.ubicacionId ?? '',
+    referenceCost: event.costoReferencial ?? '',
+    aforoMaximo: event.aforoMaximo ?? '',
+    edad_minima: event.edadMin ?? '',
+    edad_maxima: event.edadMax ?? '',
+    lastUpdatedAt: event.actualizadoEn ?? '',
+    agenda_evento: Array.isArray(event.agenda) ? event.agenda : [],
+    requisitos_evento: Array.isArray(event.requisitos) ? event.requisitos : [],
+    pendingItems,
+    completeness: Number(event.completitud ?? 0),
+    resourceItems,
+    resources: {
+      AFICHE: resourceItems.some((resource) => resource?.tipoRecurso === 'AFICHE'),
+      IMAGEN_PORTADA: resourceItems.some((resource) => resource?.tipoRecurso === 'IMAGEN_PORTADA'),
+      VIDEO: resourceItems.some((resource) => resource?.tipoRecurso === 'VIDEO'),
+    },
+    videoUrl: videoResource?.urlRecurso ?? '',
+  };
+}
+
+function mapCategoryCatalogFromApi(category) {
+  return {
+    id: category.id,
+    nombre: category.nombre ?? '',
+  };
+}
+
+function mapLocationCatalogFromApi(location) {
+  return {
+    direccion: location.direccion ?? '',
+    distrito: 'San Miguel',
+    estado: location.activo === 1 ? 'ACTIVO' : 'INACTIVO',
+    latitud: location.latitud ?? '',
+    longitud: location.longitud ?? '',
+    nombre_lugar: location.nombre ?? '',
+    referencia: location.referencia ?? '',
+    ubicacion_id: location.id,
+  };
+}
+
+function getFileNameFromForm(form, name) {
+  const control = getNamedFormControl(form, name);
+
+  return control?.files?.[0]?.name ?? '';
+}
+
+function buildResourceRequestsFromForm(form, existingEvent = null) {
+  const resources = [];
+  const coverImageName = getFileNameFromForm(form, 'coverImage');
+  const posterName = getFileNameFromForm(form, 'poster');
+  const videoUrl = getNamedFormValue(form, 'videoUrl');
+  const existingResources = Array.isArray(existingEvent?.resourceItems)
+    ? existingEvent.resourceItems
+    : [];
+  const existingCover = existingResources.find((resource) => resource.tipoRecurso === 'IMAGEN_PORTADA');
+  const existingPoster = existingResources.find((resource) => resource.tipoRecurso === 'AFICHE');
+
+  if (coverImageName) {
+    resources.push({
+      tipoRecurso: 'IMAGEN_PORTADA',
+      nombreArchivo: coverImageName,
+      urlRecurso: null,
+    });
+  } else if (existingCover) {
+    resources.push(existingCover);
+  }
+
+  if (posterName) {
+    resources.push({
+      tipoRecurso: 'AFICHE',
+      nombreArchivo: posterName,
+      urlRecurso: null,
+    });
+  } else if (existingPoster) {
+    resources.push(existingPoster);
+  }
+
+  if (videoUrl) {
+    resources.push({
+      tipoRecurso: 'VIDEO',
+      nombreArchivo: null,
+      urlRecurso: videoUrl,
+    });
+  }
+
+  return resources;
+}
+
+function emptyToNull(value) {
+  return hasValue(value) ? value : null;
+}
+
+function numberOrNull(value) {
+  return hasValue(value) ? Number(value) : null;
+}
+
+function positiveCapacityOrZero(value) {
+  if (!hasValue(value)) {
+    return 0;
+  }
+
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  return numericValue <= 0 ? 1 : numericValue;
+}
+
+function buildEventCreatePayload(form, actionType, existingEvent = null) {
+  const audienceType = getNamedFormValue(form, 'publico_tipo') || 'GENERAL';
+  const capacityMode = getNamedFormValue(form, 'capacityMode');
+  const attendanceGoalEnabled = isNamedChecked(form, 'attendanceGoalEnabled');
+
+  return {
+    titulo: emptyToNull(getNamedFormValue(form, 'title')),
+    descripcionBreve: emptyToNull(getNamedFormValue(form, 'descripcion_breve')),
+    descripcion: emptyToNull(getNamedFormValue(form, 'description')),
+    categoriaId: numberOrNull(getNamedFormValue(form, 'categoryId')),
+    areaMunicipalId: numberOrNull(getNamedFormValue(form, 'area_municipal_id')),
+    fechaHoraInicio: emptyToNull(getNamedFormValue(form, 'eventStart')),
+    fechaHoraFin: emptyToNull(getNamedFormValue(form, 'eventEnd')),
+    costoReferencial: numberOrNull(getNamedFormValue(form, 'referenceCost')),
+    ubicacionId: numberOrNull(getNamedFormValue(form, 'ubicacion_id')),
+    aforoMaximo: capacityMode === 'none' ? 0 : positiveCapacityOrZero(getNamedFormValue(form, 'capacity')),
+    publicoTipo: audienceType,
+    edadMin: audienceType === 'OBJETIVO' ? numberOrNull(getNamedFormValue(form, 'edad_minima')) : null,
+    edadMax: audienceType === 'OBJETIVO' ? numberOrNull(getNamedFormValue(form, 'edad_maxima')) : null,
+    metaTipo: attendanceGoalEnabled ? emptyToNull(getNamedFormValue(form, 'attendanceGoalType')) : null,
+    metaValor: attendanceGoalEnabled ? numberOrNull(getNamedFormValue(form, 'attendanceGoalValue')) : null,
+    encuestaSatisfaccionHabilitado: isNamedChecked(form, 'surveyEnabled'),
+    enviarRevision: actionType === 'review',
+    agenda: parseOrderedEventItems(getNamedFormValue(form, 'agenda_evento_json')),
+    requisitos: parseOrderedEventItems(getNamedFormValue(form, 'requisitos_evento_json')),
+    recursos: buildResourceRequestsFromForm(form, existingEvent),
+  };
+}
 
 // TODO: reemplazar este mock por el catálogo de áreas municipales desde Spring Boot.
 const areasMunicipales = [
@@ -364,8 +620,8 @@ function getNeighborStateTone(state) {
   return tones[state] ?? 'neighbor-inactive';
 }
 
-function getRegisteredLocationById(locationId) {
-  return registeredLocations.find(
+function getRegisteredLocationById(locationId, locations = registeredLocations) {
+  return locations.find(
     (location) => String(location.ubicacion_id) === String(locationId),
   );
 }
@@ -542,11 +798,21 @@ function getPendingTitle(state) {
 }
 
 function hasValidAforo(event) {
-  if (event.aforoMaximo === null || event.capacityMode === 'none') {
+  if (event.capacityMode === 'none') {
     return true;
   }
 
-  return Number(event.aforoMaximo ?? event.spots) > 0;
+  const aforoValue = event.aforoMaximo ?? event.spots;
+
+  if (event.capacityMode === 'defined') {
+    return Number(aforoValue) > 0;
+  }
+
+  if (!hasValue(aforoValue)) {
+    return true;
+  }
+
+  return Number(aforoValue) >= 0;
 }
 
 function hasValidAudienceConfig(event) {
@@ -696,11 +962,17 @@ function parseDurationMinutes(durationLabel = '') {
 }
 
 function getEventStartDateTimeValue(event) {
-  return getDateTimeLocalValue(event.date) || parsePublicEventDateTime(event.date, event.time);
+  return getDateTimeLocalValue(event.eventStart) ||
+    getDateTimeLocalValue(event.fechaHoraInicio) ||
+    getDateTimeLocalValue(event.date) ||
+    parsePublicEventDateTime(event.date, event.time);
 }
 
 function getEventEndDateTimeValue(event) {
-  const directEndValue = getDateTimeLocalValue(event.time);
+  const directEndValue =
+    getDateTimeLocalValue(event.eventEnd) ||
+    getDateTimeLocalValue(event.fechaHoraFin) ||
+    getDateTimeLocalValue(event.time);
 
   if (directEndValue) {
     return directEndValue;
@@ -717,6 +989,13 @@ function getEventEndDateTimeValue(event) {
   endDate.setMinutes(endDate.getMinutes() + durationMinutes);
 
   return formatDateToDateTimeLocal(endDate);
+}
+
+function hasValidEventSchedule(event) {
+  const startValue = getEventStartDateTimeValue(event);
+  const endValue = getEventEndDateTimeValue(event);
+
+  return hasValue(startValue) && hasValue(endValue) && isDateTimeAfter(startValue, endValue);
 }
 
 function canCompareDateTimeValues(startValue, endValue) {
@@ -750,9 +1029,7 @@ function getEventChecklist(event, options = {}) {
     },
     {
       complete:
-        hasValue(event.date) &&
-        hasValue(event.time) &&
-        isDateTimeAfter(event.date, event.time) &&
+        hasValidEventSchedule(event) &&
         hasValue(event.publico_tipo) &&
         hasValidAudienceConfig(event) &&
         hasValidAforo(event),
@@ -775,9 +1052,9 @@ function getEventChecklist(event, options = {}) {
       pendingLabel: 'Faltan requisitos del evento',
     },
     {
-      complete: Boolean(event.resources?.IMAGEN_PORTADA || event.resources?.AFICHE),
+      complete: Boolean(event.resources?.IMAGEN_PORTADA),
       completeLabel: 'Recursos adjuntados',
-      pendingLabel: 'Falta imagen referencial',
+      pendingLabel: 'Falta imagen de portada',
     },
   ];
   const completedChecks = checks.filter((item) => item.complete).length;
@@ -820,18 +1097,12 @@ function getCreationEventChecklist(event) {
     },
     {
       complete:
-        hasValue(event.date) &&
-        hasValue(event.time) &&
-        isDateTimeAfter(event.date, event.time) &&
+        hasValidEventSchedule(event) &&
         hasValidAforo(event) &&
         hasValue(event.referenceCost) &&
         hasValue(event.publico_tipo) &&
         hasValidAudienceConfig(event),
-      completeLabel: 'Programación completa',
-    },
-    {
-      complete: hasValue(event.ubicacion_id),
-      completeLabel: 'Ubicación registrada',
+      completeLabel: 'Programación y Aforo completos',
     },
     {
       complete: hasValidOrderedItems(event.agenda_evento ?? event.agenda),
@@ -842,7 +1113,11 @@ function getCreationEventChecklist(event) {
       completeLabel: 'Requisitos registrados',
     },
     {
-      complete: Boolean(event.resources?.IMAGEN_PORTADA || event.resources?.AFICHE),
+      complete: hasValue(event.ubicacion_id),
+      completeLabel: 'Ubicación registrada',
+    },
+    {
+      complete: Boolean(event.resources?.IMAGEN_PORTADA),
       completeLabel: 'Recursos adjuntados',
     },
   ];
@@ -858,13 +1133,17 @@ function getCreationEventChecklist(event) {
   };
 }
 
-function getChecklistEventFromForm(form, event) {
+function getChecklistEventFromForm(form, event, catalogs = {}) {
   if (!form) {
     return event;
   }
 
   const selectedLocationId = getNamedFormValue(form, 'ubicacion_id');
-  const selectedLocation = getRegisteredLocationById(selectedLocationId);
+  const selectedLocation = getRegisteredLocationById(selectedLocationId, catalogs.locations);
+  const selectedCategoryId = getNamedFormValue(form, 'categoryId');
+  const selectedCategory = catalogs.categories?.find(
+    (category) => String(category.id) === String(selectedCategoryId),
+  );
   const agendaItems = parseOrderedEventItems(getNamedFormValue(form, 'agenda_evento_json'));
   const requirementItems = parseOrderedEventItems(
     getNamedFormValue(form, 'requisitos_evento_json'),
@@ -885,7 +1164,8 @@ function getChecklistEventFromForm(form, event) {
       edad_minima: ageMin,
       publico_tipo: audienceType,
     }),
-    category: getNamedFormValue(form, 'category'),
+    category: selectedCategory?.nombre ?? '',
+    categoria_id: selectedCategoryId,
     date: getNamedFormValue(form, 'eventStart'),
     descripcion_breve: getNamedFormValue(form, 'descripcion_breve'),
     description: getNamedFormValue(form, 'description'),
@@ -906,8 +1186,8 @@ function getChecklistEventFromForm(form, event) {
     },
     aforoMaximo:
       getNamedFormValue(form, 'capacityMode') === 'none'
-        ? null
-        : getNamedFormValue(form, 'capacity'),
+        ? 0
+        : positiveCapacityOrZero(getNamedFormValue(form, 'capacity')),
     capacityMode: getNamedFormValue(form, 'capacityMode'),
     encuestaComentarioHabilitado: isNamedChecked(form, 'surveyCommentsEnabled'),
     encuestaSatisfaccionHabilitada: isNamedChecked(form, 'surveyEnabled'),
@@ -921,7 +1201,7 @@ function getChecklistEventFromForm(form, event) {
     spots:
       getNamedFormValue(form, 'capacityMode') === 'none'
         ? ''
-        : getNamedFormValue(form, 'capacity'),
+        : positiveCapacityOrZero(getNamedFormValue(form, 'capacity')),
     time: getNamedFormValue(form, 'eventEnd'),
     title: getNamedFormValue(form, 'title'),
     ubicacion_id: selectedLocationId,
@@ -973,7 +1253,7 @@ function hasNamedFile(form, name) {
 function getMissingReviewFields(form, existingEvent = null) {
   const requiredFields = [
     ['title', 'Título del evento'],
-    ['category', 'Categoría'],
+    ['categoryId', 'Categoría'],
     ['area_municipal_id', 'Área responsable'],
     ['descripcion_breve', 'Descripción breve'],
     ['description', 'Descripción'],
@@ -998,8 +1278,8 @@ function getMissingReviewFields(form, existingEvent = null) {
   const eventStart = getNamedFormValue(form, 'eventStart');
   const eventEnd = getNamedFormValue(form, 'eventEnd');
 
-  if (shortDescription.length > 255) {
-    missingFields.push('Descripción breve de máximo 255 caracteres');
+  if (shortDescription.length > 45) {
+    missingFields.push('Descripción breve de máximo 45 caracteres');
   }
 
   if (hasValue(eventStart) && hasValue(eventEnd) && !isDateTimeAfter(eventStart, eventEnd)) {
@@ -1046,12 +1326,10 @@ function getMissingReviewFields(form, existingEvent = null) {
   }
   const hasMainResource =
     hasNamedFile(form, 'coverImage') ||
-    hasNamedFile(form, 'poster') ||
-    Boolean(existingEvent?.resources?.IMAGEN_PORTADA) ||
-    Boolean(existingEvent?.resources?.AFICHE);
+    Boolean(existingEvent?.resources?.IMAGEN_PORTADA);
 
   if (!hasMainResource) {
-    missingFields.push('Imagen de portada o afiche');
+    missingFields.push('Imagen de portada');
   }
 
   return missingFields;
@@ -1078,11 +1356,30 @@ function AdminDashboard({ onLogout, user }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSidebarDrawerOpen, setIsSidebarDrawerOpen] = useState(false);
   const [eventItems, setEventItems] = useState(adminEvents);
+  const [eventCategoryCatalog, setEventCategoryCatalog] = useState([]);
+  const [eventLocationCatalog, setEventLocationCatalog] = useState(registeredLocations);
+  const [eventStateCatalog, setEventStateCatalog] = useState([]);
+  const [eventsPage, setEventsPage] = useState({
+    number: 0,
+    size: 5,
+    totalElements: 0,
+    totalPages: 0,
+  });
   const [pendingEventAction, setPendingEventAction] = useState(null);
+  const [isSavingEventAction, setIsSavingEventAction] = useState(false);
   const [eventToDelete, setEventToDelete] = useState(null);
+  const [isDeletingEventAction, setIsDeletingEventAction] = useState(false);
   const [eventDeleteNotice, setEventDeleteNotice] = useState('');
+  const [eventsReloadKey, setEventsReloadKey] = useState(0);
   const [validationIssue, setValidationIssue] = useState(null);
   const [selectedAdminEvent, setSelectedAdminEvent] = useState(null);
+  const [adminNotificationItems, setAdminNotificationItems] = useState(adminNotifications);
+  const [adminNotificationCounts, setAdminNotificationCounts] = useState({
+    total: adminNotifications.length,
+    unread: adminNotifications.filter((notification) => notification.unread).length,
+  });
+  const [notificationFilter, setNotificationFilter] = useState('all');
+  const [targetUserDetailId, setTargetUserDetailId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [stateFilter, setStateFilter] = useState('Todos');
   const [categoryFilter, setCategoryFilter] = useState('Todas');
@@ -1095,6 +1392,133 @@ function AdminDashboard({ onLogout, user }) {
   const adminUser = user ?? fallbackAdminUser;
   const adminUserName = getUserDisplayName(adminUser);
   const managementStats = useMemo(() => getManagementStats(eventItems), [eventItems]);
+  const managementStateOptions = useMemo(
+    () => [
+      { label: 'Todos', value: 'Todos' },
+      ...eventStateCatalog
+        .map((state) => state.codigo)
+        .filter(Boolean)
+        .map((state) => ({
+          label: formatEventState(state),
+          value: state,
+        })),
+    ],
+    [eventStateCatalog],
+  );
+  const managementCategoryOptions = useMemo(
+    () => {
+      return [
+        { label: 'Todas', value: 'Todas' },
+        ...eventCategoryCatalog.map((category) => ({
+          label: category.nombre,
+          value: String(category.id),
+        })),
+        { label: 'Sin categoria', value: UNCATEGORIZED_FILTER_VALUE },
+      ];
+    },
+    [eventCategoryCatalog],
+  );
+  const loadAdminNotifications = useCallback((nextFilter = notificationFilter) => {
+    const soloNoLeidas = nextFilter === 'unread';
+
+    return getNotificacionesAdministrador({ soloNoLeidas })
+      .then((data) => {
+        const notifications = Array.isArray(data.notificaciones)
+          ? data.notificaciones.map(mapAdminNotificationFromApi)
+          : [];
+
+        setAdminNotificationItems(notifications);
+        setAdminNotificationCounts({
+          total: data.total ?? notifications.length,
+          unread: data.noLeidas ?? notifications.filter((notification) => notification.unread).length,
+        });
+      })
+      .catch((error) => {
+        console.error('No se pudieron cargar las notificaciones.', error);
+        setAdminNotificationItems(adminNotifications);
+        setAdminNotificationCounts({
+          total: adminNotifications.length,
+          unread: adminNotifications.filter((notification) => notification.unread).length,
+        });
+      });
+  }, [notificationFilter]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const selectedCategoryId =
+      categoryFilter === 'Todas' || categoryFilter === UNCATEGORIZED_FILTER_VALUE
+        ? ''
+        : categoryFilter;
+
+    getEventosGestion({
+      categoriaId: selectedCategoryId,
+      estado: stateFilter === 'Todos' ? '' : stateFilter,
+      page: eventsPage.number,
+      sinCategoria: categoryFilter === UNCATEGORIZED_FILTER_VALUE,
+      size: 5,
+      texto: searchTerm,
+    })
+      .then((data) => {
+        if (!isMounted) {
+          return;
+        }
+
+        const content = Array.isArray(data.content) ? data.content : [];
+        setEventItems(content.map(mapManagementEventFromApi));
+        setEventsPage((currentPage) => ({
+          ...currentPage,
+          number: data.number ?? 0,
+          size: data.size ?? 5,
+          totalElements: data.totalElements ?? 0,
+          totalPages: data.totalPages ?? 0,
+        }));
+      })
+      .catch((error) => {
+        console.error('No se pudieron cargar los eventos en gestion.', error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [categoryFilter, eventsPage.number, eventsReloadKey, searchTerm, stateFilter]);
+
+  useEffect(() => {
+    loadAdminNotifications(notificationFilter);
+  }, [loadAdminNotifications, notificationFilter]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    Promise.all([
+      getCategoriasConfiguracion({ page: 0, size: 200 }),
+      getUbicacionesConfiguracion({ page: 0, size: 200 }),
+      getEstadosEventoGestion(),
+    ])
+      .then(([categoriesData, locationsData, statesData]) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setEventCategoryCatalog(
+          Array.isArray(categoriesData.content)
+            ? categoriesData.content.map(mapCategoryCatalogFromApi)
+            : [],
+        );
+        setEventLocationCatalog(
+          Array.isArray(locationsData.content)
+            ? locationsData.content.map(mapLocationCatalogFromApi)
+            : [],
+        );
+        setEventStateCatalog(Array.isArray(statesData) ? statesData : []);
+      })
+      .catch((error) => {
+        console.error('No se pudieron cargar los catalogos de eventos.', error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isSidebarDrawerOpen) {
@@ -1192,23 +1616,26 @@ function AdminDashboard({ onLogout, user }) {
     setIsSidebarDrawerOpen(false);
   }
 
-  const filteredAdminEvents = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
+  function resetEventsPage() {
+    setEventsPage((currentPage) => ({ ...currentPage, number: 0 }));
+  }
 
-    return eventItems.filter((event) => {
-      const matchesSearch =
-        normalizedSearch.length === 0 ||
-        [event.title, event.venue, event.organizer]
-          .join(' ')
-          .toLowerCase()
-          .includes(normalizedSearch);
-      const matchesState = stateFilter === 'Todos' || event.state === stateFilter;
-      const matchesCategory =
-        categoryFilter === 'Todas' || event.category === categoryFilter;
+  function handleEventSearchChange(value) {
+    setSearchTerm(value);
+    resetEventsPage();
+  }
 
-      return matchesSearch && matchesState && matchesCategory;
-    });
-  }, [categoryFilter, eventItems, searchTerm, stateFilter]);
+  function handleEventStateFilterChange(value) {
+    setStateFilter(value);
+    resetEventsPage();
+  }
+
+  function handleEventCategoryFilterChange(value) {
+    setCategoryFilter(value);
+    resetEventsPage();
+  }
+
+  const filteredAdminEvents = eventItems;
 
   function openAdminEventEdit(event) {
     setSelectedAdminEvent(event);
@@ -1226,6 +1653,82 @@ function AdminDashboard({ onLogout, user }) {
     setSelectedAdminEvent(event);
     setCurrentAdminView('public-preview');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function findAdminEventById(eventId) {
+    const localEvent = eventItems.find((event) => String(event.id) === String(eventId));
+
+    if (localEvent) {
+      return localEvent;
+    }
+
+    const data = await getEventosGestion({ page: 0, size: 50 });
+    const content = Array.isArray(data.content) ? data.content : [];
+    return content.map(mapManagementEventFromApi)
+      .find((event) => String(event.id) === String(eventId)) ?? null;
+  }
+
+  function handleNotificationFilterChange(nextFilter) {
+    setNotificationFilter(nextFilter);
+  }
+
+  async function handleNotificationRead(notification) {
+    const wasUnread = Boolean(notification?.unread);
+
+    if (notification?.urlDestino) {
+      await marcarNotificacionComoLeida(notification.id);
+    }
+
+    setAdminNotificationItems((currentItems) =>
+      currentItems.map((notification) =>
+        notification.id === notification?.id
+          ? { ...notification, unread: false }
+          : notification,
+      ),
+    );
+    if (wasUnread) {
+      setAdminNotificationCounts((currentCounts) => ({
+        ...currentCounts,
+        unread: Math.max(0, currentCounts.unread - 1),
+      }));
+    }
+  }
+
+  async function handleNotificationOpen(notification) {
+    const destination = notification?.urlDestino;
+
+    if (!destination) {
+      return;
+    }
+
+    window.history.pushState(null, '', destination);
+
+    const eventMatch = destination.match(/^\/admin\/eventos\/([^/]+)\/(editar|detalle)$/);
+    if (eventMatch) {
+      const [, eventId, action] = eventMatch;
+      const event = await findAdminEventById(eventId);
+
+      if (!event) {
+        setCurrentAdminView('dashboard');
+        return;
+      }
+
+      if (action === 'editar') {
+        openAdminEventEdit(event);
+        return;
+      }
+
+      openPublishedEventPreview(event);
+      return;
+    }
+
+    const userMatch = destination.match(/^\/admin\/usuarios-internos\/([^/]+)\/detalle$/);
+    if (userMatch) {
+      setTargetUserDetailId(Number(userMatch[1]));
+      setCurrentAdminView('settings-users');
+      setIsSettingsNavOpen(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
 
   function runAdminEventTableAction(event) {
@@ -1250,6 +1753,38 @@ function AdminDashboard({ onLogout, user }) {
     }
   }
 
+  async function confirmPendingEventAction() {
+    if (!pendingEventAction) {
+      return;
+    }
+
+    try {
+      setIsSavingEventAction(true);
+      const savedEvent = pendingEventAction.mode === 'edit'
+        ? await actualizarEventoGestion(pendingEventAction.eventId, pendingEventAction.payload)
+        : await guardarEventoGestion(pendingEventAction.payload);
+      setPendingEventAction(null);
+      setSelectedAdminEvent(null);
+      setCurrentAdminView('dashboard');
+      setEventsPage((currentPage) => ({ ...currentPage, number: 0 }));
+      setEventsReloadKey((currentKey) => currentKey + 1);
+      setEventDeleteNotice(
+        pendingEventAction.mode === 'edit'
+          ? 'Evento actualizado correctamente.'
+          : savedEvent.estadoCodigo === 'PARA_REVISION' || savedEvent.estadoCodigo === 'EN_REVISION'
+            ? 'Evento registrado y enviado a revisión.'
+            : 'Evento registrado como borrador.',
+      );
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      const message = error.response?.data?.message ?? 'No se pudo guardar el evento.';
+      setPendingEventAction(null);
+      setValidationIssue({ missingFields: [message] });
+    } finally {
+      setIsSavingEventAction(false);
+    }
+  }
+
   function requestDeleteDraftEvent(event) {
     setEventDeleteNotice('');
     setEventToDelete(event);
@@ -1259,12 +1794,12 @@ function AdminDashboard({ onLogout, user }) {
     setEventToDelete(null);
   }
 
-  function confirmDeleteDraftEvent() {
+  async function confirmDeleteDraftEvent() {
     if (!eventToDelete) {
       return;
     }
 
-    const currentEvent = eventItems.find((event) => event.id === eventToDelete.id);
+    const currentEvent = eventItems.find((event) => event.id === eventToDelete.id) ?? eventToDelete;
 
     if (currentEvent?.state !== 'BORRADOR') {
       setEventToDelete(null);
@@ -1272,14 +1807,28 @@ function AdminDashboard({ onLogout, user }) {
       return;
     }
 
-    setEventItems((currentEvents) =>
-      currentEvents.filter((event) => event.id !== eventToDelete.id),
-    );
-    registerEventAuditLog('ELIMINAR_EVENTO_BORRADOR', eventToDelete.id);
-    setEventToDelete(null);
-    setSelectedAdminEvent(null);
-    setCurrentAdminView('dashboard');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    try {
+      setIsDeletingEventAction(true);
+      await eliminarEventoGestion(eventToDelete.id);
+      setEventToDelete(null);
+      setSelectedAdminEvent(null);
+      setCurrentAdminView('dashboard');
+      setEventDeleteNotice('Evento eliminado correctamente.');
+
+      if (eventItems.length === 1 && eventsPage.number > 0) {
+        setEventsPage((currentPage) => ({ ...currentPage, number: currentPage.number - 1 }));
+      } else {
+        setEventsReloadKey((currentKey) => currentKey + 1);
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      const message = error.response?.data?.message ?? 'No se pudo eliminar el evento.';
+      setEventToDelete(null);
+      setEventDeleteNotice(message);
+    } finally {
+      setIsDeletingEventAction(false);
+    }
   }
 
   return (
@@ -1456,23 +2005,29 @@ function AdminDashboard({ onLogout, user }) {
       <main className="admin-main">
         {currentAdminView === 'new-event' ? (
           <NewEventView
+            categories={eventCategoryCatalog}
+            locations={eventLocationCatalog}
             onBack={() => setCurrentAdminView('dashboard')}
-            onRequestAction={(type) =>
-              setPendingEventAction({ mode: 'create', type })
+            onRequestAction={(type, payload) =>
+              setPendingEventAction({ mode: 'create', payload, type })
             }
             onValidationIssue={setValidationIssue}
           />
         ) : currentAdminView === 'edit-event' && selectedAdminEvent ? (
           <EditEventView
+            categories={eventCategoryCatalog}
             event={selectedAdminEvent}
+            locations={eventLocationCatalog}
             onBack={() => {
               setSelectedAdminEvent(null);
               setCurrentAdminView('dashboard');
             }}
-            onRequestAction={(type) =>
+            onRequestAction={(type, payload) =>
               setPendingEventAction({
+                eventId: selectedAdminEvent.id,
                 eventTitle: selectedAdminEvent.title,
                 mode: 'edit',
+                payload,
                 type,
               })
             }
@@ -1499,7 +2054,7 @@ function AdminDashboard({ onLogout, user }) {
         ) : currentAdminView === 'neighbors' ? (
           <NeighborAccountsPage adminUserName={adminUserName} />
         ) : currentAdminView === 'settings-users' ? (
-          <SettingsUsersPage />
+          <SettingsUsersPage targetUserDetailId={targetUserDetailId} />
         ) : currentAdminView === 'settings-categories' ? (
           <SettingsCategoriesPage />
         ) : currentAdminView === 'settings-locations' ? (
@@ -1512,7 +2067,14 @@ function AdminDashboard({ onLogout, user }) {
                 <h1 id="admin-title">Gestión municipal de eventos</h1>
               </div>
               <div className="admin-topbar-actions">
-                <NotificationMenu notifications={adminNotifications} />
+                <NotificationMenu
+                  notifications={adminNotificationItems}
+                  totalCount={adminNotificationCounts.total}
+                  unreadCount={adminNotificationCounts.unread}
+                  onFilterChange={handleNotificationFilterChange}
+                  onNotificationOpen={handleNotificationOpen}
+                  onNotificationRead={handleNotificationRead}
+                />
                 <button
                   className="admin-new-event-action"
                   type="button"
@@ -1560,32 +2122,28 @@ function AdminDashboard({ onLogout, user }) {
                     placeholder="Ingrese el nombre..."
                     type="search"
                     value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
+                    onChange={(event) => handleEventSearchChange(event.target.value)}
                   />
                 </label>
                 <label>
                   Estado
-                  <select
+                  <ManagementFilterCombobox
+                    emptyLabel="No se encontraron estados"
+                    options={managementStateOptions}
+                    placeholder="Buscar estado"
                     value={stateFilter}
-                    onChange={(event) => setStateFilter(event.target.value)}
-                  >
-                    {stateOptions.map((state) => (
-                      <option key={state} value={state}>
-                        {state === 'Todos' ? state : formatEventState(state)}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={handleEventStateFilterChange}
+                  />
                 </label>
                 <label>
                   Categoría
-                  <select
+                  <ManagementFilterCombobox
+                    emptyLabel="No se encontraron categorías"
+                    options={managementCategoryOptions}
+                    placeholder="Buscar categoría"
                     value={categoryFilter}
-                    onChange={(event) => setCategoryFilter(event.target.value)}
-                  >
-                    {categoryOptions.map((category) => (
-                      <option key={category}>{category}</option>
-                    ))}
-                  </select>
+                    onChange={handleEventCategoryFilterChange}
+                  />
                 </label>
               </div>
 
@@ -1597,6 +2155,11 @@ function AdminDashboard({ onLogout, user }) {
                   <span>Completitud</span>
                   <span>Acción</span>
                 </div>
+                {filteredAdminEvents.length === 0 && (
+                  <div className="admin-table-row admin-table-empty-row">
+                    <span>No se encontraron eventos con los filtros seleccionados.</span>
+                  </div>
+                )}
                 {filteredAdminEvents.map((event) => {
                   const actionConfig = getAdminEventActionConfig(event);
                   const ActionIcon = actionConfig?.icon;
@@ -1610,7 +2173,7 @@ function AdminDashboard({ onLogout, user }) {
                       <span>
                         <StateBadge state={event.state} />
                       </span>
-                      <span>{event.category}</span>
+                      <span>{event.category || 'Sin categoria'}</span>
                       <span className="completeness-cell">
                         <CompletenessMeter compact value={event.completeness} />
                         <PendingItemsControl
@@ -1641,6 +2204,40 @@ function AdminDashboard({ onLogout, user }) {
                   );
                 })}
               </div>
+              <div className="settings-pagination">
+                <button
+                  className="back-button"
+                  disabled={eventsPage.number === 0}
+                  type="button"
+                  onClick={() =>
+                    setEventsPage((currentPage) => ({
+                      ...currentPage,
+                      number: Math.max(0, currentPage.number - 1),
+                    }))
+                  }
+                >
+                  Anterior
+                </button>
+                <span>
+                  Página {eventsPage.totalPages === 0 ? 0 : eventsPage.number + 1} de {eventsPage.totalPages}
+                  {' '}· {eventsPage.totalElements} eventos
+                </span>
+                <button
+                  className="back-button"
+                  disabled={eventsPage.number + 1 >= eventsPage.totalPages}
+                  type="button"
+                  onClick={() =>
+                    setEventsPage((currentPage) => ({
+                      ...currentPage,
+                      number: currentPage.number + 1 >= currentPage.totalPages
+                        ? currentPage.number
+                        : currentPage.number + 1,
+                    }))
+                  }
+                >
+                  Siguiente
+                </button>
+              </div>
             </section>
 
             
@@ -1650,13 +2247,9 @@ function AdminDashboard({ onLogout, user }) {
         {pendingEventAction && (
           <ConfirmEventActionModal
             action={pendingEventAction}
+            isSaving={isSavingEventAction}
             onCancel={() => setPendingEventAction(null)}
-            onConfirm={() => {
-              setPendingEventAction(null);
-              setSelectedAdminEvent(null);
-              setCurrentAdminView('dashboard');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
+            onConfirm={() => confirmPendingEventAction()}
           />
         )}
 
@@ -1670,6 +2263,7 @@ function AdminDashboard({ onLogout, user }) {
         {eventToDelete && (
           <DeleteDraftEventModal
             event={eventToDelete}
+            isDeleting={isDeletingEventAction}
             onCancel={cancelDeleteDraftEvent}
             onConfirm={confirmDeleteDraftEvent}
           />
@@ -1964,9 +2558,9 @@ function VideoResourceCard({ defaultValue = '' }) {
   );
 }
 
-function LocationCatalogSelector({ defaultLocationId = '' }) {
+function LocationCatalogSelector({ defaultLocationId = '', locations = registeredLocations }) {
   const [selectedLocationId, setSelectedLocationId] = useState(defaultLocationId);
-  const selectedLocation = getRegisteredLocationById(selectedLocationId);
+  const selectedLocation = getRegisteredLocationById(selectedLocationId, locations);
   const mapUrl = getLocationMapEmbedUrl(selectedLocation);
 
   return (
@@ -1980,14 +2574,14 @@ function LocationCatalogSelector({ defaultLocationId = '' }) {
             onChange={(event) => setSelectedLocationId(event.target.value)}
           >
             <option value="">Seleccionar ubicación</option>
-            {registeredLocations.map((location) => (
+            {locations.map((location) => (
               <option key={location.ubicacion_id} value={location.ubicacion_id}>
                 {location.nombre_lugar}
               </option>
             ))}
           </select>
           <small>
-            TODO: consumir ubicaciones desde el CRUD administrador cuando el backend esté listo.
+            Selecciona una ubicación registrada en configuración.
           </small>
         </label>
 
@@ -2151,6 +2745,7 @@ function getStateSummaryText(state) {
     CANCELADO: 'Evento cancelado.',
     CERRADO: 'Evento cerrado.',
     EN_REVISION: 'Pendiente de revisión directiva.',
+    PARA_REVISION: 'Pendiente de revisión directiva.',
     OBSERVADO_EN_REVISION: 'Ficha corregida y reenviada al directivo.',
     FINALIZADO: 'Evento cerrado.',
     OBSERVADO: 'Requiere correcciones antes de reenviar.',
@@ -2179,7 +2774,7 @@ function getAdminEventActionConfig(event) {
     };
   }
 
-  if (['EN_REVISION', 'APROBADO'].includes(event.state)) {
+  if (['EN_REVISION', 'PARA_REVISION', 'APROBADO'].includes(event.state)) {
     return {
       icon: ClipboardCheckLineIcon,
       label: `Ver estado de revision de ${event.title}`,
@@ -2402,6 +2997,261 @@ function MunicipalAreaCombobox({ defaultAreaId = '', defaultAreaName = '', onAre
             ))
           ) : (
             <span className="area-combobox-empty">No se encontraron áreas</span>
+          )}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function ManagementFilterCombobox({
+  emptyLabel = 'No se encontraron opciones',
+  onChange,
+  options = [],
+  placeholder = 'Buscar',
+  value,
+}) {
+  const selectedOption =
+    options.find((option) => String(option.value) === String(value)) ?? options[0] ?? null;
+  const [searchValue, setSearchValue] = useState(selectedOption?.label ?? '');
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const comboboxRef = useRef(null);
+  const normalizedSearch = normalizeSearchText(searchValue.trim());
+  const filteredOptions = options.filter((option) => {
+    if (!normalizedSearch || selectedOption?.label === searchValue) {
+      return true;
+    }
+
+    return normalizeSearchText(option.label).includes(normalizedSearch);
+  });
+
+  useEffect(() => {
+    setSearchValue(selectedOption?.label ?? '');
+    setHighlightedIndex(0);
+  }, [selectedOption?.label]);
+
+  useEffect(() => {
+    function closeOnOutsideClick(event) {
+      if (!comboboxRef.current?.contains(event.target)) {
+        setIsOpen(false);
+        setSearchValue(selectedOption?.label ?? '');
+      }
+    }
+
+    document.addEventListener('mousedown', closeOnOutsideClick);
+
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick);
+    };
+  }, [selectedOption?.label]);
+
+  function selectOption(option) {
+    setSearchValue(option.label);
+    setIsOpen(false);
+    setHighlightedIndex(0);
+    onChange?.(option.value);
+  }
+
+  function handleSearchChange(event) {
+    setSearchValue(event.target.value);
+    setIsOpen(true);
+    setHighlightedIndex(0);
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setIsOpen(true);
+      setHighlightedIndex((currentIndex) =>
+        Math.min(currentIndex + 1, Math.max(filteredOptions.length - 1, 0)),
+      );
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setHighlightedIndex((currentIndex) => Math.max(currentIndex - 1, 0));
+      return;
+    }
+
+    if (event.key === 'Enter' && isOpen && filteredOptions[highlightedIndex]) {
+      event.preventDefault();
+      selectOption(filteredOptions[highlightedIndex]);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      setIsOpen(false);
+      setSearchValue(selectedOption?.label ?? '');
+    }
+  }
+
+  return (
+    <span className="area-combobox category-combobox management-filter-combobox" ref={comboboxRef}>
+      <input
+        aria-autocomplete="list"
+        aria-expanded={isOpen}
+        className="area-combobox-input"
+        placeholder={placeholder}
+        role="combobox"
+        type="text"
+        value={searchValue}
+        onChange={handleSearchChange}
+        onClick={() => setIsOpen(true)}
+        onFocus={() => setIsOpen(true)}
+        onKeyDown={handleKeyDown}
+      />
+      {isOpen && (
+        <span className="area-combobox-menu" role="listbox">
+          {filteredOptions.length > 0 ? (
+            filteredOptions.map((option, index) => (
+              <button
+                aria-selected={String(option.value) === String(value)}
+                className={index === highlightedIndex ? 'is-highlighted' : ''}
+                key={option.value}
+                role="option"
+                type="button"
+                onClick={() => selectOption(option)}
+                onMouseEnter={() => setHighlightedIndex(index)}
+              >
+                <span>{option.label}</span>
+              </button>
+            ))
+          ) : (
+            <span className="area-combobox-empty">{emptyLabel}</span>
+          )}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function CategoryCombobox({ categories = [], defaultCategoryId = '', defaultCategoryName = '', onCategoryChange }) {
+  const initialCategory =
+    categories.find((category) => String(category.id) === String(defaultCategoryId)) ??
+    categories.find(
+      (category) => normalizeSearchText(category.nombre) === normalizeSearchText(defaultCategoryName),
+    ) ??
+    null;
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
+  const [searchValue, setSearchValue] = useState(initialCategory?.nombre ?? defaultCategoryName ?? '');
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const comboboxRef = useRef(null);
+  const normalizedSearch = normalizeSearchText(searchValue.trim());
+  const filteredCategories = categories.filter((category) => {
+    if (!normalizedSearch) {
+      return true;
+    }
+
+    return normalizeSearchText(category.nombre).includes(normalizedSearch);
+  });
+
+  useEffect(() => {
+    if (selectedCategory || !defaultCategoryId || categories.length === 0) {
+      return;
+    }
+
+    const category = categories.find((item) => String(item.id) === String(defaultCategoryId));
+
+    if (category) {
+      setSelectedCategory(category);
+      setSearchValue(category.nombre);
+    }
+  }, [categories, defaultCategoryId, selectedCategory]);
+
+  useEffect(() => {
+    function closeOnOutsideClick(event) {
+      if (!comboboxRef.current?.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', closeOnOutsideClick);
+
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick);
+    };
+  }, []);
+
+  function selectCategory(category) {
+    setSelectedCategory(category);
+    setSearchValue(category.nombre);
+    setIsOpen(false);
+    setHighlightedIndex(0);
+    window.setTimeout(() => onCategoryChange?.(), 0);
+  }
+
+  function handleSearchChange(event) {
+    setSearchValue(event.target.value);
+    setSelectedCategory(null);
+    setIsOpen(true);
+    setHighlightedIndex(0);
+    window.setTimeout(() => onCategoryChange?.(), 0);
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setIsOpen(true);
+      setHighlightedIndex((currentIndex) =>
+        Math.min(currentIndex + 1, Math.max(filteredCategories.length - 1, 0)),
+      );
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setHighlightedIndex((currentIndex) => Math.max(currentIndex - 1, 0));
+      return;
+    }
+
+    if (event.key === 'Enter' && isOpen && filteredCategories[highlightedIndex]) {
+      event.preventDefault();
+      selectCategory(filteredCategories[highlightedIndex]);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      setIsOpen(false);
+    }
+  }
+
+  return (
+    <span className="area-combobox category-combobox" ref={comboboxRef}>
+      <input name="categoryId" readOnly type="hidden" value={selectedCategory?.id ?? ''} />
+      <input
+        aria-autocomplete="list"
+        aria-expanded={isOpen}
+        className="area-combobox-input"
+        placeholder="Buscar o seleccionar categoría"
+        role="combobox"
+        type="text"
+        value={searchValue}
+        onChange={handleSearchChange}
+        onClick={() => setIsOpen(true)}
+        onFocus={() => setIsOpen(true)}
+        onKeyDown={handleKeyDown}
+      />
+      {isOpen && (
+        <span className="area-combobox-menu" role="listbox">
+          {filteredCategories.length > 0 ? (
+            filteredCategories.map((category, index) => (
+              <button
+                aria-selected={selectedCategory?.id === category.id}
+                className={index === highlightedIndex ? 'is-highlighted' : ''}
+                key={category.id}
+                role="option"
+                type="button"
+                onClick={() => selectCategory(category)}
+                onMouseEnter={() => setHighlightedIndex(index)}
+              >
+                <span>{category.nombre}</span>
+              </button>
+            ))
+          ) : (
+            <span className="area-combobox-empty">No se encontraron categorías</span>
           )}
         </span>
       )}
@@ -3028,7 +3878,7 @@ function NeighborAccountActionModal({ action, reason, onCancel, onConfirm, onRea
   );
 }
 
-function SettingsUsersPage() {
+function SettingsUsersPage({ targetUserDetailId = null }) {
 
   // >>>>>>>>>>> Estados de SettingsUsersPage <<<<<<<<<<<<<<<<
   const [searchValue, setSearchValue] = useState('');
@@ -3051,6 +3901,7 @@ function SettingsUsersPage() {
   const [identityLookupNotice, setIdentityLookupNotice] = useState('');
   const [passwordResetNotice, setPasswordResetNotice] = useState('');
   const [userNotice, setUserNotice] = useState('');
+  const [openedTargetUserId, setOpenedTargetUserId] = useState(null);
 
   useEffect(()=>{
     async function loadUsuariosInternos() {
@@ -3162,6 +4013,28 @@ function SettingsUsersPage() {
       setUserNotice(error.response?.data?.message ?? 'No se pudo cargar la información del usuario.');
     }
   };
+
+  useEffect(() => {
+    if (!targetUserDetailId || openedTargetUserId === targetUserDetailId || roleCatalog.length === 0) {
+      return;
+    }
+
+    const targetUser = users.find((user) => user.id === targetUserDetailId) ?? {
+      id: targetUserDetailId,
+      nombre: '',
+      correo: '',
+      rol: '',
+      estado: 'ACTIVO',
+    };
+
+    setUsers((currentUsers) =>
+      currentUsers.some((user) => user.id === targetUserDetailId)
+        ? currentUsers
+        : [targetUser, ...currentUsers],
+    );
+    setOpenedTargetUserId(targetUserDetailId);
+    openEditUserModal(targetUser);
+  }, [openedTargetUserId, roleCatalog, targetUserDetailId, users]);
 
   const saveUser = async () => {
     const errors = validateUserForm(userFormData, userModalMode);
@@ -3446,14 +4319,6 @@ function requestPasswordResetLink(user) {
   return {
     recipient: user.correo,
     status: 'sent',
-  };
-}
-
-function registerEventAuditLog(action, eventId) {
-  return {
-    action,
-    eventId,
-    status: 'registered',
   };
 }
 
@@ -5124,6 +5989,13 @@ function EvaluationTrackingSection({
 }) {
   const hasDefinedCapacity = capacityMode !== 'none';
   const isPercentageGoal = goalType === 'PORCENTAJE_ASISTENCIA';
+  const normalizedCapacityValue = Number(capacityValue) > 0 ? capacityValue : '';
+
+  function keepCapacityAtMinimum(event) {
+    if (event.target.value !== '' && Number(event.target.value) <= 0) {
+      event.target.value = '1';
+    }
+  }
 
   return (
     <article className="event-form-section" id="evaluacion">
@@ -5158,11 +6030,14 @@ function EvaluationTrackingSection({
           <label className="form-field">
             Aforo máximo
             <input
-              defaultValue={capacityValue}
+              defaultValue={normalizedCapacityValue}
               min="1"
               name="capacity"
               placeholder="120"
+              step="1"
               type="number"
+              onBlur={keepCapacityAtMinimum}
+              onInput={keepCapacityAtMinimum}
             />
           </label>
         )}
@@ -5218,7 +6093,7 @@ function EvaluationTrackingSection({
   );
 }
 
-function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
+function NewEventView({ categories = [], locations = [], onBack, onRequestAction, onValidationIssue }) {
   const formRef = useRef(null);
   const [capacityMode, setCapacityMode] = useState('defined');
   const [audienceType, setAudienceType] = useState('GENERAL');
@@ -5226,6 +6101,7 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
   const [goalType, setGoalType] = useState('CANTIDAD_ASISTENTES');
   const [surveyEnabled, setSurveyEnabled] = useState(false);
   const [surveyCommentsEnabled, setSurveyCommentsEnabled] = useState(false);
+  const [eventStartValue, setEventStartValue] = useState('');
   const [checklistEvent, setChecklistEvent] = useState(() => ({
     resources: {},
     state: 'BORRADOR',
@@ -5245,11 +6121,12 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
     setGoalType(getNamedFormValue(form, 'attendanceGoalType') || 'CANTIDAD_ASISTENTES');
     setSurveyEnabled(isNamedChecked(form, 'surveyEnabled'));
     setSurveyCommentsEnabled(isNamedChecked(form, 'surveyCommentsEnabled'));
+    setEventStartValue(getNamedFormValue(form, 'eventStart'));
     setChecklistEvent(
       getChecklistEventFromForm(form, {
         resources: {},
         state: 'BORRADOR',
-      }),
+      }, { categories, locations }),
     );
     setMissingReviewFields(getMissingReviewFields(form));
   }
@@ -5262,7 +6139,7 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
       return;
     }
 
-    onRequestAction('review');
+    onRequestAction('review', buildEventCreatePayload(formRef.current, 'review'));
   }
 
   return (
@@ -5298,14 +6175,7 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
               </label>
               <label className="form-field">
                 Categoria
-                <select defaultValue="" name="category">
-                  <option disabled value="">Seleccionar categoría</option>
-                  {categoryOptions
-                    .filter((category) => category !== 'Todas')
-                    .map((category) => (
-                      <option key={category}>{category}</option>
-                    ))}
-                </select>
+                <CategoryCombobox categories={categories} onCategoryChange={syncChecklistFromForm} />
               </label>
               <label className="form-field">
                 Área responsable
@@ -5314,13 +6184,13 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
               <label className="form-field span-2">
                 Descripción breve
                 <textarea
-                  maxLength={255}
+                  maxLength={45}
                   name="descripcion_breve"
                   placeholder="Resumen corto para la agenda y cabecera del evento."
                   rows={3}
                 />
                 <small>
-                  Resumen corto que se mostrará en la agenda y en la cabecera del evento. Máximo 255 caracteres.
+                  Resumen corto que se mostrará en la agenda y en la cabecera del evento. Máximo 45 caracteres.
                 </small>
               </label>
               <label className="form-field span-2">
@@ -5345,7 +6215,7 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
               </label>
               <label className="form-field">
                 Fin del evento
-                <input name="eventEnd" type="datetime-local" />
+                <input min={eventStartValue || undefined} name="eventEnd" type="datetime-local" />
               </label>
               <label className="form-field">
                 Costo referencial
@@ -5419,7 +6289,7 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
               <span className="section-kicker">Ubicación</span>
               <h2>Lugar del evento</h2>
             </div>
-            <LocationCatalogSelector />
+            <LocationCatalogSelector locations={locations} />
           </article>
 
           <article className="event-form-section" id="recursos">
@@ -5475,7 +6345,7 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
             <button
               className="admin-secondary-action event-draft-action"
               type="button"
-              onClick={() => onRequestAction('draft')}
+              onClick={() => onRequestAction('draft', buildEventCreatePayload(formRef.current, 'draft'))}
             >
               Guardar borrador
             </button>
@@ -5494,9 +6364,9 @@ function NewEventView({ onBack, onRequestAction, onValidationIssue }) {
   );
 }
 
-function EditEventView({ event, onBack, onRequestAction, onRequestDelete, onValidationIssue }) {
+function EditEventView({ categories = [], event, locations = [], onBack, onRequestAction, onRequestDelete, onValidationIssue }) {
   const formRef = useRef(null);
-  const initialCapacityMode = event.aforoMaximo === null ? 'none' : 'defined';
+  const initialCapacityMode = Number(event.aforoMaximo ?? event.spots ?? 0) > 0 ? 'defined' : 'none';
   const initialAudienceType =
     event.publico_tipo ?? (event.edad_minima || event.edad_maxima ? 'OBJETIVO' : 'GENERAL');
   const initialMunicipalArea = getMunicipalAreaByEvent(event);
@@ -5511,6 +6381,7 @@ function EditEventView({ event, onBack, onRequestAction, onRequestDelete, onVali
   const [goalType, setGoalType] = useState(event.metaTipo ?? 'CANTIDAD_ASISTENTES');
   const [surveyEnabled, setSurveyEnabled] = useState(Boolean(event.encuestaSatisfaccionHabilitada));
   const [surveyCommentsEnabled, setSurveyCommentsEnabled] = useState(Boolean(event.encuestaComentarioHabilitado));
+  const [eventStartValue, setEventStartValue] = useState(() => getEventStartDateTimeValue(event));
   const [checklistEvent, setChecklistEvent] = useState(() => eventWithMunicipalArea);
   const [hasFormChanges, setHasFormChanges] = useState(false);
   const checklist = getEventChecklist(checklistEvent, {
@@ -5528,7 +6399,8 @@ function EditEventView({ event, onBack, onRequestAction, onRequestDelete, onVali
     setGoalType(getNamedFormValue(formRef.current, 'attendanceGoalType') || 'CANTIDAD_ASISTENTES');
     setSurveyEnabled(isNamedChecked(formRef.current, 'surveyEnabled'));
     setSurveyCommentsEnabled(isNamedChecked(formRef.current, 'surveyCommentsEnabled'));
-    setChecklistEvent(getChecklistEventFromForm(formRef.current, eventWithMunicipalArea));
+    setEventStartValue(getNamedFormValue(formRef.current, 'eventStart'));
+    setChecklistEvent(getChecklistEventFromForm(formRef.current, eventWithMunicipalArea, { categories, locations }));
   }
 
   function requestReview() {
@@ -5539,7 +6411,7 @@ function EditEventView({ event, onBack, onRequestAction, onRequestDelete, onVali
       return;
     }
 
-    onRequestAction('review-changes');
+    onRequestAction('review-changes', buildEventCreatePayload(formRef.current, 'review', event));
   }
 
   return (
@@ -5575,13 +6447,12 @@ function EditEventView({ event, onBack, onRequestAction, onRequestDelete, onVali
               </label>
               <label className="form-field">
                 Categoría
-                <select defaultValue={event.category} name="category">
-                  {categoryOptions
-                    .filter((category) => category !== 'Todas')
-                    .map((category) => (
-                      <option key={category}>{category}</option>
-                    ))}
-                </select>
+                <CategoryCombobox
+                  categories={categories}
+                  defaultCategoryId={event.categoria_id}
+                  defaultCategoryName={event.category}
+                  onCategoryChange={syncChecklistFromForm}
+                />
               </label>
               <label className="form-field">
                 Área responsable
@@ -5595,12 +6466,12 @@ function EditEventView({ event, onBack, onRequestAction, onRequestDelete, onVali
                 Descripción breve
                 <textarea
                   defaultValue={event.descripcion_breve ?? event.summary ?? ''}
-                  maxLength={255}
+                  maxLength={45}
                   name="descripcion_breve"
                   rows={3}
                 />
                 <small>
-                  Resumen corto que se mostrará en la agenda y en la cabecera del evento. Máximo 255 caracteres.
+                  Resumen corto que se mostrará en la agenda y en la cabecera del evento. Máximo 45 caracteres.
                 </small>
               </label>
               <label className="form-field span-2">
@@ -5628,6 +6499,7 @@ function EditEventView({ event, onBack, onRequestAction, onRequestDelete, onVali
                 Fin del evento
                 <input
                   defaultValue={getEventEndDateTimeValue(event)}
+                  min={eventStartValue || undefined}
                   name="eventEnd"
                   type="datetime-local"
                 />
@@ -5721,7 +6593,7 @@ function EditEventView({ event, onBack, onRequestAction, onRequestDelete, onVali
               <span className="section-kicker">Ubicación</span>
               <h2>Lugar del evento</h2>
             </div>
-            <LocationCatalogSelector defaultLocationId={event.ubicacion_id} />
+            <LocationCatalogSelector defaultLocationId={event.ubicacion_id} locations={locations} />
           </article>
 
           <article className="event-form-section" id="recursos">
@@ -5808,7 +6680,7 @@ function EditEventView({ event, onBack, onRequestAction, onRequestDelete, onVali
             <button
               className="admin-secondary-action event-draft-action"
               type="button"
-              onClick={() => onRequestAction('save-changes')}
+              onClick={() => onRequestAction('save-changes', buildEventCreatePayload(formRef.current, 'draft', event))}
             >
               Guardar cambios
             </button>
@@ -5859,9 +6731,13 @@ function ValidationIssueModal({ missingFields, onClose }) {
   );
 }
 
-function DeleteDraftEventModal({ event, onCancel, onConfirm }) {
+function DeleteDraftEventModal({ event, isDeleting = false, onCancel, onConfirm }) {
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={onCancel}>
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onMouseDown={isDeleting ? undefined : onCancel}
+    >
       <section
         aria-labelledby="delete-draft-event-title"
         aria-modal="true"
@@ -5875,11 +6751,11 @@ function DeleteDraftEventModal({ event, onCancel, onConfirm }) {
           ¿Deseas eliminar el evento "{event.title}"? Esta acción no se puede deshacer.
         </p>
         <div className="modal-actions">
-          <button className="back-button" type="button" onClick={onCancel}>
+          <button className="back-button" disabled={isDeleting} type="button" onClick={onCancel}>
             Cancelar
           </button>
-          <button className="primary-button danger-action" type="button" onClick={onConfirm}>
-            Eliminar evento
+          <button className="primary-button danger-action" disabled={isDeleting} type="button" onClick={onConfirm}>
+            {isDeleting ? 'Eliminando...' : 'Eliminar evento'}
           </button>
         </div>
       </section>
@@ -5887,7 +6763,7 @@ function DeleteDraftEventModal({ event, onCancel, onConfirm }) {
   );
 }
 
-function ConfirmEventActionModal({ action, onCancel, onConfirm }) {
+function ConfirmEventActionModal({ action, isSaving = false, onCancel, onConfirm }) {
   const actionType = typeof action === 'string' ? action : action.type;
   const isCreate = typeof action === 'string' || action.mode === 'create';
   const isReview = actionType === 'review' || actionType === 'review-changes';
@@ -5918,11 +6794,11 @@ function ConfirmEventActionModal({ action, onCancel, onConfirm }) {
         <h2 id="confirm-event-action-title">{title}</h2>
         <p>{description}</p>
         <div className="modal-actions">
-          <button className="back-button" type="button" onClick={onCancel}>
+          <button className="back-button" disabled={isSaving} type="button" onClick={onCancel}>
             Revisar datos
           </button>
-          <button className="primary-button" type="button" onClick={onConfirm}>
-            {confirmLabel}
+          <button className="primary-button" disabled={isSaving} type="button" onClick={onConfirm}>
+            {isSaving ? 'Guardando...' : confirmLabel}
           </button>
         </div>
       </section>

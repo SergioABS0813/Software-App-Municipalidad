@@ -12,6 +12,9 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -23,6 +26,9 @@ public class VecinoNotificacionService {
 
     @Value("${app.mail.enabled:false}")
     private boolean mailEnabled;
+
+    @Value("${app.frontend.base-url:http://localhost:5173}")
+    private String frontendBaseUrl;
 
     public void notificarCambioContacto(
             String emailDestino,
@@ -51,6 +57,49 @@ public class VecinoNotificacionService {
                         """.formatted(escapeHtml(nombre), detalleCambio)
                 )
         );
+    }
+
+    public void enviarCorreoValoracionEvento(
+            String emailDestino,
+            String nombre,
+            String tituloEvento,
+            String token
+    ) {
+        if (!StringUtils.hasText(emailDestino) || !StringUtils.hasText(token)) {
+            return;
+        }
+
+        String enlaceValoracion = construirEnlaceValoracion(token);
+
+        enviarCorreoHtml(
+                emailDestino,
+                "Ayúdanos a mejorar: puntúa el evento al que asististe",
+                construirPlantillaHtml(
+                        "Valora tu experiencia",
+                        """
+                        <p>Hola <strong>%s</strong>,</p>
+                        <p>Gracias por asistir al evento <strong>%s</strong>. Tu opiniÃ³n nos ayuda a mejorar las prÃ³ximas actividades municipales.</p>
+                        <p style="margin:28px 0;text-align:center;">
+                          <a href="%s" style="display:inline-block;background:#0a56c2;color:#ffffff;text-decoration:none;font-weight:800;border-radius:8px;padding:14px 24px;">
+                            PuntÃºa el evento
+                          </a>
+                        </p>
+                        <p style="color:#2f5276;">La valoraciÃ³n solo toma unos segundos.</p>
+                        """.formatted(
+                                escapeHtml(StringUtils.hasText(nombre) ? nombre : "vecino"),
+                                escapeHtml(tituloEvento),
+                                escapeHtml(enlaceValoracion)
+                        )
+                )
+        );
+    }
+
+    private String construirEnlaceValoracion(String token) {
+        String baseUrl = StringUtils.hasText(frontendBaseUrl)
+                ? frontendBaseUrl.stripTrailing()
+                : "http://localhost:5173";
+
+        return baseUrl + "/valorar-evento?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
     }
 
     private String construirDetalleCambio(String correoActual, String celularActual, boolean cambioCorreo, boolean cambioCelular) {

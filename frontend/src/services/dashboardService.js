@@ -51,17 +51,58 @@ export async function actualizarContactoCuentaVecinal(id, contacto){
     return response.data
 }
 
-export async function getCategoriasConfiguracion({ texto = '', page = 0 } = {}){
+export async function getCategoriasConfiguracion({ texto = '', page = 0, size } = {}){
     const response = await api.get("categoria/admin/configuracion", {
-        params: { texto, page },
+        params: { texto, page, size },
     });
     return response.data
 }
 
-export async function getUbicacionesConfiguracion({ texto = '', page = 0 } = {}){
+export async function getUbicacionesConfiguracion({ texto = '', page = 0, size } = {}){
     const response = await api.get("ubicacion/admin/configuracion", {
-        params: { texto, page },
+        params: { texto, page, size },
     });
+    return response.data
+}
+
+export async function getEventosGestion({
+    texto = '',
+    estado = '',
+    categoriaId = '',
+    sinCategoria = false,
+    page = 0,
+    size = 5,
+} = {}){
+    const response = await api.get("eventos/admin/operacion", {
+        params: {
+            texto,
+            estado: estado || undefined,
+            categoriaId: categoriaId || undefined,
+            sinCategoria,
+            page,
+            size,
+        },
+    });
+    return response.data
+}
+
+export async function getEstadosEventoGestion(){
+    const response = await api.get("estado_evento/admin/operacion");
+    return response.data
+}
+
+export async function guardarEventoGestion(evento){
+    const response = await api.post("eventos/admin/operacion", evento);
+    return response.data
+}
+
+export async function actualizarEventoGestion(id, evento){
+    const response = await api.put(`eventos/admin/operacion/${id}`, evento);
+    return response.data
+}
+
+export async function eliminarEventoGestion(id){
+    const response = await api.delete(`eventos/admin/operacion/${id}`);
     return response.data
 }
 
@@ -95,4 +136,15 @@ export async function guardarCategoria(categoria){
 export async function eliminarCategoriaConfiguracion(id){
     const response = await api.delete(`categoria/admin/${id}`);
     return response.data
+}
+
+export async function getNotificacionesAdministrador({ soloNoLeidas = false } = {}){
+    const endpoint = soloNoLeidas ? "notificacion/no_leidas" : "notificacion/todas";
+    const response = await api.get(endpoint);
+    return response.data;
+}
+
+export async function marcarNotificacionComoLeida(id){
+    const response = await api.patch(`notificacion/${id}/leer`);
+    return response.data;
 }

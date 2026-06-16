@@ -8,8 +8,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Optional;
+
 public interface CategoriaRepository extends JpaRepository<Categoria, Integer> {
     boolean existsByNombreIgnoreCase(String nombre);
+
+    Optional<Categoria> findByNombreIgnoreCase(String nombre);
 
     @Query(
             value = """

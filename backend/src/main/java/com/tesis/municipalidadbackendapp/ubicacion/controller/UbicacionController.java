@@ -26,9 +26,10 @@ public class UbicacionController {
     @GetMapping("admin/configuracion")
     public Page<UbicacionConfiguracionDto> obtenerUbicacionesConfiguracion(
             @RequestParam(required = false) String texto,
-            @RequestParam(defaultValue = "0") int page
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size
     ) {
-        return ubicacionService.obtenerUbicacionesConfiguracion(texto, page);
+        return ubicacionService.obtenerUbicacionesConfiguracion(texto, page, size);
     }
 
     @PostMapping("admin/guardar_ubicacion")

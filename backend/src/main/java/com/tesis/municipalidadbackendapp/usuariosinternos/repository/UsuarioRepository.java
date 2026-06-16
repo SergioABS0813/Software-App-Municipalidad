@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface UsuarioRepository extends JpaRepository<Usuario,Integer> {
@@ -18,6 +19,13 @@ public interface UsuarioRepository extends JpaRepository<Usuario,Integer> {
     boolean existsByEmail(String email);
 
     boolean existsByEmailAndIdNot(String email, Integer id);
+
+    @Query("""
+        SELECT u
+        FROM Usuario u
+        WHERE UPPER(COALESCE(u.rol.codigo, u.rol.nombre)) = UPPER(:rol)
+    """)
+    List<Usuario> findByRolCodigoOrNombre(@Param("rol") String rol);
 
     @Query("""
         SELECT u

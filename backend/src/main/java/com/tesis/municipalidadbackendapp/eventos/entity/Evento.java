@@ -28,14 +28,12 @@ public class Evento {
     @Column(name = "descripcion", columnDefinition = "TEXT")
     private String descripcion;
 
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY, optional=false)
-    @JoinColumn(name = "categoria_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "categoria_id")
     private Categoria categoria;
 
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY, optional=false)
-    @JoinColumn(name="area_municipal_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name="area_municipal_id")
     private AreaMunicipal areaMunicipal;
 
     @Column(name = "fecha_hora_inicio")
@@ -48,13 +46,12 @@ public class Evento {
     private Float costoReferencial;
 
     @NotNull
-    @ManyToOne(fetch = FetchType.LAZY, optional=false)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "estado_evento_id", nullable = false)
     private EstadoEvento estadoEvento;
 
-    @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional=false)
-    @JoinColumn(name="ubicacion_id", nullable = false)
+    @JoinColumn(name="ubicacion_id")
     private Ubicacion ubicacion;
 
     @Column(name = "aforo_maximo")

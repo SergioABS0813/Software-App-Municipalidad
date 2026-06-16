@@ -33,8 +33,9 @@ public class CategoriaService {
         return categoriaRepository.findAll();
     }
 
-    public Page<CategoriaConfiguracionDto> obtenerCategoriasConfiguracion(String texto, int page) {
-        PageRequest pageable = PageRequest.of(page, 5, Sort.by("nombre").ascending());
+    public Page<CategoriaConfiguracionDto> obtenerCategoriasConfiguracion(String texto, int page, int size) {
+        int pageSize = Math.max(1, Math.min(size, 200));
+        PageRequest pageable = PageRequest.of(page, pageSize, Sort.by("nombre").ascending());
         return categoriaRepository.findAllConfiguracion(texto, pageable);
     }
 

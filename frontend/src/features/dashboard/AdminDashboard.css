@@ -578,10 +578,47 @@
 .notification-item {
   align-items: start;
   border-top: 1px solid var(--color-border);
+  cursor: pointer;
   display: grid;
   gap: 12px;
   grid-template-columns: 34px minmax(0, 1fr);
   padding: 13px 16px;
+  position: relative;
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.notification-item:hover,
+.notification-item:focus-visible {
+  background: #e8f0f6;
+  box-shadow: inset 3px 0 0 #0284c7;
+  outline: none;
+}
+
+.notification-item:hover .notification-item-icon,
+.notification-item:focus-visible .notification-item-icon {
+  background: #bae6fd;
+  color: #0369a1;
+}
+
+.notification-item.is-unread {
+  padding-right: 38px;
+}
+
+.notification-item > div {
+  min-width: 0;
+}
+
+.notification-unread-indicator {
+  background: #0284c7;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.14);
+  height: 11px;
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 11px;
 }
 
 .notification-item-icon {
@@ -611,6 +648,9 @@
   font-size: 0.84rem;
   font-weight: 760;
   line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .notification-item-heading {
@@ -618,6 +658,7 @@
   display: flex;
   gap: 10px;
   justify-content: space-between;
+  min-width: 0;
 }
 
 .notification-item-heading time {
@@ -633,6 +674,18 @@
   font-weight: 560;
   line-height: 1.42;
   margin: 4px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notification-empty {
+  color: var(--color-text-muted);
+  font-size: 0.84rem;
+  font-weight: 650;
+  margin: 0;
+  padding: 18px 16px;
+  text-align: center;
 }
 
 .admin-new-event-action {
@@ -968,6 +1021,16 @@
 .events-management-table .admin-table-row {
   grid-template-columns: minmax(280px, 44fr) minmax(128px, 15fr) minmax(118px, 15fr) minmax(150px, 18fr) minmax(58px, 8fr);
   min-width: 0;
+}
+
+.events-management-table .admin-table-empty-row {
+  grid-template-columns: 1fr;
+}
+
+.events-management-table .admin-table-empty-row span {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  font-weight: 650;
 }
 
 .events-management-table .admin-table-row > span {
@@ -2892,6 +2955,20 @@
 .area-combobox-menu button:hover,
 .area-combobox-menu button.is-highlighted {
   background: var(--brand-soft);
+}
+
+.category-combobox .area-combobox-menu button {
+  gap: 0;
+  padding-bottom: 8px;
+  padding-top: 8px;
+}
+
+.management-filter-combobox {
+  width: 100%;
+}
+
+.management-filter-combobox .area-combobox-menu {
+  z-index: 80;
 }
 
 .area-combobox-menu button span {

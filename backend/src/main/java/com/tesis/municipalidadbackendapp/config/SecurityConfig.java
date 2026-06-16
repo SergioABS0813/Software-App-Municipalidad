@@ -11,7 +11,6 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -34,27 +33,33 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-
         JwtAuthenticationConverter jwtConverter = new JwtAuthenticationConverter();
         jwtConverter.setJwtGrantedAuthoritiesConverter(keycloakRoleConverter);
 
         http
-                .csrf(AbstractHttpConfigurer::disable) // Deshabilitar CSRF ya que usamos JWT
-                .cors(Customizer.withDefaults()) // Habilitar CORS con la configuración predeterminada
+                .csrf(AbstractHttpConfigurer::disable)
+                .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/public/**").permitAll() // Permitir acceso a las rutas de autenticación sin autenticación
-                        .requestMatchers("/api/admin/**").hasRole("ADMINISTRADOR") // Solo los usuarios con rol ADMIN pueden acceder a estas rutas
+                        .requestMatchers("/public/**").permitAll()
+                        .requestMatchers("/api/valoraciones/validar").permitAll()
+                        .requestMatchers("/api/valoraciones/responder").permitAll()
+                        .requestMatchers("/api/valoraciones/admin/**").hasAnyRole("ADMINISTRADOR", "DIRECTIVO")
+                        .requestMatchers("/api/eventos/admin/operacion/*/finalizar").hasAnyRole("ADMINISTRADOR", "DIRECTIVO")
+                        .requestMatchers("/api/eventos/admin/**").hasRole("ADMINISTRADOR")
+                        .requestMatchers("/api/estado_evento/admin/**").hasRole("ADMINISTRADOR")
+                        .requestMatchers("/api/notificacion/**").hasAnyRole("ADMINISTRADOR", "DIRECTIVO", "OPERATIVO")
+                        .requestMatchers("/api/admin/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/usuario/admin/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/rol/admin/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/vecino/admin/**").hasRole("ADMINISTRADOR")
-                        .requestMatchers("/api/area_municipal/**").hasRole("DIRECTIVO") // Solo los usuarios con rol DIRECTIVO pueden acceder a estas rutas
+                        .requestMatchers("/api/area_municipal/**").hasRole("DIRECTIVO")
                         .requestMatchers("/api/categoria/admin/**").hasRole("ADMINISTRADOR")
-                        .requestMatchers("/api/categoria/**").hasRole("OPERATIVO") // Solo los usuarios con rol DIRECTIVO pueden acceder a estas rutas
+                        .requestMatchers("/api/categoria/**").hasRole("OPERATIVO")
                         .requestMatchers("/api/ubicacion/admin/**").hasRole("ADMINISTRADOR")
-                        .anyRequest().authenticated() // Requerir autenticación para cualquier otra ruta
+                        .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter)) // JWT PARA AUTENTICACION
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter))
                 );
         return http.build();
     }
@@ -65,6 +70,7 @@ public class SecurityConfig {
 
         corsConfiguration.setAllowedOrigins(List.of(
                 "http://localhost:5173",
+                "http://localhost:5174",
                 "http://localhost"
         ));
 
