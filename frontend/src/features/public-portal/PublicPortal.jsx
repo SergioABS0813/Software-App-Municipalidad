@@ -13,7 +13,7 @@ import keycloak, {
 import { eventCategories, events } from './data/events';
 import PublicEventDetail from './PublicEventDetail';
 import './PublicPortal.css';
-import api from '../../services/api/api';
+import { SESSION_EXPIRED_MESSAGE } from '../../services/api/api';
 
 const institutionalUsers = [
   {
@@ -316,6 +316,7 @@ function PublicPortal() {
   const [authenticatedUser, setAuthenticatedUser] = useState(readStoredCitizenUser);
   const [detailOriginPath, setDetailOriginPath] = useState(eventsListPath);
   const [loginNotice, setLoginNotice] = useState('');
+  const [sessionExpiredMessage, setSessionExpiredMessage] = useState('');
 
   useEffect(() => {
     let isMounted = true;
@@ -348,6 +349,18 @@ function PublicPortal() {
 
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    function showSessionExpiredMessage(event) {
+      setSessionExpiredMessage(event.detail?.message ?? SESSION_EXPIRED_MESSAGE);
+    }
+
+    window.addEventListener('app-session-expired', showSessionExpiredMessage);
+
+    return () => {
+      window.removeEventListener('app-session-expired', showSessionExpiredMessage);
     };
   }, []);
 
@@ -639,6 +652,16 @@ function PublicPortal() {
           onCategoryChange={setSelectedCategory}
           onEventSelect={openEventDetail}
           onSearchChange={setSearchTerm}
+        />
+      )}
+
+      {sessionExpiredMessage && (
+        <SessionExpiredModal
+          message={sessionExpiredMessage}
+          onLogin={() => {
+            setSessionExpiredMessage('');
+            openLogin();
+          }}
         />
       )}
     </main>
@@ -1847,6 +1870,28 @@ function ConfirmRegistrationModal({ eventTitle, onCancel, onConfirm }) {
           </button>
           <button className="primary-button" type="button" onClick={onConfirm}>
             Sí, inscribirme
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function SessionExpiredModal({ message, onLogin }) {
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section
+        aria-labelledby="session-expired-title"
+        aria-modal="true"
+        className="confirm-modal login-required-modal"
+        role="dialog"
+      >
+        <span className="section-kicker">Sesión expirada</span>
+        <h2 id="session-expired-title">Vuelve a iniciar sesión</h2>
+        <p>{message}</p>
+        <div className="modal-actions">
+          <button className="primary-button" type="button" onClick={onLogin}>
+            Iniciar sesión
           </button>
         </div>
       </section>

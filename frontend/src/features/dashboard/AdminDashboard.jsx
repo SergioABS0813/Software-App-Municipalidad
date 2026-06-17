@@ -29,6 +29,7 @@ import {
   guardarUbicacionConfiguracion,
   marcarNotificacionComoLeida,
 } from '../../services/dashboardService';
+import { getApiErrorMessage } from '../../services/api/api';
 
 function getManagementStats(events) {
   return [
@@ -1386,6 +1387,8 @@ function AdminDashboard({ onLogout, user }) {
   const [activePendingPopover, setActivePendingPopover] = useState(null);
   const [activeFormSection, setActiveFormSection] = useState(eventFormSections[0].id);
   const pendingPopoverRef = useRef(null);
+  const manualFormSectionRef = useRef(null);
+  const manualFormSectionTimeoutRef = useRef(null);
   const isEventFormView =
     currentAdminView === 'new-event' || currentAdminView === 'edit-event';
   const isSettingsView = currentAdminView.startsWith('settings-');
@@ -1555,7 +1558,6 @@ function AdminDashboard({ onLogout, user }) {
   }, [activePendingPopover]);
 
   useEffect(() => {
-    //Gagaga
     if (!isEventFormView) {
       return undefined;
     }
@@ -1570,6 +1572,10 @@ function AdminDashboard({ onLogout, user }) {
 
     const observer = new IntersectionObserver(
       (entries) => {
+        if (manualFormSectionRef.current) {
+          return;
+        }
+
         const visibleEntry = entries
           .filter((entry) => entry.isIntersecting)
           .sort(
@@ -1590,17 +1596,29 @@ function AdminDashboard({ onLogout, user }) {
     sectionElements.forEach((sectionElement) => observer.observe(sectionElement));
 
     return () => {
+      if (manualFormSectionTimeoutRef.current) {
+        window.clearTimeout(manualFormSectionTimeoutRef.current);
+        manualFormSectionTimeoutRef.current = null;
+      }
       observer.disconnect();
     };
   }, [isEventFormView, currentAdminView]);
 
   function navigateToFormSection(sectionId) {
     closeSidebarDrawer();
+    manualFormSectionRef.current = sectionId;
+    if (manualFormSectionTimeoutRef.current) {
+      window.clearTimeout(manualFormSectionTimeoutRef.current);
+    }
     setActiveFormSection(sectionId);
     document.getElementById(sectionId)?.scrollIntoView({
       behavior: 'smooth',
       block: 'start',
     });
+    manualFormSectionTimeoutRef.current = window.setTimeout(() => {
+      manualFormSectionRef.current = null;
+      manualFormSectionTimeoutRef.current = null;
+    }, 900);
   }
 
   function toggleSidebarControl() {
@@ -1777,9 +1795,31 @@ function AdminDashboard({ onLogout, user }) {
       );
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
-      const message = error.response?.data?.message ?? 'No se pudo guardar el evento.';
+      const message = getApiErrorMessage(error, 'No se pudo guardar el evento.');
+      const status = error.response?.status;
       setPendingEventAction(null);
-      setValidationIssue({ missingFields: [message] });
+      setValidationIssue({
+        description:
+          status === 401 || error.sessionExpired
+            ? 'Tu sesión ya no está activa.'
+            : status === 403
+              ? 'Tu usuario no puede realizar esta acción.'
+              : 'Revisa la información enviada.',
+        kicker:
+          status === 401 || error.sessionExpired
+            ? 'Sesión expirada'
+            : status === 403
+              ? 'Sin permisos'
+              : 'Datos inválidos',
+        missingFields: [message],
+        title:
+          status === 401 || error.sessionExpired
+            ? 'Vuelve a iniciar sesión'
+            : status === 403
+              ? 'Acción no permitida'
+              : 'Datos inválidos o ficha incompleta',
+        actionLabel: status === 400 ? 'Revisar ficha' : 'Entendido',
+      });
     } finally {
       setIsSavingEventAction(false);
     }
@@ -1823,7 +1863,7 @@ function AdminDashboard({ onLogout, user }) {
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
-      const message = error.response?.data?.message ?? 'No se pudo eliminar el evento.';
+      const message = getApiErrorMessage(error, 'No se pudo eliminar el evento.');
       setEventToDelete(null);
       setEventDeleteNotice(message);
     } finally {
@@ -2255,7 +2295,11 @@ function AdminDashboard({ onLogout, user }) {
 
         {validationIssue && (
           <ValidationIssueModal
+            actionLabel={validationIssue.actionLabel}
+            description={validationIssue.description}
+            kicker={validationIssue.kicker}
             missingFields={validationIssue.missingFields}
+            title={validationIssue.title}
             onClose={() => setValidationIssue(null)}
           />
         )}
@@ -2386,7 +2430,6 @@ function PendingItemsControl({
         data-tooltip={
           pendingItems.length > 1 ? 'Ficha incompleta' : pendingItems[0]
         }
-        title={pendingItems.length > 1 ? 'Ficha incompleta' : pendingItems[0]}
         type="button"
         onClick={togglePendingPopover}
       >
@@ -2888,7 +2931,11 @@ function MunicipalAreaCombobox({ defaultAreaId = '', defaultAreaName = '', onAre
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const comboboxRef = useRef(null);
-  const normalizedSearch = normalizeSearchText(searchValue.trim());
+  const isShowingCurrentArea =
+    selectedArea && normalizeSearchText(searchValue) === normalizeSearchText(selectedArea.nombre);
+  const normalizedSearch = isOpen && isShowingCurrentArea
+    ? ''
+    : normalizeSearchText(searchValue.trim());
   const filteredAreas = eventOrganizerAreas.filter((area) => {
     if (!normalizedSearch) {
       return true;
@@ -3139,7 +3186,13 @@ function CategoryCombobox({ categories = [], defaultCategoryId = '', defaultCate
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const comboboxRef = useRef(null);
-  const normalizedSearch = normalizeSearchText(searchValue.trim());
+  const hasInitializedDefaultCategoryRef = useRef(Boolean(initialCategory));
+  const hasUserEditedCategoryRef = useRef(false);
+  const isShowingCurrentCategory =
+    selectedCategory && normalizeSearchText(searchValue) === normalizeSearchText(selectedCategory.nombre);
+  const normalizedSearch = isOpen && isShowingCurrentCategory
+    ? ''
+    : normalizeSearchText(searchValue.trim());
   const filteredCategories = categories.filter((category) => {
     if (!normalizedSearch) {
       return true;
@@ -3149,17 +3202,27 @@ function CategoryCombobox({ categories = [], defaultCategoryId = '', defaultCate
   });
 
   useEffect(() => {
-    if (selectedCategory || !defaultCategoryId || categories.length === 0) {
+    if (
+      hasInitializedDefaultCategoryRef.current ||
+      hasUserEditedCategoryRef.current ||
+      (!defaultCategoryId && !defaultCategoryName) ||
+      categories.length === 0
+    ) {
       return;
     }
 
-    const category = categories.find((item) => String(item.id) === String(defaultCategoryId));
+    const category =
+      categories.find((item) => String(item.id) === String(defaultCategoryId)) ??
+      categories.find(
+        (item) => normalizeSearchText(item.nombre) === normalizeSearchText(defaultCategoryName),
+      );
 
     if (category) {
       setSelectedCategory(category);
       setSearchValue(category.nombre);
+      hasInitializedDefaultCategoryRef.current = true;
     }
-  }, [categories, defaultCategoryId, selectedCategory]);
+  }, [categories, defaultCategoryId, defaultCategoryName]);
 
   useEffect(() => {
     function closeOnOutsideClick(event) {
@@ -3184,6 +3247,7 @@ function CategoryCombobox({ categories = [], defaultCategoryId = '', defaultCate
   }
 
   function handleSearchChange(event) {
+    hasUserEditedCategoryRef.current = true;
     setSearchValue(event.target.value);
     setSelectedCategory(null);
     setIsOpen(true);
@@ -3359,7 +3423,7 @@ function NeighborAccountsPage({ adminUserName }) {
         }
 
         setNeighbors([]);
-        setListNotice(error.response?.data?.message ?? 'No se pudieron cargar las cuentas vecinales.');
+        setListNotice(getApiErrorMessage(error, 'No se pudieron cargar las cuentas vecinales.'));
       } finally {
         if (!ignoreResponse) {
           setIsLoadingNeighbors(false);
@@ -3410,7 +3474,7 @@ function NeighborAccountsPage({ adminUserName }) {
       const detail = await getCuentaVecinalDetalle(neighbor.id);
       setSelectedNeighbor(mapNeighborDetailFromApi(detail));
     } catch (error) {
-      setListNotice(error.response?.data?.message ?? 'No se pudo cargar el detalle de la cuenta vecinal.');
+      setListNotice(getApiErrorMessage(error, 'No se pudo cargar el detalle de la cuenta vecinal.'));
     } finally {
       setIsLoadingNeighborDetail(false);
     }
@@ -3503,7 +3567,7 @@ function NeighborAccountsPage({ adminUserName }) {
       setEditingContact(false);
       setNotice('Contacto actualizado correctamente. Se notificó al vecino por correo.');
     } catch (error) {
-      setNotice(error.response?.data?.message ?? 'No se pudo actualizar el contacto.');
+      setNotice(getApiErrorMessage(error, 'No se pudo actualizar el contacto.'));
     }
   }
 
@@ -4010,7 +4074,7 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
       setUserFormData(getUserFormData(detailedUser));
       setUserModalMode('edit');
     } catch (error) {
-      setUserNotice(error.response?.data?.message ?? 'No se pudo cargar la información del usuario.');
+      setUserNotice(getApiErrorMessage(error, 'No se pudo cargar la información del usuario.'));
     }
   };
 
@@ -4065,7 +4129,7 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
         setUsersReloadKey((currentKey) => currentKey + 1);
       } catch (error) {
         setUserFormErrors({
-          general: error.response?.data?.message ?? 'No se pudo actualizar el usuario.',
+          general: getApiErrorMessage(error, 'No se pudo actualizar el usuario.'),
         });
         return;
       }
@@ -4082,7 +4146,7 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
         setUsersReloadKey((currentKey) => currentKey + 1);
       } catch (error) {
         setUserFormErrors({
-          general: error.response?.data?.message ?? 'No se pudo guardar el usuario.',
+          general: getApiErrorMessage(error, 'No se pudo guardar el usuario.'),
         });
         return;
       }
@@ -4104,7 +4168,7 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
       closeUserModal();
     } catch (error) {
       setUserFormErrors({
-        general: error.response?.data?.message ?? 'No se pudo actualizar el estado del usuario.',
+        general: getApiErrorMessage(error, 'No se pudo actualizar el estado del usuario.'),
       });
     }
   };
@@ -4759,7 +4823,7 @@ function SettingsCategoriesPage() {
       setCategoryNotice('Categoría registrada correctamente.');
       closeCategoryForm();
     } catch (error) {
-      setCategoryFormError(error.response?.data?.message ?? 'No se pudo guardar la categoría.');
+      setCategoryFormError(getApiErrorMessage(error, 'No se pudo guardar la categoría.'));
     } finally {
       setIsSavingCategory(false);
     }
@@ -4791,7 +4855,7 @@ function SettingsCategoriesPage() {
     } catch (error) {
       setCategoryToDelete(null);
       setCategoryNotice(
-        error.response?.data?.message ?? 'No se pudo eliminar la categoría.',
+        getApiErrorMessage(error, 'No se pudo eliminar la categoría.'),
       );
     }
   };
@@ -5164,7 +5228,7 @@ function SettingsLocationsPage() {
       setLocationsReloadKey((currentKey) => currentKey + 1);
     } catch (error) {
       setLocationFormErrors({
-        general: error.response?.data?.message ?? 'No se pudo actualizar el estado de la ubicación.',
+        general: getApiErrorMessage(error, 'No se pudo actualizar el estado de la ubicación.'),
       });
     }
   };
@@ -5195,7 +5259,7 @@ function SettingsLocationsPage() {
     } catch (error) {
       setLocationToDelete(null);
       setLocationNotice(
-        error.response?.data?.message ?? 'No se pudo eliminar la ubicación.',
+        getApiErrorMessage(error, 'No se pudo eliminar la ubicación.'),
       );
     }
   };
@@ -5310,7 +5374,7 @@ function SettingsLocationsPage() {
 }
 
 function getLocationBackendErrors(error) {
-  const message = error.response?.data?.message ?? 'No se pudo guardar la ubicación.';
+  const message = getApiErrorMessage(error, 'No se pudo guardar la ubicación.');
   const normalizedMessage = message.toLowerCase();
 
   if (normalizedMessage.includes('nombre')) {
@@ -6701,7 +6765,14 @@ function EditEventView({ categories = [], event, locations = [], onBack, onReque
   );
 }
 
-function ValidationIssueModal({ missingFields, onClose }) {
+function ValidationIssueModal({
+  actionLabel = 'Revisar ficha',
+  description = 'Para enviar este evento a revisión directiva, primero registra los siguientes campos:',
+  kicker = 'Ficha incompleta',
+  missingFields,
+  onClose,
+  title = 'Completa la información requerida',
+}) {
   return (
     <div className="modal-backdrop" role="presentation">
       <section
@@ -6710,12 +6781,9 @@ function ValidationIssueModal({ missingFields, onClose }) {
         className="confirm-modal"
         role="dialog"
       >
-        <span className="section-kicker">Ficha incompleta</span>
-        <h2 id="validation-issue-title">Completa la información requerida</h2>
-        <p>
-          Para enviar este evento a revisión directiva, primero registra los
-          siguientes campos:
-        </p>
+        <span className="section-kicker">{kicker}</span>
+        <h2 id="validation-issue-title">{title}</h2>
+        <p>{description}</p>
         <ul className="validation-missing-list">
           {missingFields.map((field) => (
             <li key={field}>{field}</li>
@@ -6723,7 +6791,7 @@ function ValidationIssueModal({ missingFields, onClose }) {
         </ul>
         <div className="modal-actions single-action">
           <button className="primary-button" type="button" onClick={onClose}>
-            Revisar ficha
+            {actionLabel}
           </button>
         </div>
       </section>

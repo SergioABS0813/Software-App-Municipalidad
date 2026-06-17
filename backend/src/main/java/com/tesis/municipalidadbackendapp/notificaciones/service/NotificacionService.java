@@ -200,7 +200,7 @@ public class NotificacionService {
             notificacion.setUrlDestino(urlDestino);
             notificacion.setLeida((byte) 0);
             notificacion.setFechaCreacion(fechaCreacion);
-            notificacion.setFechaExpiracion(fechaCreacion.plus(4, ChronoUnit.WEEKS));
+            notificacion.setFechaExpiracion(fechaCreacion.plus(28, ChronoUnit.DAYS));
             notificacion.setUsuarioOrigen(usuarioOrigen);
             notificacion.setUsuarioDestino(usuarioDestino);
             notificacion.setBitacoraAccion(bitacoraAccion);
