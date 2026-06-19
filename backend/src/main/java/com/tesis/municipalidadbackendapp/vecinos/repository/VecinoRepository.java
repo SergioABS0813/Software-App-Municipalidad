@@ -68,6 +68,8 @@ public interface VecinoRepository extends JpaRepository<Vecino, Integer> {
     """)
     Optional<Vecino> findDetalleById(@Param("id") Integer id);
 
+    Optional<Vecino> findByEmailAndDni(String email, String dni);
+
     boolean existsByEmailIgnoreCaseAndIdNot(String email, Integer id);
 
 }

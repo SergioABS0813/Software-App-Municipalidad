@@ -2,6 +2,7 @@ import { type FormEvent, useState } from "react";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../KcContext";
 import municipalLogo from "../assets/municipalidad-logo.png";
+import {recuperarContrasena} from '../services/reset-password';
 
 type ResetPasswordKcContext = Extract<KcContext, { pageId: "login-reset-password.ftl" }>;
 
@@ -10,16 +11,6 @@ type Identity = {
     nombreCompleto: string;
 };
 
-const mockIdentities: Record<string, Identity> = {
-    "12345678": {
-        dni: "12345678",
-        nombreCompleto: "Sergio André Bustamante Villanueva"
-    },
-    "87654321": {
-        dni: "87654321",
-        nombreCompleto: "María Fernanda Rojas Mendoza"
-    }
-};
 
 function getBackToEventsUrl() {
     const fallbackEventsUrl = "http://localhost:5173/eventos";
@@ -62,7 +53,6 @@ export default function ResetPassword(props: {
     const [formSuccess, setFormSuccess] = useState("");
     const [isNewPasswordVisible, setIsNewPasswordVisible] = useState(false);
     const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
-    const [isReferenceVisible, setIsReferenceVisible] = useState(false);
     const backToEventsUrl = getBackToEventsUrl();
 
     function updateDni(value: string) {
@@ -72,7 +62,7 @@ export default function ResetPassword(props: {
         setFormSuccess("");
     }
 
-    function verifyAccount(event: FormEvent<HTMLFormElement>) {
+    async function verifyAccount(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
 
         const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -92,17 +82,15 @@ export default function ResetPassword(props: {
             return;
         }
 
-        const identity = mockIdentities[dni.trim()];
-
-        if (identity === undefined) {
-            setVerifiedUser(null);
-            setFormError("No se encontró una cuenta vecinal con los datos ingresados.");
-            return;
+        try{
+            await recuperarContrasena(correo, dni);
+            setFormError("");
+            setFormSuccess("Si los datos corresponden a una cuenta registrada, recibirás un correo para restablecer tu contraseña.")
+        }catch(error){
+            console.error(error);
+            setFormSuccess("");
+            setFormError("No se pudo procesar la solicitud. Inténtalo nuevamente.")
         }
-
-        setVerifiedUser(identity);
-        setFormError("");
-        setFormSuccess("");
     }
 
     function updatePassword() {
@@ -149,14 +137,6 @@ export default function ResetPassword(props: {
                         <h1 id="kc-recover-password-title">Recuperar contraseña</h1>
                         <p>Ingresa tu correo electrónico y DNI para verificar tu cuenta.</p>
                     </div>
-
-                    <button
-                        className="kc-reference-toggle"
-                        type="button"
-                        onClick={() => setIsReferenceVisible(currentValue => !currentValue)}
-                    >
-                        {isReferenceVisible ? "Ocultar referencia React" : "Ver referencia React"}
-                    </button>
 
                     <label className="kc-login-field" htmlFor="username">
                         Correo electrónico
@@ -267,8 +247,6 @@ export default function ResetPassword(props: {
                     {formSuccess && <p className="kc-login-success">{formSuccess}</p>}
                 </form>
 
-                {isReferenceVisible && <ReactRecoverPasswordReference />}
-
                 <p className="kc-login-footer">
                     <a href={url.loginUrl}>Volver a iniciar sesión</a>
                     <span aria-hidden="true"> · </span>
@@ -278,59 +256,6 @@ export default function ResetPassword(props: {
 
             <aside className="kc-login-art-side" aria-hidden="true" />
         </main>
-    );
-}
-
-function ReactRecoverPasswordReference() {
-    return (
-        <section className="kc-login-card kc-react-reference-card" aria-label="Referencia React de recuperar contraseña">
-            <div className="kc-login-title">
-                <span>Portal de eventos</span>
-                <h2>Recuperar contraseña</h2>
-                <p>Ingresa tu correo electrónico y DNI para verificar tu cuenta.</p>
-            </div>
-
-            <label className="kc-login-field">
-                Correo electrónico
-                <input placeholder="Ingrese su correo electrónico" type="email" />
-            </label>
-
-            <label className="kc-login-field">
-                DNI
-                <input inputMode="numeric" maxLength={8} placeholder="Ingrese su DNI" type="text" />
-            </label>
-
-            <button className="kc-login-submit" type="button">
-                Verificar datos
-            </button>
-
-            <section className="kc-recover-password-step" aria-label="Referencia actualizar contraseña">
-                <span className="kc-identity-verified-message">
-                    Cuenta verificada: Sergio André Bustamante Villanueva
-                </span>
-                <label className="kc-login-field">
-                    Nueva contraseña
-                    <span className="kc-password-control">
-                        <input placeholder="Ingrese su nueva contraseña" type="password" />
-                        <span className="kc-password-toggle kc-password-toggle-static">
-                            <EyeIcon />
-                        </span>
-                    </span>
-                </label>
-                <label className="kc-login-field">
-                    Confirmar nueva contraseña
-                    <span className="kc-password-control">
-                        <input placeholder="Repita su nueva contraseña" type="password" />
-                        <span className="kc-password-toggle kc-password-toggle-static">
-                            <EyeIcon />
-                        </span>
-                    </span>
-                </label>
-                <button className="kc-login-submit kc-register-primary-button" type="button">
-                    Actualizar contraseña
-                </button>
-            </section>
-        </section>
     );
 }
 

@@ -36,17 +36,9 @@ export default function LoginUpdatePassword(props: {
                 >
                     <div className="kc-login-title">
                         <span>Portal de eventos</span>
-                        <h1 id="kc-update-password-title">Configuración inicial de cuenta</h1>
-                        <p>Para activar tu cuenta institucional, debes crear una contraseña segura.</p>
+                        <h1 id="kc-update-password-title">Configura tu contraseña de acceso</h1>
+                        <p>Ingresa una nueva contraseña segura para acceder al Sistema de Gestión de Eventos.</p>
                     </div>
-
-                    <section className="kc-update-password-required" aria-label="Acción requerida">
-                        <span>Acción requerida</span>
-                        <strong>
-                            <span aria-hidden="true">✓</span>
-                            Crear contraseña
-                        </strong>
-                    </section>
 
                     <label className="kc-login-field" htmlFor="password-new">
                         Nueva contraseña
@@ -138,7 +130,7 @@ export default function LoginUpdatePassword(props: {
 
                     <div className="kc-update-password-actions">
                         <button className="kc-login-submit kc-register-primary-button kc-update-password-primary" type="submit">
-                            Crear contraseña
+                            Guardar contraseña
                         </button>
 
                         {isAppInitiatedAction && (

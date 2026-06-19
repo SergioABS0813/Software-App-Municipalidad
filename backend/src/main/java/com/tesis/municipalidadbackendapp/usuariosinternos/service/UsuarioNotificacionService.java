@@ -31,9 +31,8 @@ public class UsuarioNotificacionService {
                 construirPlantillaHtml(
                         "Correo seleccionado para acceso",
                         """
-                        <p>Hola <strong>%s</strong>,</p>
-                        <p>Se ha registrado este correo electronico como medio de acceso a la plataforma institucional de eventos de la Municipalidad de San Miguel.</p>
-                        <p>Si no reconoces esta accion o no perteneces a la entidad, comunicate con la Municipalidad de San Miguel para revisar el caso.</p>
+                        <p style="margin:0 0 14px;">Hola <strong>%s</strong>,</p>
+                        <p>Se ha registrado este correo electrónico como medio de acceso a la plataforma institucional de eventos de la Municipalidad de San Miguel.</p>
                         """.formatted(escapeHtml(nombre))
                 )
         );
@@ -46,11 +45,10 @@ public class UsuarioNotificacionService {
                 construirPlantillaHtml(
                         "Correo de acceso actualizado",
                         """
-                        <p>Hola <strong>%s</strong>,</p>
-                        <p>Te informamos que este correo electronico dejo de estar asociado como medio de acceso a la plataforma institucional de eventos de la Municipalidad de San Miguel.</p>
-                        <p>El nuevo correo seleccionado para el acceso es:</p>
-                        <p><strong>%s</strong></p>
-                        <p>Si no reconoces esta accion o no perteneces a la entidad, comunicate con la Municipalidad de San Miguel para revisar el caso.</p>
+                        <p style="margin:0 0 14px;">Hola <strong>%s</strong>,</p>
+                        <p style="margin:0 0 14px;">Le informamos que este correo electrónico dejó de estar asociado como medio de acceso a la plataforma institucional de eventos de la Municipalidad de San Miguel.</p>
+                        <p style="margin:0 0 14px;">El nuevo correo seleccionado para el acceso es:</p>
+                        <p style="margin:0 0 0px; text-align:center"><strong>%s</strong></p>
                         """.formatted(escapeHtml(nombre), escapeHtml(emailNuevo))
                 )
         );
@@ -94,28 +92,27 @@ public class UsuarioNotificacionService {
                     <meta name="viewport" content="width=device-width, initial-scale=1.0">
                     <title>%s</title>
                   </head>
-                  <body style="margin:0;padding:0;background:#eef6fb;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
-                    <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="background:#eef6fb;padding:28px 14px;">
+                  <body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+                    <table role="presentation" width="100%%" cellspacing="0" cellpadding="0";style="padding:28px 14px;">
                       <tr>
                         <td align="center">
-                          <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="max-width:814px;background:#ffffff;border:1px solid #1f8bf2;border-radius:10px;overflow:hidden;">
+                          <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="max-width:550px;background:#ffffff;border:1px solid #1f8bf2;border-radius:10px;overflow:hidden;">
                             <tr>
-                              <td style="background:#1f86e8;padding:38px 24px 34px;text-align:center;color:#ffffff;">
-                                <div style="font-size:31px;line-height:1.2;font-weight:800;letter-spacing:.2px;">
+                              <td style="background:#1f86e8;padding:24px 22px 22px;text-align:center;color:#ffffff;">
+                                <div style="font-size:24px;line-height:1.2;font-weight:800;letter-spacing:.2px;">
                                   <span style="color:#084c8d;">Municipalidad</span> de San Miguel
                                 </div>
-                                <div style="margin-top:14px;font-size:16px;font-weight:700;">Sistema de Gestion de Eventos</div>
+                                <div style="margin-top:5px;font-size:18px;font-weight:700;">Sistema de Gestión de Eventos</div>
                               </td>
                             </tr>
                             <tr>
-                              <td style="padding:38px 36px 42px;font-size:18px;line-height:1.55;">
-                                <h1 style="margin:0 0 24px;font-size:20px;line-height:1.3;font-weight:500;color:#0f172a;">%s</h1>
+                              <td style="padding:20px 32px 24px;font-size:14px;line-height:1.65;">
                                 %s
                               </td>
                             </tr>
                             <tr>
-                              <td style="background:#f8fbfd;border-top:1px solid #e2edf5;padding:22px 36px;color:#2f5276;font-size:14px;line-height:1.45;">
-                                Este mensaje fue generado automaticamente. Si no solicitaste esta operacion, puedes comunicarte con la Municipalidad de San Miguel.
+                              <td style="background:#f8fbfd;border-top:1px solid #e2edf5;padding:17px 32px;color:#2f5276;font-size:12.5px;line-height:1.5;">
+                                Este mensaje fue generado automáticamente. Si no solicitaste esta operación, puedes comunicarte con la Municipalidad de San Miguel.
                               </td>
                             </tr>
                           </table>
@@ -124,7 +121,7 @@ public class UsuarioNotificacionService {
                     </table>
                   </body>
                 </html>
-                """.formatted(escapeHtml(titulo), escapeHtml(titulo), contenido);
+                """.formatted(escapeHtml(titulo), contenido);
     }
 
     private String escapeHtml(String value) {

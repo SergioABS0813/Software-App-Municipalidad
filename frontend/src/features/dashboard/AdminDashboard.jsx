@@ -266,6 +266,21 @@ function mapLocationCatalogFromApi(location) {
   };
 }
 
+function uniqueCatalogItems(items, getKey) {
+  const seenKeys = new Set();
+
+  return items.filter((item) => {
+    const key = getKey(item);
+
+    if (key === null || key === undefined || key === '' || seenKeys.has(String(key))) {
+      return false;
+    }
+
+    seenKeys.add(String(key));
+    return true;
+  });
+}
+
 function getFileNameFromForm(form, name) {
   const control = getNamedFormControl(form, name);
 
@@ -853,15 +868,15 @@ function normalizeSearchText(value = '') {
     .toLowerCase();
 }
 
-function getMunicipalAreaById(areaId) {
-  return eventOrganizerAreas.find(
+function getMunicipalAreaById(areaId, areas = eventOrganizerAreas) {
+  return areas.find(
     (area) => String(area.area_municipal_id) === String(areaId),
   );
 }
 
-function getMunicipalAreaByEvent(event) {
+function getMunicipalAreaByEvent(event, areas = eventOrganizerAreas) {
   if (event?.area_municipal_id) {
-    return getMunicipalAreaById(event.area_municipal_id);
+    return getMunicipalAreaById(event.area_municipal_id, areas);
   }
 
   const organizerText = normalizeSearchText(event?.organizer ?? '');
@@ -871,10 +886,10 @@ function getMunicipalAreaByEvent(event) {
   }
 
   return (
-    eventOrganizerAreas.find((area) => normalizeSearchText(area.nombre) === organizerText) ??
-    eventOrganizerAreas.find((area) => normalizeSearchText(area.nombre).includes(organizerText)) ??
-    eventOrganizerAreas.find((area) => organizerText.includes(normalizeSearchText(area.nombre))) ??
-    eventOrganizerAreas.find((area) => {
+    areas.find((area) => normalizeSearchText(area.nombre) === organizerText) ??
+    areas.find((area) => normalizeSearchText(area.nombre).includes(organizerText)) ??
+    areas.find((area) => organizerText.includes(normalizeSearchText(area.nombre))) ??
+    areas.find((area) => {
       const areaText = normalizeSearchText(area.nombre);
 
       return ['cultura', 'deporte', 'participacion', 'salud', 'comercio', 'innovacion'].some(
@@ -1358,8 +1373,11 @@ function AdminDashboard({ onLogout, user }) {
   const [isSidebarDrawerOpen, setIsSidebarDrawerOpen] = useState(false);
   const [eventItems, setEventItems] = useState(adminEvents);
   const [eventCategoryCatalog, setEventCategoryCatalog] = useState([]);
+  const [eventAreaCatalog, setEventAreaCatalog] = useState(eventOrganizerAreas);
   const [eventLocationCatalog, setEventLocationCatalog] = useState(registeredLocations);
   const [eventStateCatalog, setEventStateCatalog] = useState([]);
+  const [isLoadingEventCatalogs, setIsLoadingEventCatalogs] = useState(false);
+  const [eventCatalogError, setEventCatalogError] = useState('');
   const [eventsPage, setEventsPage] = useState({
     number: 0,
     size: 5,
@@ -1386,6 +1404,7 @@ function AdminDashboard({ onLogout, user }) {
   const [categoryFilter, setCategoryFilter] = useState('Todas');
   const [activePendingPopover, setActivePendingPopover] = useState(null);
   const [activeFormSection, setActiveFormSection] = useState(eventFormSections[0].id);
+  const eventCatalogRequestRef = useRef(0);
   const pendingPopoverRef = useRef(null);
   const manualFormSectionRef = useRef(null);
   const manualFormSectionTimeoutRef = useRef(null);
@@ -1446,6 +1465,47 @@ function AdminDashboard({ onLogout, user }) {
       });
   }, [notificationFilter]);
 
+  const loadEventCatalogs = useCallback(async () => {
+    const requestId = eventCatalogRequestRef.current + 1;
+    eventCatalogRequestRef.current = requestId;
+    setIsLoadingEventCatalogs(true);
+    setEventCatalogError('');
+
+    try {
+      const [categoriesData, locationsData, statesData] = await Promise.all([
+        getCategoriasConfiguracion({ page: 0, size: 200 }),
+        getUbicacionesConfiguracion({ page: 0, size: 200 }),
+        getEstadosEventoGestion(),
+      ]);
+
+      if (eventCatalogRequestRef.current !== requestId) {
+        return;
+      }
+
+      const categories = Array.isArray(categoriesData.content)
+        ? categoriesData.content.map(mapCategoryCatalogFromApi)
+        : [];
+      const locations = Array.isArray(locationsData.content)
+        ? locationsData.content.map(mapLocationCatalogFromApi)
+        : [];
+
+      setEventCategoryCatalog(uniqueCatalogItems(categories, (category) => category.id));
+      setEventAreaCatalog(uniqueCatalogItems(eventOrganizerAreas, (area) => area.area_municipal_id));
+      setEventLocationCatalog(uniqueCatalogItems(locations, (location) => location.ubicacion_id));
+      setEventStateCatalog(Array.isArray(statesData) ? statesData : []);
+    } catch (error) {
+      console.error('No se pudieron cargar los catalogos de eventos.', error);
+
+      if (eventCatalogRequestRef.current === requestId) {
+        setEventCatalogError('No se pudieron cargar los catálogos del evento.');
+      }
+    } finally {
+      if (eventCatalogRequestRef.current === requestId) {
+        setIsLoadingEventCatalogs(false);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
     const selectedCategoryId =
@@ -1490,38 +1550,35 @@ function AdminDashboard({ onLogout, user }) {
   }, [loadAdminNotifications, notificationFilter]);
 
   useEffect(() => {
-    let isMounted = true;
-
-    Promise.all([
-      getCategoriasConfiguracion({ page: 0, size: 200 }),
-      getUbicacionesConfiguracion({ page: 0, size: 200 }),
-      getEstadosEventoGestion(),
-    ])
-      .then(([categoriesData, locationsData, statesData]) => {
-        if (!isMounted) {
-          return;
-        }
-
-        setEventCategoryCatalog(
-          Array.isArray(categoriesData.content)
-            ? categoriesData.content.map(mapCategoryCatalogFromApi)
-            : [],
-        );
-        setEventLocationCatalog(
-          Array.isArray(locationsData.content)
-            ? locationsData.content.map(mapLocationCatalogFromApi)
-            : [],
-        );
-        setEventStateCatalog(Array.isArray(statesData) ? statesData : []);
-      })
-      .catch((error) => {
-        console.error('No se pudieron cargar los catalogos de eventos.', error);
-      });
+    const catalogLoadTimeout = window.setTimeout(() => {
+      loadEventCatalogs();
+    }, 0);
 
     return () => {
-      isMounted = false;
+      window.clearTimeout(catalogLoadTimeout);
     };
-  }, []);
+  }, [loadEventCatalogs]);
+
+  useEffect(() => {
+    if (!isEventFormView) {
+      return undefined;
+    }
+
+    const catalogLoadTimeout = window.setTimeout(() => {
+      loadEventCatalogs();
+    }, 0);
+
+    function reloadCatalogsOnFocus() {
+      loadEventCatalogs();
+    }
+
+    window.addEventListener('focus', reloadCatalogsOnFocus);
+
+    return () => {
+      window.clearTimeout(catalogLoadTimeout);
+      window.removeEventListener('focus', reloadCatalogsOnFocus);
+    };
+  }, [currentAdminView, isEventFormView, loadEventCatalogs]);
 
   useEffect(() => {
     if (!isSidebarDrawerOpen) {
@@ -2045,7 +2102,10 @@ function AdminDashboard({ onLogout, user }) {
       <main className="admin-main">
         {currentAdminView === 'new-event' ? (
           <NewEventView
+            areas={eventAreaCatalog}
             categories={eventCategoryCatalog}
+            catalogError={eventCatalogError}
+            isLoadingCatalogs={isLoadingEventCatalogs}
             locations={eventLocationCatalog}
             onBack={() => setCurrentAdminView('dashboard')}
             onRequestAction={(type, payload) =>
@@ -2055,8 +2115,11 @@ function AdminDashboard({ onLogout, user }) {
           />
         ) : currentAdminView === 'edit-event' && selectedAdminEvent ? (
           <EditEventView
+            areas={eventAreaCatalog}
             categories={eventCategoryCatalog}
+            catalogError={eventCatalogError}
             event={selectedAdminEvent}
+            isLoadingCatalogs={isLoadingEventCatalogs}
             locations={eventLocationCatalog}
             onBack={() => {
               setSelectedAdminEvent(null);
@@ -2096,9 +2159,9 @@ function AdminDashboard({ onLogout, user }) {
         ) : currentAdminView === 'settings-users' ? (
           <SettingsUsersPage targetUserDetailId={targetUserDetailId} />
         ) : currentAdminView === 'settings-categories' ? (
-          <SettingsCategoriesPage />
+          <SettingsCategoriesPage onEventCatalogChanged={loadEventCatalogs} />
         ) : currentAdminView === 'settings-locations' ? (
-          <SettingsLocationsPage />
+          <SettingsLocationsPage onEventCatalogChanged={loadEventCatalogs} />
         ) : (
           <>
             <header className="admin-topbar">
@@ -2921,10 +2984,15 @@ function TriangleAlertLineIcon() {
   );
 }
 
-function MunicipalAreaCombobox({ defaultAreaId = '', defaultAreaName = '', onAreaChange }) {
+function MunicipalAreaCombobox({
+  areas = eventOrganizerAreas,
+  defaultAreaId = '',
+  defaultAreaName = '',
+  onAreaChange,
+}) {
   const initialArea =
-    getMunicipalAreaById(defaultAreaId) ??
-    getMunicipalAreaByEvent({ organizer: defaultAreaName }) ??
+    getMunicipalAreaById(defaultAreaId, areas) ??
+    getMunicipalAreaByEvent({ organizer: defaultAreaName }, areas) ??
     null;
   const [selectedArea, setSelectedArea] = useState(initialArea);
   const [searchValue, setSearchValue] = useState(initialArea?.nombre ?? defaultAreaName ?? '');
@@ -2936,7 +3004,7 @@ function MunicipalAreaCombobox({ defaultAreaId = '', defaultAreaName = '', onAre
   const normalizedSearch = isOpen && isShowingCurrentArea
     ? ''
     : normalizeSearchText(searchValue.trim());
-  const filteredAreas = eventOrganizerAreas.filter((area) => {
+  const filteredAreas = areas.filter((area) => {
     if (!normalizedSearch) {
       return true;
     }
@@ -4691,7 +4759,7 @@ function UserAreaCombobox({ onChange, value }) {
   );
 }
 
-function SettingsCategoriesPage() {
+function SettingsCategoriesPage({ onEventCatalogChanged }) {
   const [searchValue, setSearchValue] = useState('');
   const [categories, setCategories] = useState(settingsCategories);
   const [categoriesPage, setCategoriesPage] = useState({
@@ -4820,6 +4888,7 @@ function SettingsCategoriesPage() {
       await guardarCategoria({ nombre: normalizedName });
       setCategoriesPage((currentPage) => ({ ...currentPage, number: 0 }));
       setCategoriesReloadKey((currentKey) => currentKey + 1);
+      onEventCatalogChanged?.();
       setCategoryNotice('Categoría registrada correctamente.');
       closeCategoryForm();
     } catch (error) {
@@ -4851,6 +4920,7 @@ function SettingsCategoriesPage() {
       setCategoryToDelete(null);
       setCategoriesPage((currentPage) => ({ ...currentPage, number: 0 }));
       setCategoriesReloadKey((currentKey) => currentKey + 1);
+      onEventCatalogChanged?.();
       setCategoryNotice('Categoría eliminada correctamente.');
     } catch (error) {
       setCategoryToDelete(null);
@@ -5014,7 +5084,7 @@ function CategoryDeleteModal({ category, onCancel, onConfirm }) {
   );
 }
 
-function SettingsLocationsPage() {
+function SettingsLocationsPage({ onEventCatalogChanged }) {
   const [searchValue, setSearchValue] = useState('');
   const [locations, setLocations] = useState(settingsLocations);
   const [locationsPage, setLocationsPage] = useState({
@@ -5177,6 +5247,7 @@ function SettingsLocationsPage() {
 
         setLocationsPage((currentPage) => ({ ...currentPage, number: 0 }));
         setLocationsReloadKey((currentKey) => currentKey + 1);
+        onEventCatalogChanged?.();
         setLocationNotice('Ubicación registrada correctamente.');
         closeLocationModal();
       } catch (error) {
@@ -5226,6 +5297,7 @@ function SettingsLocationsPage() {
       setSelectedLocation(updatedLocation);
       setLocationFormData(getLocationFormData(updatedLocation));
       setLocationsReloadKey((currentKey) => currentKey + 1);
+      onEventCatalogChanged?.();
     } catch (error) {
       setLocationFormErrors({
         general: getApiErrorMessage(error, 'No se pudo actualizar el estado de la ubicación.'),
@@ -5255,6 +5327,7 @@ function SettingsLocationsPage() {
       setLocationToDelete(null);
       setLocationsPage((currentPage) => ({ ...currentPage, number: 0 }));
       setLocationsReloadKey((currentKey) => currentKey + 1);
+      onEventCatalogChanged?.();
       setLocationNotice('Ubicación eliminada correctamente.');
     } catch (error) {
       setLocationToDelete(null);
@@ -6157,7 +6230,16 @@ function EvaluationTrackingSection({
   );
 }
 
-function NewEventView({ categories = [], locations = [], onBack, onRequestAction, onValidationIssue }) {
+function NewEventView({
+  areas = eventOrganizerAreas,
+  categories = [],
+  catalogError = '',
+  isLoadingCatalogs = false,
+  locations = [],
+  onBack,
+  onRequestAction,
+  onValidationIssue,
+}) {
   const formRef = useRef(null);
   const [capacityMode, setCapacityMode] = useState('defined');
   const [audienceType, setAudienceType] = useState('GENERAL');
@@ -6226,6 +6308,11 @@ function NewEventView({ categories = [], locations = [], onBack, onRequestAction
           event.preventDefault();
         }}
       >
+        {(isLoadingCatalogs || catalogError) && (
+          <p className="settings-inline-notice">
+            {catalogError || 'Actualizando catálogos...'}
+          </p>
+        )}
         <section className="event-form-main">
           <article className="event-form-section" id="datos-generales">
             <div className="form-section-heading">
@@ -6243,7 +6330,7 @@ function NewEventView({ categories = [], locations = [], onBack, onRequestAction
               </label>
               <label className="form-field">
                 Área responsable
-                <MunicipalAreaCombobox onAreaChange={syncChecklistFromForm} />
+                <MunicipalAreaCombobox areas={areas} onAreaChange={syncChecklistFromForm} />
               </label>
               <label className="form-field span-2">
                 Descripción breve
@@ -6428,12 +6515,23 @@ function NewEventView({ categories = [], locations = [], onBack, onRequestAction
   );
 }
 
-function EditEventView({ categories = [], event, locations = [], onBack, onRequestAction, onRequestDelete, onValidationIssue }) {
+function EditEventView({
+  areas = eventOrganizerAreas,
+  categories = [],
+  catalogError = '',
+  event,
+  isLoadingCatalogs = false,
+  locations = [],
+  onBack,
+  onRequestAction,
+  onRequestDelete,
+  onValidationIssue,
+}) {
   const formRef = useRef(null);
   const initialCapacityMode = Number(event.aforoMaximo ?? event.spots ?? 0) > 0 ? 'defined' : 'none';
   const initialAudienceType =
     event.publico_tipo ?? (event.edad_minima || event.edad_maxima ? 'OBJETIVO' : 'GENERAL');
-  const initialMunicipalArea = getMunicipalAreaByEvent(event);
+  const initialMunicipalArea = getMunicipalAreaByEvent(event, areas);
   const eventWithMunicipalArea = {
     ...event,
     area_municipal_id: event.area_municipal_id ?? initialMunicipalArea?.area_municipal_id ?? '',
@@ -6478,6 +6576,12 @@ function EditEventView({ categories = [], event, locations = [], onBack, onReque
     onRequestAction('review-changes', buildEventCreatePayload(formRef.current, 'review', event));
   }
 
+  useEffect(() =>{
+
+    
+
+  }, []);
+
   return (
     <section className="new-event-view" aria-labelledby="edit-event-title">
       <header className="admin-topbar">
@@ -6498,6 +6602,11 @@ function EditEventView({ categories = [], event, locations = [], onBack, onReque
           formEvent.preventDefault();
         }}
       >
+        {(isLoadingCatalogs || catalogError) && (
+          <p className="settings-inline-notice">
+            {catalogError || 'Actualizando catálogos...'}
+          </p>
+        )}
         <section className="event-form-main">
           <article className="event-form-section" id="datos-generales">
             <div className="form-section-heading">
@@ -6521,6 +6630,7 @@ function EditEventView({ categories = [], event, locations = [], onBack, onReque
               <label className="form-field">
                 Área responsable
                 <MunicipalAreaCombobox
+                  areas={areas}
                   defaultAreaId={eventWithMunicipalArea.area_municipal_id}
                   defaultAreaName={eventWithMunicipalArea.organizer}
                   onAreaChange={syncChecklistFromForm}

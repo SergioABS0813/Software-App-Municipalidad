@@ -14,6 +14,7 @@ import { eventCategories, events } from './data/events';
 import PublicEventDetail from './PublicEventDetail';
 import './PublicPortal.css';
 import { SESSION_EXPIRED_MESSAGE } from '../../services/api/api';
+import {recuperarContrasena} from '../../services/publicPortalService';
 
 const institutionalUsers = [
   {
@@ -1159,7 +1160,7 @@ function RecoverPasswordPage({ onBack, onLogin }) {
     setFormSuccess('');
   }
 
-  function verifyAccount(event) {
+  async function verifyAccount(event) {
     event.preventDefault();
 
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1186,27 +1187,22 @@ function RecoverPasswordPage({ onBack, onLogin }) {
       return;
     }
 
-    // TODO: en produccion este flujo debe enviar un codigo o enlace al correo
-    // antes de permitir cambiar la contrasena desde Spring Boot.
-    const user = institutionalUsers.find(
-      (mockUser) =>
-        (mockUser.correo ?? mockUser.email)?.toLowerCase() === correo &&
-        mockUser.dni === dni,
-    );
+    try {
+      console.log("aca")
+      await recuperarContrasena(correo, dni);
 
-    if (!user) {
-      setVerifiedUser(null);
-      setFormError('No encontramos una cuenta con el correo y DNI ingresados.');
-      return;
+      setFormError('');
+      setFormSuccess(
+        'Si los datos corresponden a una cuenta registrada, recibirás un correo para restablecer tu contraseña.'
+      );
+    } catch (error) {
+      console.error(error);
+
+      setFormError(
+        'No se pudo procesar la solicitud. Inténtalo nuevamente.'
+      );
     }
 
-    setVerifiedUser(user);
-    setPasswordData({
-      confirmPassword: '',
-      newPassword: '',
-    });
-    setFormError('');
-    setFormSuccess('');
   }
 
   function updatePassword(event) {

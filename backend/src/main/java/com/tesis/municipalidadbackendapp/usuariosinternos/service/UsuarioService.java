@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -143,6 +144,10 @@ public class UsuarioService {
         }
 
         return rolKeycloak.trim();
+    }
+
+    public Optional<Usuario> obtenerPorCorreoDni(String email, String dni){
+        return usuarioRepository.findByEmailAndDni(email, dni);
     }
 
     public List<UsuarioConfiguracionDto> obtenerUsuariosInternos() {

@@ -44,6 +44,8 @@ public interface UsuarioRepository extends JpaRepository<Usuario,Integer> {
             Pageable pageable
     );
 
+    Optional<Usuario> findByEmailAndDni(String email, String dni);
+
 
 
 }

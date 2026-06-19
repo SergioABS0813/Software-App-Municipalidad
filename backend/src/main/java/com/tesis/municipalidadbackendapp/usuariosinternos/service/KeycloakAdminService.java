@@ -178,6 +178,35 @@ public class KeycloakAdminService {
         }
     }
 
+    public void enviarCorreoRecuperacionContrasena(String keycloakId){
+        String token = obtenerAccessToken();
+        RestClient restClient = restClientBuilder.baseUrl(normalizedServerUrl()).build();
+
+        try{
+            restClient.put()
+                    .uri(uriBuilder -> {
+                        var builder = uriBuilder.path("/admin/realms/{realm}/users/{userId}/reset-password-email");
+                        if (StringUtils.hasText(properties.getActivationClientId())) {
+                            builder.queryParam("client_id", properties.getActivationClientId());
+                        }
+                        if (StringUtils.hasText(properties.getActivationRedirectUri())) {
+                            builder.queryParam("redirect_uri", properties.getActivationRedirectUri());
+                        }
+                        builder.queryParam("lifespan", 300); // El enlace de actualización de contraseña será válido por 5 minutos (300 segundos)
+                        return builder.build(properties.getRealm(), keycloakId);
+                    })
+                    .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                    //.contentType(MediaType.APPLICATION_JSON)
+                    //.body(List.of("UPDATE_PASSWORD")) CORREGIR CORREO
+                    .retrieve()
+                    .toBodilessEntity();
+
+        } catch (RuntimeException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
     private void asignarRolRealm(RestClient restClient, String token, String keycloakId, String rolKeycloak) {
         try {
             Map<String, Object> roleRepresentation = obtenerRolRealm(restClient, token, rolKeycloak);

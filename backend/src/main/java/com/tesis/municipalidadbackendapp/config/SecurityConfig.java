@@ -41,6 +41,7 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/public/**").permitAll()
+                        .requestMatchers("/api/auth/forgot-password").permitAll()
                         .requestMatchers("/api/valoraciones/validar").permitAll()
                         .requestMatchers("/api/valoraciones/responder").permitAll()
                         .requestMatchers("/api/valoraciones/admin/**").hasAnyRole("ADMINISTRADOR", "DIRECTIVO")
@@ -70,8 +71,7 @@ public class SecurityConfig {
 
         corsConfiguration.setAllowedOrigins(List.of(
                 "http://localhost:5173",
-                "http://localhost:5174",
-                "http://localhost"
+                "http://localhost:7000"
         ));
 
         corsConfiguration.setAllowedMethods(List.of("*"));

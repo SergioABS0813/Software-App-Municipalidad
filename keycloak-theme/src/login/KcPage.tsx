@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import LoginUpdatePassword from "./pages/LoginUpdatePassword";
 import RegisterCitizen from "./pages/RegisterCitizen";
 import ResetPassword from "./pages/ResetPassword";
+import ErrorMessage from "./pages/ErrorMessage";
 const UserProfileFormFields = lazy(
     () => import("keycloakify/login/UserProfileFormFields")
 );
@@ -26,6 +27,8 @@ export default function KcPage(props: { kcContext: KcContext }) {
                 switch (kcContext.pageId) {
                     case "info.ftl":
                         return <InfoMessage kcContext={kcContext} i18n={i18n} />;
+                    case "error.ftl":
+                        return <ErrorMessage kcContext={kcContext} i18n={i18n}/>;
                     case "login.ftl":
                         return <Login kcContext={kcContext} i18n={i18n} />;
                     case "login-reset-password.ftl":

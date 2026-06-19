@@ -25,11 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -56,6 +52,10 @@ public class VecinoService {
     private final AsistenciaRepository asistenciaRepository;
     private final KeycloakAdminService keycloakAdminService;
     private final VecinoNotificacionService vecinoNotificacionService;
+
+    public Optional<Vecino> obtenerVecinoPorCorreoDni(String email, String dni){
+        return vecinoRepository.findByEmailAndDni(email, dni);
+    }
 
     public List<VecinoDirectorioDto> obtenerTodosVecinos() {
         return vecinoRepository.findAll().stream()
