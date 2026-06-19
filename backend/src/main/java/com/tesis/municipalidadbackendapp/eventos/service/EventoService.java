@@ -54,6 +54,7 @@ public class EventoService {
     private final BitacoraAccionService bitacoraAccionService;
     private final NotificacionService notificacionService;
     private final ValoracionEventoService valoracionEventoService;
+    private final EventoOperativoService eventoOperativoService;
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
 
     public Page<EventoPanelAdministrativoDto> obtenerEventosPanelAdministrativo(
@@ -98,12 +99,15 @@ public class EventoService {
                 evento.getAforoMaximo(),
                 evento.getEdadMin(),
                 evento.getEdadMax(),
+                requiereControlAsistencia(evento),
                 toLocalDateTime(evento.getEventoActualizadoEn() != null ? evento.getEventoActualizadoEn() : evento.getTiempoActualizado()),
                 calcularCompletitud(evento),
                 construirAlertasFichaEventoPanelAdministrativoDto(evento),
+                construirCriteriosFicha(evento),
                 obtenerAgendaDto(evento),
                 obtenerRequisitosDto(evento),
-                obtenerRecursosDto(evento)
+                obtenerRecursosDto(evento),
+                eventoOperativoService.listarOperativosAsignados(evento)
         );
     }
 
@@ -135,6 +139,7 @@ public class EventoService {
         AreaMunicipal areaMunicipal = obtenerAreaMunicipalOpcional(request.areaMunicipalId());
         Ubicacion ubicacion = obtenerUbicacionOpcional(request.ubicacionId());
         Usuario usuario = usuarioAutenticadoService.obtenerUsuarioAutenticado();
+        validarEnvioRevisionConOperativos(request, usuario, null, httpServletRequest);
         String estadoCodigo = Boolean.TRUE.equals(request.enviarRevision()) && estaCompletoParaRevision(request)
                 ? "PARA_REVISION"
                 : "BORRADOR";
@@ -156,6 +161,7 @@ public class EventoService {
         evento.setMetaTipo(normalizarTexto(request.metaTipo()));
         evento.setMetaValor(request.metaValor());
         evento.setEncuestaSatisfaccionHabilitado(Boolean.TRUE.equals(request.encuestaSatisfaccionHabilitado()) ? (byte) 1 : (byte) 0);
+        evento.setRequiereControlAsistencia(requiereControlAsistencia(request) ? (byte) 1 : (byte) 0);
         evento.setTiempoCreado(ahora);
         evento.setTiempoActualizado(ahora);
         evento.setEventoActualizadoEn(ahora);
@@ -167,6 +173,12 @@ public class EventoService {
         guardarAgenda(eventoGuardado, request.agenda());
         guardarRequisitos(eventoGuardado, request.requisitos());
         guardarRecursos(eventoGuardado, request.recursos());
+        eventoOperativoService.sincronizarOperativos(
+                eventoGuardado,
+                requiereControlAsistencia(request) ? request.operativosAsignadosIds() : List.of(),
+                usuario,
+                httpServletRequest
+        );
 
         BitacoraAccion bitacoraAccion = bitacoraAccionService.guardarAccion(
                 "CREAR_EVENTO",
@@ -228,6 +240,8 @@ public class EventoService {
         AreaMunicipal areaMunicipal = obtenerAreaMunicipalOpcional(request.areaMunicipalId());
         Ubicacion ubicacion = obtenerUbicacionOpcional(request.ubicacionId());
         String estadoAnterior = evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : "";
+        boolean requeriaControlAnterior = requiereControlAsistencia(evento);
+        validarEnvioRevisionConOperativos(request, usuario, evento, httpServletRequest);
         String estadoCodigo = obtenerEstadoActualizacion(evento, request);
         EstadoEvento estadoEvento = obtenerEstadoEvento(estadoCodigo);
         Instant ahora = Instant.now();
@@ -246,6 +260,7 @@ public class EventoService {
         evento.setMetaTipo(normalizarTexto(request.metaTipo()));
         evento.setMetaValor(request.metaValor());
         evento.setEncuestaSatisfaccionHabilitado(Boolean.TRUE.equals(request.encuestaSatisfaccionHabilitado()) ? (byte) 1 : (byte) 0);
+        evento.setRequiereControlAsistencia(requiereControlAsistencia(request) ? (byte) 1 : (byte) 0);
         evento.setTiempoActualizado(ahora);
         evento.setEventoActualizadoEn(ahora);
         evento.setEdadMin(esPublicoObjetivo(request) ? request.edadMin() : null);
@@ -259,6 +274,24 @@ public class EventoService {
         guardarAgenda(eventoGuardado, request.agenda());
         guardarRequisitos(eventoGuardado, request.requisitos());
         guardarRecursos(eventoGuardado, request.recursos());
+        eventoOperativoService.sincronizarOperativos(
+                eventoGuardado,
+                requiereControlAsistencia(request) ? request.operativosAsignadosIds() : List.of(),
+                usuario,
+                httpServletRequest
+        );
+
+        if (requeriaControlAnterior != requiereControlAsistencia(eventoGuardado)) {
+            bitacoraAccionService.guardarAccion(
+                    requiereControlAsistencia(eventoGuardado) ? "ACTIVAR_CONTROL_ASISTENCIA" : "DESACTIVAR_CONTROL_ASISTENCIA",
+                    "EVENTO",
+                    eventoGuardado.getId(),
+                    (requiereControlAsistencia(eventoGuardado) ? "Se activo" : "Se desactivo")
+                            + " el control de asistencia del evento \"" + valorDetalle(eventoGuardado.getTitulo()) + "\"",
+                    usuario,
+                    httpServletRequest
+            );
+        }
 
         bitacoraAccionService.guardarAccion(
                 "ACTUALIZAR_EVENTO",
@@ -312,7 +345,7 @@ public class EventoService {
             return 0;
         }
 
-        int total = 6; //Son 6 partes para colocar información sí o sí del evento
+        int total = 7;
         int completos = 0;
 
         //Parte 1:Datos generales (1/6)
@@ -329,6 +362,7 @@ public class EventoService {
         if (evento.getUbicacion() != null) completos++;
         //Parte 6: Recursos Adjuntos (6/6)
         if (tienePortada(evento)) completos++;
+        if (personalOperativoCompleto(evento)) completos++;
 
         return Math.round((completos * 100f) / total);
     }
@@ -402,7 +436,8 @@ public class EventoService {
                 && tienePublicoValido(request)
                 && tieneItemsValidos(request.agenda())
                 && tieneItemsValidos(request.requisitos())
-                && tieneRecursoPrincipal(request.recursos());
+                && tieneRecursoPrincipal(request.recursos())
+                && personalOperativoCompleto(request);
     }
 
     private boolean tieneAforoValido(EventoRegistroRequest request) {
@@ -481,6 +516,58 @@ public class EventoService {
 
         return recursoEventoRepository.findByEvento(evento).stream()
                 .anyMatch(recurso -> recurso != null && "IMAGEN_PORTADA".equals(recurso.getTipoRecurso()));
+    }
+
+    private boolean requiereControlAsistencia(Evento evento) {
+        return evento == null
+                || evento.getRequiereControlAsistencia() == null
+                || evento.getRequiereControlAsistencia() == 1;
+    }
+
+    private boolean requiereControlAsistencia(EventoRegistroRequest request) {
+        return request == null
+                || request.requiereControlAsistencia() == null
+                || Boolean.TRUE.equals(request.requiereControlAsistencia());
+    }
+
+    private boolean personalOperativoCompleto(Evento evento) {
+        return !requiereControlAsistencia(evento) || eventoOperativoService.tieneOperativosActivos(evento);
+    }
+
+    private boolean personalOperativoCompleto(EventoRegistroRequest request) {
+        return !requiereControlAsistencia(request)
+                || (request.operativosAsignadosIds() != null
+                && request.operativosAsignadosIds().stream().anyMatch(id -> id != null));
+    }
+
+    private void validarEnvioRevisionConOperativos(
+            EventoRegistroRequest request,
+            Usuario usuario,
+            Evento evento,
+            HttpServletRequest httpServletRequest
+    ) {
+        boolean tieneOperativosEnRequest = personalOperativoCompleto(request);
+        boolean puedeUsarAsignacionesExistentes = evento != null
+                && request.operativosAsignadosIds() == null
+                && personalOperativoCompleto(evento);
+
+        if (!Boolean.TRUE.equals(request.enviarRevision()) || tieneOperativosEnRequest || puedeUsarAsignacionesExistentes) {
+            return;
+        }
+
+        bitacoraAccionService.guardarAccion(
+                "INTENTO_REVISION_SIN_OPERATIVO",
+                "EVENTO",
+                evento != null ? evento.getId() : null,
+                "Se intento enviar a revision un evento que requiere control de asistencia sin personal operativo",
+                usuario,
+                httpServletRequest
+        );
+
+        throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Este evento requiere control de asistencia. Asigna al menos un operativo antes de enviarlo a revision."
+        );
     }
 
     private boolean esBorrador(Evento evento) {
@@ -636,6 +723,42 @@ public class EventoService {
                 .toList();
     }
 
+    private List<EventoPanelAdministrativoDto.CriterioFichaEventoPanelAdministrativoDto> construirCriteriosFicha(Evento evento) {
+        boolean requiereControl = requiereControlAsistencia(evento);
+        boolean operativoCompleto = personalOperativoCompleto(evento);
+
+        return List.of(
+                criterioFicha("DATOS_GENERALES", "Datos generales", tieneDatosGeneralesCompletos(evento), true),
+                criterioFicha("PROGRAMACION", "Programacion y aforo", tieneProgramacionValida(evento), true),
+                criterioFicha("AGENDA", "Agenda del evento", agendaEventoRepository.findByEvento(evento).size() != 0, true),
+                criterioFicha("REQUISITOS", "Requisitos", requisitoEventoRepository.findByEvento(evento).size() != 0, true),
+                criterioFicha("UBICACION", "Ubicacion", evento.getUbicacion() != null, true),
+                criterioFicha("RECURSOS", "Recursos", tienePortada(evento), true),
+                new EventoPanelAdministrativoDto.CriterioFichaEventoPanelAdministrativoDto(
+                        "PERSONAL_OPERATIVO",
+                        "Personal operativo asignado",
+                        operativoCompleto,
+                        requiereControl,
+                        requiereControl ? (operativoCompleto ? "Completo" : "Pendiente") : "No requerido"
+                )
+        );
+    }
+
+    private EventoPanelAdministrativoDto.CriterioFichaEventoPanelAdministrativoDto criterioFicha(
+            String codigo,
+            String nombre,
+            boolean completo,
+            boolean requerido
+    ) {
+        return new EventoPanelAdministrativoDto.CriterioFichaEventoPanelAdministrativoDto(
+                codigo,
+                nombre,
+                completo,
+                requerido,
+                completo ? "Completo" : "Pendiente"
+        );
+    }
+
     private List<EventoPanelAdministrativoDto.AlertaFichaEventoPanelAdministrativoDto> construirAlertasFichaEventoPanelAdministrativoDto(Evento evento) {
         if (evento == null) {
             return List.of();
@@ -716,6 +839,9 @@ public class EventoService {
         //Parte 6: Recursos Adjuntos (6/6)
         if (!tienePortada(evento)){
             agregarAlertaCampoPendiente(alertas, "Agregar imagen de portada del evento");
+        }
+        if (!personalOperativoCompleto(evento)) {
+            agregarAlertaCampoPendiente(alertas, "Asignar personal operativo al evento");
         }
 
     }

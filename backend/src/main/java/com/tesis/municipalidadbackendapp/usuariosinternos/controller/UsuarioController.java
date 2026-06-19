@@ -1,6 +1,7 @@
 package com.tesis.municipalidadbackendapp.usuariosinternos.controller;
 
 import com.tesis.municipalidadbackendapp.common.UsuarioAutenticadoService;
+import com.tesis.municipalidadbackendapp.eventos.dto.UsuarioOperativoDto;
 import com.tesis.municipalidadbackendapp.usuariosinternos.dto.UsuarioConfiguracionDto;
 import com.tesis.municipalidadbackendapp.usuariosinternos.dto.UsuarioRequest;
 import com.tesis.municipalidadbackendapp.usuariosinternos.dto.UsuarioResponse;
@@ -60,6 +61,12 @@ public class UsuarioController {
     ){
         usuarioAutenticadoService.obtenerUsuarioAutenticado();
         return usuarioService.buscarUsuariosInternos(texto, rolId, page, size);
+    }
+
+    @GetMapping("admin/operativos")
+    public List<UsuarioOperativoDto> listarOperativosActivos(){
+        usuarioAutenticadoService.obtenerUsuarioAutenticado();
+        return usuarioService.listarOperativosActivos();
     }
 
     //Muestra datos de usuario en Editar usuario

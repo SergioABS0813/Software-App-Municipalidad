@@ -91,5 +91,8 @@ public class Evento {
     @Column(name = "descripcion_breve", length = 45)
     private String descripcionBreve;
 
+    @Column(name = "requiere_control_asistencia", nullable = false)
+    private Byte requiereControlAsistencia = 1;
+
 
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { ErrorState, ListSkeleton } from '../../components/feedback/LoadingStates';
 
 function BellIcon() {
   return (
@@ -10,12 +11,15 @@ function BellIcon() {
 }
 
 export default function NotificationMenu({
+  isLoading = false,
+  error = '',
   notifications,
   totalCount,
   unreadCount,
   onFilterChange,
   onNotificationOpen,
   onNotificationRead,
+  onRetry,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState('all');
@@ -121,7 +125,11 @@ export default function NotificationMenu({
             </div>
           </div>
           <div className="notification-list">
-            {visibleNotifications.length === 0 ? (
+            {isLoading ? (
+              <ListSkeleton count={3} />
+            ) : error ? (
+              <ErrorState description={error} onRetry={onRetry} />
+            ) : visibleNotifications.length === 0 ? (
               <p className="notification-empty">Sin notificaciones.</p>
             ) : visibleNotifications.map((notification) => (
               <article

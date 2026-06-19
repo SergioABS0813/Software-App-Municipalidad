@@ -49,6 +49,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/eventos/admin/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/estado_evento/admin/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/notificacion/**").hasAnyRole("ADMINISTRADOR", "DIRECTIVO", "OPERATIVO")
+                        .requestMatchers("/api/operativo/**").hasRole("OPERATIVO")
                         .requestMatchers("/api/admin/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/usuario/admin/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/rol/admin/**").hasRole("ADMINISTRADOR")

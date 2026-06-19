@@ -4053,6 +4053,127 @@
   }
 }
 
+.operative-assignment-section {
+  display: grid;
+  gap: 18px;
+}
+
+.operative-assignment-combobox {
+  max-width: 100%;
+}
+
+.operative-assignment-combobox .area-combobox-input {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  font: inherit;
+  min-height: 44px;
+  padding: 11px 12px;
+  width: 100%;
+}
+
+.operative-assignment-selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.operative-assignment-selected span {
+  background: #eef6ff;
+  border: 1px solid rgba(10, 86, 194, 0.14);
+  border-radius: 999px;
+  color: #294766;
+  font-size: 0.78rem;
+  font-weight: 720;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 5px 9px;
+}
+
+.operative-assignment-menu {
+  gap: 4px;
+  max-height: 18rem;
+  padding: 6px;
+  z-index: 85;
+}
+
+.operative-assignment-menu .operative-assignment-option {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  color: #294766;
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 9px;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 42px;
+  padding: 7px 8px;
+}
+
+.operative-assignment-menu .operative-assignment-option:hover,
+.operative-assignment-menu .operative-assignment-option.is-selected {
+  background: var(--brand-soft);
+}
+
+.operative-assignment-menu .operative-assignment-option input {
+  height: 15px;
+  margin: 0;
+  width: 15px;
+}
+
+.operative-assignment-menu .operative-assignment-option span {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.operative-assignment-menu .operative-assignment-option strong,
+.operative-assignment-menu .operative-assignment-option small {
+  overflow-wrap: anywhere;
+}
+
+.operative-assignment-menu .operative-assignment-option strong {
+  font-size: 0.84rem;
+  line-height: 1.15;
+}
+
+.operative-assignment-menu .operative-assignment-option small {
+  color: #6c8198;
+  font-size: 0.7rem;
+  font-weight: 680;
+  line-height: 1.2;
+  text-transform: none;
+}
+
+.operative-assignment-warning {
+  background: #FFF7E6;
+  border: 1px solid #F3C98B;
+  border-radius: 10px;
+  color: #B45309;
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 500;
+}
+
+.operative-detail-panel {
+  margin: 24px auto;
+  max-width: 1120px;
+}
+
+.operative-detail-panel ul {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding-left: 18px;
+}
+
 @media (max-width: 1024px) {
   .admin-shell,
   .admin-shell.is-sidebar-collapsed {

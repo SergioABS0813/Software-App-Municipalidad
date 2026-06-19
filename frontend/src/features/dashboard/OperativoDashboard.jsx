@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import municipalLogo from '../../assets/images/municipalidad-logo.png';
-import { adminEvents } from './dashboardData';
+import { getApiErrorMessage } from '../../services/api/api';
+import { getEventosOperativoHoy } from '../../services/dashboardService';
+import { DashboardSkeleton, ErrorState } from '../../components/feedback/LoadingStates';
 import './AdminDashboard.css';
 import './OperativoDashboard.css';
 
@@ -107,11 +109,14 @@ function isEventToday(event, now) {
     return false;
   }
 
-  return isSameLocalDay(start, now) || isSameLocalDay(end, now);
-}
+  if (!start || !end) {
+    return isSameLocalDay(start ?? end, now);
+  }
 
-function isAssignedToOperative(event, operativeId) {
-  return Boolean(operativeId && event.operativosAsignados?.includes(operativeId));
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+  return start < dayEnd && end >= dayStart;
 }
 
 function buildOperativeEvent(event, now) {
@@ -257,29 +262,30 @@ function getMockValidationResult(code, event) {
 
 function OperativoDashboard({ onLogout, user }) {
   const operativeUser = user?.id ? user : { ...fallbackOperativeUser, ...user };
-  const operativeUserId = operativeUser.id;
   const operativeUserName =
     operativeUser.fullName || operativeUser.name || fallbackOperativeUser.fullName;
   const now = useMemo(() => new Date(), []);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSidebarDrawerOpen, setIsSidebarDrawerOpen] = useState(false);
   const [activeOperativeSection, setActiveOperativeSection] = useState('control-acceso');
+  const [operativeEventsData, setOperativeEventsData] = useState([]);
+  const [isLoadingOperativeEvents, setIsLoadingOperativeEvents] = useState(true);
+  const [operativeEventsError, setOperativeEventsError] = useState('');
+  const [operativeEventsReloadKey, setOperativeEventsReloadKey] = useState(0);
   const operativeEvents = useMemo(
     () =>
-      adminEvents
+      operativeEventsData
         .filter((event) => {
           const operativeState = getOperativeState(event, now);
 
           return (
-            isAssignedToOperative(event, operativeUserId) &&
             isEventToday(event, now) &&
-            event.controlAsistenciaHabilitado !== false &&
             ['PUBLICADO', 'EN_CURSO'].includes(operativeState) &&
             !['FINALIZADO', 'CANCELADO'].includes(event.state)
           );
         })
         .map((event) => buildOperativeEvent(event, now)),
-    [now, operativeUserId],
+    [now, operativeEventsData],
   );
   const activeOperativeEvent = operativeEvents[0] ?? null;
   const [selectedEventId, setSelectedEventId] = useState(null);
@@ -310,6 +316,39 @@ function OperativoDashboard({ onLogout, user }) {
   const availableCapacity = hasCapacityControl
     ? Math.max(aforoMaximo - validValidationCount, 0)
     : null;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    setIsLoadingOperativeEvents(true);
+    setOperativeEventsError('');
+
+    getEventosOperativoHoy()
+      .then((data) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setOperativeEventsData(Array.isArray(data) ? data : []);
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setOperativeEventsData([]);
+        setOperativeEventsError(getApiErrorMessage(error, 'No se pudieron cargar tus eventos asignados.'));
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingOperativeEvents(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [operativeEventsReloadKey]);
 
   useEffect(() => {
     if (!isSidebarDrawerOpen) {
@@ -642,13 +681,25 @@ function OperativoDashboard({ onLogout, user }) {
           ) : null}
         </header>
 
-        {!hasAuthorizedEvent ? (
+        {isLoadingOperativeEvents ? (
+          <DashboardSkeleton tableColumns={4} />
+        ) : operativeEventsError ? (
+          <ErrorState
+            description={operativeEventsError}
+            onRetry={() => setOperativeEventsReloadKey((key) => key + 1)}
+          />
+        ) : !hasAuthorizedEvent ? (
           <section className="admin-panel operative-empty-state" aria-live="polite">
-            <span className="section-kicker">Sin asignación activa</span>
-            <h2>No tienes eventos asignados para hoy.</h2>
+            <span className="section-kicker">
+              {isLoadingOperativeEvents ? 'Cargando asignaciones' : 'Sin asignación activa'}
+            </span>
+            <h2>
+              {isLoadingOperativeEvents
+                ? 'Cargando eventos asignados...'
+                : 'No tienes eventos asignados para hoy.'}
+            </h2>
             <p>
-              Cuando seas asignado a un evento publicado o en curso, podrás registrar
-              asistencias desde este panel.
+              {operativeEventsError || 'Cuando seas asignado a un evento publicado o en curso, podrás registrar asistencias desde este panel.'}
             </p>
           </section>
         ) : (

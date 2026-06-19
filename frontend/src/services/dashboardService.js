@@ -8,6 +8,11 @@ export async function getUsuariosInternos({ texto = '', rolId = '', page = 0, si
     return response.data;
 }
 
+export async function getOperativosActivos(){
+    const response = await api.get("usuario/admin/operativos");
+    return response.data;
+}
+
 export async function getUsuarioInternoDetalle(id){
     const response = await api.get(`usuario/admin/obtener_usuario_interno/${id}`);
     return response.data;
@@ -146,5 +151,10 @@ export async function getNotificacionesAdministrador({ soloNoLeidas = false } = 
 
 export async function marcarNotificacionComoLeida(id){
     const response = await api.patch(`notificacion/${id}/leer`);
+    return response.data;
+}
+
+export async function getEventosOperativoHoy(){
+    const response = await api.get("operativo/eventos/hoy");
     return response.data;
 }

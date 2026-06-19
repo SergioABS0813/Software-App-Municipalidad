@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import municipalLogo from '../../assets/images/municipalidad-logo.png';
 import PublicEventDetail from '../public-portal/PublicEventDetail';
-import { adminEvents, formatEventState } from './dashboardData';
+import { formatEventState } from './dashboardData';
 import NotificationMenu from './NotificationMenu';
 import './AdminDashboard.css';
 import {
@@ -20,6 +20,7 @@ import {
   getEventosGestion,
   getUbicacionesConfiguracion,
   getNotificacionesAdministrador,
+  getOperativosActivos,
   getUsuarioInternoDetalle,
   getUsuariosInternos,
   getRolesUsuariosInternos,
@@ -30,6 +31,7 @@ import {
   marcarNotificacionComoLeida,
 } from '../../services/dashboardService';
 import { getApiErrorMessage } from '../../services/api/api';
+import { CardSkeleton, EmptyState, ErrorState, EventFormSkeleton, TableSkeleton } from '../../components/feedback/LoadingStates';
 
 function getManagementStats(events) {
   return [
@@ -108,6 +110,8 @@ const adminNotifications = [
 const eventFormSections = [
   { id: 'datos-generales', label: 'Datos generales' },
   { id: 'programacion', label: 'Programación' },
+  { id: 'control-asistencia', label: 'Asistencia' },
+  { id: 'personal-operativo', label: 'Operativos' },
   { id: 'evaluacion', label: 'Evaluación' },
   { id: 'contenido-evento', label: 'Contenido' },
   { id: 'ubicacion', label: 'Ubicación' },
@@ -231,9 +235,15 @@ function mapManagementEventFromApi(event) {
     aforoMaximo: event.aforoMaximo ?? '',
     edad_minima: event.edadMin ?? '',
     edad_maxima: event.edadMax ?? '',
+    requiereControlAsistencia: event.requiereControlAsistencia ?? true,
     lastUpdatedAt: event.actualizadoEn ?? '',
+    criteriosFicha: Array.isArray(event.criteriosFicha) ? event.criteriosFicha : [],
     agenda_evento: Array.isArray(event.agenda) ? event.agenda : [],
     requisitos_evento: Array.isArray(event.requisitos) ? event.requisitos : [],
+    operativosAsignados: Array.isArray(event.operativosAsignados) ? event.operativosAsignados : [],
+    operativosAsignadosIds: Array.isArray(event.operativosAsignados)
+      ? event.operativosAsignados.map((operativo) => operativo.usuarioId).filter(Boolean)
+      : [],
     pendingItems,
     completeness: Number(event.completitud ?? 0),
     resourceItems,
@@ -355,6 +365,7 @@ function buildEventCreatePayload(form, actionType, existingEvent = null) {
   const audienceType = getNamedFormValue(form, 'publico_tipo') || 'GENERAL';
   const capacityMode = getNamedFormValue(form, 'capacityMode');
   const attendanceGoalEnabled = isNamedChecked(form, 'attendanceGoalEnabled');
+  const requiereControlAsistencia = isNamedChecked(form, 'requiresAttendanceControl');
 
   return {
     titulo: emptyToNull(getNamedFormValue(form, 'title')),
@@ -373,11 +384,23 @@ function buildEventCreatePayload(form, actionType, existingEvent = null) {
     metaTipo: attendanceGoalEnabled ? emptyToNull(getNamedFormValue(form, 'attendanceGoalType')) : null,
     metaValor: attendanceGoalEnabled ? numberOrNull(getNamedFormValue(form, 'attendanceGoalValue')) : null,
     encuestaSatisfaccionHabilitado: isNamedChecked(form, 'surveyEnabled'),
+    requiereControlAsistencia,
     enviarRevision: actionType === 'review',
+    operativosAsignadosIds: requiereControlAsistencia ? getSelectedOperativeIdsFromForm(form) : [],
     agenda: parseOrderedEventItems(getNamedFormValue(form, 'agenda_evento_json')),
     requisitos: parseOrderedEventItems(getNamedFormValue(form, 'requisitos_evento_json')),
     recursos: buildResourceRequestsFromForm(form, existingEvent),
   };
+}
+
+function getSelectedOperativeIdsFromForm(form) {
+  if (!form) {
+    return [];
+  }
+
+  return Array.from(form.querySelectorAll('input[name="operativosAsignadosIds"]'))
+    .map((input) => Number(input.value))
+    .filter((value) => Number.isFinite(value));
 }
 
 // TODO: reemplazar este mock por el catálogo de áreas municipales desde Spring Boot.
@@ -457,12 +480,6 @@ const neighborStatusOptions = [
   { label: 'Activo', value: 'ACTIVO' },
   { label: 'Pendiente de confirmación', value: 'PENDIENTE_CONFIRMACION' },
   { label: 'Inactivo', value: 'INACTIVO' },
-];
-
-const settingsUsers = [
-  { id: 1, dni: '12345678', nombre: 'Administrador municipal', correo: 'admin@munisanmiguel.gob.pe', rol: 'Administrador', areaId: 1, area: 'Gerencia de Desarrollo Social', estado: 'ACTIVO' },
-  { id: 2, dni: '87654321', nombre: 'Directivo de Cultura', correo: 'directivo@munisanmiguel.gob.pe', rol: 'Directivo', areaId: 3, area: 'Subgerencia de Educación y Cultura', estado: 'ACTIVO' },
-  { id: 3, dni: '11223344', nombre: 'Operativo de asistencia', correo: 'operativo@munisanmiguel.gob.pe', rol: 'Operativo', areaId: 5, area: 'Oficina de Participación Vecinal', estado: 'INACTIVO' },
 ];
 
 const identityLookupMock = {
@@ -850,6 +867,30 @@ function hasValidAudienceConfig(event) {
   );
 }
 
+function requiresAttendanceControl(event) {
+  return event?.requiereControlAsistencia !== false;
+}
+
+function hasAssignedOperatives(event) {
+  return Array.isArray(event?.operativosAsignadosIds) && event.operativosAsignadosIds.length > 0;
+}
+
+function getOperativeChecklistItem(event) {
+  if (!requiresAttendanceControl(event)) {
+    return {
+      complete: true,
+      completeLabel: 'Personal operativo no requerido',
+      pendingLabel: 'Personal operativo no requerido',
+    };
+  }
+
+  return {
+    complete: hasAssignedOperatives(event),
+    completeLabel: 'Personal operativo asignado',
+    pendingLabel: 'Falta personal operativo asignado',
+  };
+}
+
 function getAudienceLabel(event) {
   const audienceType = event.publico_tipo ?? (event.edad_minima || event.edad_maxima ? 'OBJETIVO' : 'GENERAL');
 
@@ -1072,6 +1113,7 @@ function getEventChecklist(event, options = {}) {
       completeLabel: 'Recursos adjuntados',
       pendingLabel: 'Falta imagen de portada',
     },
+    getOperativeChecklistItem(event),
   ];
   const completedChecks = checks.filter((item) => item.complete).length;
   const items = checks.map((item) => ({
@@ -1136,6 +1178,7 @@ function getCreationEventChecklist(event) {
       complete: Boolean(event.resources?.IMAGEN_PORTADA),
       completeLabel: 'Recursos adjuntados',
     },
+    getOperativeChecklistItem(event),
   ];
   const completedChecks = checks.filter((item) => item.complete).length;
 
@@ -1144,6 +1187,7 @@ function getCreationEventChecklist(event) {
     hasCriticalPending: completedChecks !== checks.length,
     items: checks.map((item) => ({
       complete: item.complete,
+      label: item.complete ? item.completeLabel : item.pendingLabel,
       positiveLabel: item.completeLabel,
     })),
   };
@@ -1214,6 +1258,8 @@ function getChecklistEventFromForm(form, event, catalogs = {}) {
     metaValor: isNamedChecked(form, 'attendanceGoalEnabled')
       ? getNamedFormValue(form, 'attendanceGoalValue')
       : null,
+    requiereControlAsistencia: isNamedChecked(form, 'requiresAttendanceControl'),
+    operativosAsignadosIds: getSelectedOperativeIdsFromForm(form),
     spots:
       getNamedFormValue(form, 'capacityMode') === 'none'
         ? ''
@@ -1293,6 +1339,7 @@ function getMissingReviewFields(form, existingEvent = null) {
   const maxAge = Number(getNamedFormValue(form, 'edad_maxima'));
   const eventStart = getNamedFormValue(form, 'eventStart');
   const eventEnd = getNamedFormValue(form, 'eventEnd');
+  const requiereControlAsistencia = isNamedChecked(form, 'requiresAttendanceControl');
 
   if (shortDescription.length > 45) {
     missingFields.push('Descripción breve de máximo 45 caracteres');
@@ -1348,6 +1395,10 @@ function getMissingReviewFields(form, existingEvent = null) {
     missingFields.push('Imagen de portada');
   }
 
+  if (requiereControlAsistencia && getSelectedOperativeIdsFromForm(form).length === 0) {
+    missingFields.push('Personal operativo asignado');
+  }
+
   return missingFields;
 }
 
@@ -1371,13 +1422,16 @@ function AdminDashboard({ onLogout, user }) {
   );
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSidebarDrawerOpen, setIsSidebarDrawerOpen] = useState(false);
-  const [eventItems, setEventItems] = useState(adminEvents);
+  const [eventItems, setEventItems] = useState([]);
   const [eventCategoryCatalog, setEventCategoryCatalog] = useState([]);
   const [eventAreaCatalog, setEventAreaCatalog] = useState(eventOrganizerAreas);
   const [eventLocationCatalog, setEventLocationCatalog] = useState(registeredLocations);
+  const [eventOperativeCatalog, setEventOperativeCatalog] = useState([]);
   const [eventStateCatalog, setEventStateCatalog] = useState([]);
-  const [isLoadingEventCatalogs, setIsLoadingEventCatalogs] = useState(false);
+  const [isLoadingEventCatalogs, setIsLoadingEventCatalogs] = useState(true);
   const [eventCatalogError, setEventCatalogError] = useState('');
+  const [isLoadingEvents, setIsLoadingEvents] = useState(true);
+  const [eventsError, setEventsError] = useState('');
   const [eventsPage, setEventsPage] = useState({
     number: 0,
     size: 5,
@@ -1398,6 +1452,8 @@ function AdminDashboard({ onLogout, user }) {
     unread: adminNotifications.filter((notification) => notification.unread).length,
   });
   const [notificationFilter, setNotificationFilter] = useState('all');
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
+  const [notificationError, setNotificationError] = useState('');
   const [targetUserDetailId, setTargetUserDetailId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [stateFilter, setStateFilter] = useState('Todos');
@@ -1442,6 +1498,8 @@ function AdminDashboard({ onLogout, user }) {
   );
   const loadAdminNotifications = useCallback((nextFilter = notificationFilter) => {
     const soloNoLeidas = nextFilter === 'unread';
+    setIsLoadingNotifications(true);
+    setNotificationError('');
 
     return getNotificacionesAdministrador({ soloNoLeidas })
       .then((data) => {
@@ -1457,12 +1515,11 @@ function AdminDashboard({ onLogout, user }) {
       })
       .catch((error) => {
         console.error('No se pudieron cargar las notificaciones.', error);
-        setAdminNotificationItems(adminNotifications);
-        setAdminNotificationCounts({
-          total: adminNotifications.length,
-          unread: adminNotifications.filter((notification) => notification.unread).length,
-        });
-      });
+        setAdminNotificationItems([]);
+        setAdminNotificationCounts({ total: 0, unread: 0 });
+        setNotificationError(getApiErrorMessage(error, 'No se pudieron cargar las notificaciones.'));
+      })
+      .finally(() => setIsLoadingNotifications(false));
   }, [notificationFilter]);
 
   const loadEventCatalogs = useCallback(async () => {
@@ -1472,10 +1529,11 @@ function AdminDashboard({ onLogout, user }) {
     setEventCatalogError('');
 
     try {
-      const [categoriesData, locationsData, statesData] = await Promise.all([
+      const [categoriesData, locationsData, statesData, operativesData] = await Promise.all([
         getCategoriasConfiguracion({ page: 0, size: 200 }),
         getUbicacionesConfiguracion({ page: 0, size: 200 }),
         getEstadosEventoGestion(),
+        getOperativosActivos(),
       ]);
 
       if (eventCatalogRequestRef.current !== requestId) {
@@ -1493,6 +1551,7 @@ function AdminDashboard({ onLogout, user }) {
       setEventAreaCatalog(uniqueCatalogItems(eventOrganizerAreas, (area) => area.area_municipal_id));
       setEventLocationCatalog(uniqueCatalogItems(locations, (location) => location.ubicacion_id));
       setEventStateCatalog(Array.isArray(statesData) ? statesData : []);
+      setEventOperativeCatalog(Array.isArray(operativesData) ? operativesData : []);
     } catch (error) {
       console.error('No se pudieron cargar los catalogos de eventos.', error);
 
@@ -1513,6 +1572,8 @@ function AdminDashboard({ onLogout, user }) {
         ? ''
         : categoryFilter;
 
+    setIsLoadingEvents(true);
+    setEventsError('');
     getEventosGestion({
       categoriaId: selectedCategoryId,
       estado: stateFilter === 'Todos' ? '' : stateFilter,
@@ -1538,6 +1599,13 @@ function AdminDashboard({ onLogout, user }) {
       })
       .catch((error) => {
         console.error('No se pudieron cargar los eventos en gestion.', error);
+        if (isMounted) {
+          setEventItems([]);
+          setEventsError(getApiErrorMessage(error, 'No se pudieron cargar los eventos.'));
+        }
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingEvents(false);
       });
 
     return () => {
@@ -1568,15 +1636,8 @@ function AdminDashboard({ onLogout, user }) {
       loadEventCatalogs();
     }, 0);
 
-    function reloadCatalogsOnFocus() {
-      loadEventCatalogs();
-    }
-
-    window.addEventListener('focus', reloadCatalogsOnFocus);
-
     return () => {
       window.clearTimeout(catalogLoadTimeout);
-      window.removeEventListener('focus', reloadCatalogsOnFocus);
     };
   }, [currentAdminView, isEventFormView, loadEventCatalogs]);
 
@@ -1713,6 +1774,8 @@ function AdminDashboard({ onLogout, user }) {
   const filteredAdminEvents = eventItems;
 
   function openAdminEventEdit(event) {
+    setIsLoadingEventCatalogs(true);
+    setEventCatalogError('');
     setSelectedAdminEvent(event);
     setCurrentAdminView('edit-event');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2101,12 +2164,15 @@ function AdminDashboard({ onLogout, user }) {
 
       <main className="admin-main">
         {currentAdminView === 'new-event' ? (
-          <NewEventView
+          isLoadingEventCatalogs ? <EventFormSkeleton /> : eventCatalogError ? (
+            <ErrorState description={eventCatalogError} onRetry={loadEventCatalogs} />
+          ) : <NewEventView
             areas={eventAreaCatalog}
             categories={eventCategoryCatalog}
             catalogError={eventCatalogError}
             isLoadingCatalogs={isLoadingEventCatalogs}
             locations={eventLocationCatalog}
+            operatives={eventOperativeCatalog}
             onBack={() => setCurrentAdminView('dashboard')}
             onRequestAction={(type, payload) =>
               setPendingEventAction({ mode: 'create', payload, type })
@@ -2114,13 +2180,16 @@ function AdminDashboard({ onLogout, user }) {
             onValidationIssue={setValidationIssue}
           />
         ) : currentAdminView === 'edit-event' && selectedAdminEvent ? (
-          <EditEventView
+          isLoadingEventCatalogs ? <EventFormSkeleton /> : eventCatalogError ? (
+            <ErrorState description={eventCatalogError} onRetry={loadEventCatalogs} />
+          ) : <EditEventView
             areas={eventAreaCatalog}
             categories={eventCategoryCatalog}
             catalogError={eventCatalogError}
             event={selectedAdminEvent}
             isLoadingCatalogs={isLoadingEventCatalogs}
             locations={eventLocationCatalog}
+            operatives={eventOperativeCatalog}
             onBack={() => {
               setSelectedAdminEvent(null);
               setCurrentAdminView('dashboard');
@@ -2171,17 +2240,22 @@ function AdminDashboard({ onLogout, user }) {
               </div>
               <div className="admin-topbar-actions">
                 <NotificationMenu
+                  error={notificationError}
+                  isLoading={isLoadingNotifications}
                   notifications={adminNotificationItems}
                   totalCount={adminNotificationCounts.total}
                   unreadCount={adminNotificationCounts.unread}
                   onFilterChange={handleNotificationFilterChange}
                   onNotificationOpen={handleNotificationOpen}
                   onNotificationRead={handleNotificationRead}
+                  onRetry={() => loadAdminNotifications(notificationFilter)}
                 />
                 <button
                   className="admin-new-event-action"
                   type="button"
                   onClick={() => {
+                    setIsLoadingEventCatalogs(true);
+                    setEventCatalogError('');
                     setCurrentAdminView('new-event');
                   }}
                 >
@@ -2192,7 +2266,7 @@ function AdminDashboard({ onLogout, user }) {
             </header>
 
             <section className="admin-stats" id="resumen" aria-label="Resumen de gestion">
-              {managementStats.map((stat) => (
+              {isLoadingEvents ? <CardSkeleton count={4} /> : managementStats.map((stat) => (
                 <article
                   className={`admin-stat-card management-stat-card ${stat.tone}`}
                   key={stat.label}
@@ -2258,12 +2332,13 @@ function AdminDashboard({ onLogout, user }) {
                   <span>Completitud</span>
                   <span>Acción</span>
                 </div>
-                {filteredAdminEvents.length === 0 && (
-                  <div className="admin-table-row admin-table-empty-row">
-                    <span>No se encontraron eventos con los filtros seleccionados.</span>
-                  </div>
-                )}
-                {filteredAdminEvents.map((event) => {
+                {isLoadingEvents ? (
+                  <TableSkeleton columns={5} rows={5} />
+                ) : eventsError ? (
+                  <ErrorState description={eventsError} onRetry={() => setEventsReloadKey((key) => key + 1)} />
+                ) : filteredAdminEvents.length === 0 ? (
+                  <EmptyState title="No se encontraron eventos" description="Prueba con otros filtros o registra un nuevo evento." />
+                ) : filteredAdminEvents.map((event) => {
                   const actionConfig = getAdminEventActionConfig(event);
                   const ActionIcon = actionConfig?.icon;
 
@@ -2429,6 +2504,189 @@ function EventReviewStatusView({ event, onBack }) {
   );
 }
 
+function OperativeAssignmentSection({
+  onSelectionChange,
+  operatives = [],
+  selectedIds = [],
+}) {
+  const [searchValue, setSearchValue] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const comboboxRef = useRef(null);
+  const selectedSet = new Set(selectedIds.map(String));
+  const selectedOperatives = operatives.filter((operative) =>
+    selectedSet.has(String(operative.usuarioId ?? operative.id)),
+  );
+  const normalizedSearch = normalizeSearchText(searchValue.trim());
+  const filteredOperatives = operatives.filter((operative) => {
+    if (!normalizedSearch) {
+      return true;
+    }
+
+    return [
+      operative.nombres,
+      operative.apellidos,
+      operative.dni,
+      operative.email,
+    ].some((value) => normalizeSearchText(value).includes(normalizedSearch));
+  });
+
+  useEffect(() => {
+    function closeOnOutsideClick(event) {
+      if (!comboboxRef.current?.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', closeOnOutsideClick);
+
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick);
+    };
+  }, []);
+
+  function toggleOperative(operativeId) {
+    const normalizedId = Number(operativeId);
+    const nextSelectedIds = selectedSet.has(String(operativeId))
+      ? selectedIds.filter((id) => String(id) !== String(operativeId))
+      : [...selectedIds, normalizedId];
+
+    onSelectionChange?.(nextSelectedIds);
+  }
+
+  function getOperativeName(operative) {
+    return [operative.nombres, operative.apellidos].filter(Boolean).join(' ')
+      || operative.email
+      || `Usuario ${operative.usuarioId ?? operative.id}`;
+  }
+
+  function getSelectionSummary() {
+    if (selectedOperatives.length === 0) {
+      return '';
+    }
+
+    if (selectedOperatives.length === 1) {
+      return getOperativeName(selectedOperatives[0]);
+    }
+
+    return `${selectedOperatives.length} operativos seleccionados`;
+  }
+
+  return (
+    <article className="event-form-section operative-assignment-section" id="personal-operativo">
+      <div className="form-section-heading">
+        <span className="section-kicker">Personal operativo</span>
+        <h2>Personal operativo asignado</h2>
+      </div>
+
+      {operatives.length === 0 ? (
+        <p className="settings-inline-notice">
+          No hay usuarios operativos activos disponibles para asignar.
+        </p>
+      ) : (
+        <div className="area-combobox operative-assignment-combobox" ref={comboboxRef}>
+          {selectedIds.map((operativeId) => (
+            <input
+              key={operativeId}
+              name="operativosAsignadosIds"
+              readOnly
+              type="hidden"
+              value={operativeId}
+            />
+          ))}
+          <input
+            aria-autocomplete="list"
+            aria-expanded={isOpen}
+            className="area-combobox-input"
+            placeholder={getSelectionSummary() || 'Buscar operativos por nombre, DNI o correo'}
+            role="combobox"
+            type="text"
+            value={searchValue}
+            onChange={(event) => {
+              setSearchValue(event.target.value);
+              setIsOpen(true);
+            }}
+            onClick={() => setIsOpen(true)}
+            onFocus={() => setIsOpen(true)}
+          />
+          {selectedOperatives.length > 0 && (
+            <div className="operative-assignment-selected">
+              {selectedOperatives.map((operative) => (
+                <span key={operative.usuarioId ?? operative.id}>
+                  {getOperativeName(operative)}
+                </span>
+              ))}
+            </div>
+          )}
+          {isOpen && (
+            <div className="area-combobox-menu operative-assignment-menu" role="listbox">
+              {filteredOperatives.length > 0 ? (
+                filteredOperatives.map((operative) => {
+                  const operativeId = operative.usuarioId ?? operative.id;
+                  const isSelected = selectedSet.has(String(operativeId));
+
+                  return (
+                    <label
+                      aria-selected={isSelected}
+                      className={isSelected ? 'operative-assignment-option is-selected' : 'operative-assignment-option'}
+                      key={operativeId}
+                      role="option"
+                    >
+                      <input
+                        checked={isSelected}
+                        type="checkbox"
+                        onChange={(event) => {
+                          event.stopPropagation();
+                          toggleOperative(operativeId);
+                        }}
+                      />
+                      <span>
+                        <strong>{getOperativeName(operative)}</strong>
+                        <small>{operative.dni || 'Sin DNI'} · {operative.email || 'Sin correo'}</small>
+                      </span>
+                    </label>
+                  );
+                })
+              ) : (
+                <span className="area-combobox-empty">No se encontraron operativos activos.</span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {selectedSet.size === 0 && (
+        <p className="operative-assignment-warning">
+          Este evento requiere control de asistencia. Asigna al menos un operativo para que pueda validar el ingreso de asistentes el día del evento.
+        </p>
+      )}
+    </article>
+  );
+}
+
+function AttendanceControlSection({ requiresControl = true }) {
+  return (
+    <article className="event-form-section attendance-control-section" id="control-asistencia">
+      <div className="form-section-heading">
+        <span className="section-kicker">Control de asistencia</span>
+        <h2>Validación de ingreso</h2>
+      </div>
+      <label className="form-switch-field">
+        <input
+          defaultChecked={requiresControl}
+          name="requiresAttendanceControl"
+          type="checkbox"
+        />
+        <span>
+          <strong>Este evento requiere control de asistencia</strong>
+          <small>
+            Activa esta opción si el ingreso de asistentes será validado por personal operativo mediante QR o búsqueda manual.
+          </small>
+        </span>
+      </label>
+    </article>
+  );
+}
+
 function AdminPublicEventPreview({ event, onBack }) {
   function preventPreviewSubmit(submitEvent) {
     submitEvent.preventDefault();
@@ -2448,6 +2706,21 @@ function AdminPublicEventPreview({ event, onBack }) {
         onBack={onBack}
         onSubmit={preventPreviewSubmit}
       />
+      <section className="admin-panel operative-detail-panel">
+        <span className="section-kicker">Personal operativo</span>
+        <h2>Personal operativo asignado</h2>
+        {event.operativosAsignados?.length ? (
+          <ul>
+            {event.operativosAsignados.map((operative) => (
+              <li key={operative.usuarioId}>
+                {[operative.nombres, operative.apellidos].filter(Boolean).join(' ') || operative.email}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>Este evento no tiene personal operativo asignado.</p>
+        )}
+      </section>
     </section>
   );
 }
@@ -3446,7 +3719,7 @@ function NeighborAccountsPage({ adminUserName }) {
   const [actionReason, setActionReason] = useState('');
   const [notice, setNotice] = useState('');
   const [listNotice, setListNotice] = useState('');
-  const [isLoadingNeighbors, setIsLoadingNeighbors] = useState(false);
+  const [isLoadingNeighbors, setIsLoadingNeighbors] = useState(true);
   const [isLoadingNeighborDetail, setIsLoadingNeighborDetail] = useState(false);
   const modalNeighbor = useMemo(() => {
     if (!selectedNeighbor) {
@@ -3731,24 +4004,9 @@ function NeighborAccountsPage({ adminUserName }) {
             <div className="admin-table-row admin-table-head">
               <span>Vecino</span><span>Estado</span><span>Editar</span>
             </div>
-            {isLoadingNeighbors && (
-              <div className="admin-table-row">
-                <span className="neighbor-person-cell">
-                  <strong>Cargando cuentas vecinales...</strong>
-                </span>
-                <span />
-                <span />
-              </div>
-            )}
+            {isLoadingNeighbors && <TableSkeleton columns={3} rows={5} />}
             {!isLoadingNeighbors && neighbors.length === 0 && (
-              <div className="admin-table-row">
-                <span className="neighbor-person-cell">
-                  <strong>No se encontraron cuentas vecinales.</strong>
-                  <small>Prueba con otro nombre, DNI, correo o estado.</small>
-                </span>
-                <span />
-                <span />
-              </div>
+              <EmptyState title="No se encontraron cuentas vecinales" description="Prueba con otro nombre, DNI, correo o estado." />
             )}
             {!isLoadingNeighbors && neighbors.map((neighbor) => (
               <div className="admin-table-row" key={neighbor.id}>
@@ -4033,32 +4291,43 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
   const [identityLookupNotice, setIdentityLookupNotice] = useState('');
   const [passwordResetNotice, setPasswordResetNotice] = useState('');
   const [userNotice, setUserNotice] = useState('');
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+  const [usersError, setUsersError] = useState('');
   const [openedTargetUserId, setOpenedTargetUserId] = useState(null);
 
   useEffect(()=>{
     async function loadUsuariosInternos() {
-      const data = await getUsuariosInternos({
-        texto: searchValue,
-        rolId: roleFilter,
-        page: usersPage.number,
-        size: usersPage.size,
-      });
-      const usuarios = data.content.map((usuario) => ({
-        id: usuario.id,
-        nombre: usuario.nombre,
-        correo: usuario.email,
-        rolId: usuario.rolConfiguracionDto?.id,
-        rol: usuario.rolConfiguracionDto?.codigo ?? '',
-        estado: usuario.activo === 1 ? 'ACTIVO' : 'INACTIVO',
-      }));
-      setUsers(usuarios);
-      setUsersPage((currentPage) => ({
-        ...currentPage,
-        number: data.number,
-        size: data.size,
-        totalElements: data.totalElements,
-        totalPages: data.totalPages,
-      }));
+      setIsLoadingUsers(true);
+      setUsersError('');
+      try {
+        const data = await getUsuariosInternos({
+          texto: searchValue,
+          rolId: roleFilter,
+          page: usersPage.number,
+          size: usersPage.size,
+        });
+        const usuarios = data.content.map((usuario) => ({
+          id: usuario.id,
+          nombre: usuario.nombre,
+          correo: usuario.email,
+          rolId: usuario.rolConfiguracionDto?.id,
+          rol: usuario.rolConfiguracionDto?.codigo ?? '',
+          estado: usuario.activo === 1 ? 'ACTIVO' : 'INACTIVO',
+        }));
+        setUsers(usuarios);
+        setUsersPage((currentPage) => ({
+          ...currentPage,
+          number: data.number,
+          size: data.size,
+          totalElements: data.totalElements,
+          totalPages: data.totalPages,
+        }));
+      } catch (error) {
+        setUsers([]);
+        setUsersError(getApiErrorMessage(error, 'No se pudieron cargar los usuarios internos.'));
+      } finally {
+        setIsLoadingUsers(false);
+      }
     }
 
     loadUsuariosInternos();
@@ -4262,7 +4531,11 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
           <div className="admin-table-row admin-table-head">
             <span>Usuario</span><span>Correo</span><span>Rol</span><span>Estado</span><span>Acción</span>
           </div>
-          {users.map((user) => (
+          {isLoadingUsers ? <TableSkeleton columns={5} rows={6} /> : usersError ? (
+            <ErrorState description={usersError} onRetry={() => setUsersReloadKey((key) => key + 1)} />
+          ) : users.length === 0 ? (
+            <EmptyState title="No se encontraron usuarios" description="Ajusta los filtros o registra un nuevo usuario interno." />
+          ) : users.map((user) => (
             <div className="admin-table-row" key={user.id}>
               <span><strong>{user.nombre}</strong></span>
               <span>{user.correo}</span>
@@ -4424,18 +4697,6 @@ function validateUserForm(formData, mode) {
   }
 
   return errors;
-}
-
-function getChangedUserFields(currentUser, nextUser) {
-  return ['correo', 'rol', 'areaId', 'area'].filter((field) => currentUser[field] !== nextUser[field]);
-}
-
-function notifyUserAccountChanges(user, changedFields) {
-  return {
-    changedFields,
-    recipient: user.correo,
-    status: 'queued',
-  };
 }
 
 function registerUserAuditLog(action, userId, changedFields) {
@@ -4773,7 +5034,7 @@ function SettingsCategoriesPage({ onEventCatalogChanged }) {
   const [categoryNotice, setCategoryNotice] = useState('');
   const [categoryToDelete, setCategoryToDelete] = useState(null);
   const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false);
-  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [categoriesReloadKey, setCategoriesReloadKey] = useState(0);
 
@@ -4949,7 +5210,9 @@ function SettingsCategoriesPage({ onEventCatalogChanged }) {
           <div className="admin-table-row admin-table-head">
             <span>Categoría</span><span>Eventos asociados</span><span>Acción</span>
           </div>
-          {categories.map((category) => (
+          {isLoadingCategories ? <TableSkeleton columns={3} rows={5} /> : categories.length === 0 ? (
+            <EmptyState title="Sin categorias registradas" description="Registra una categoria para clasificar los eventos." />
+          ) : categories.map((category) => (
             <div className="admin-table-row" key={category.id}>
               <span><strong>{category.nombre}</strong></span>
               <span className="category-events-count">{category.eventosAsociados}</span>
@@ -5099,7 +5362,7 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
   const [locationFormData, setLocationFormData] = useState(getEmptyLocationFormData());
   const [locationFormErrors, setLocationFormErrors] = useState({});
   const [locationNotice, setLocationNotice] = useState('');
-  const [isLoadingLocations, setIsLoadingLocations] = useState(false);
+  const [isLoadingLocations, setIsLoadingLocations] = useState(true);
   const [locationsReloadKey, setLocationsReloadKey] = useState(0);
   const isLocationModalOpen = Boolean(locationModalMode);
 
@@ -5356,7 +5619,9 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
           <div className="admin-table-row admin-table-head">
             <span>Ubicación</span><span>Dirección</span><span>Estado</span><span>Detalle</span>
           </div>
-          {locations.map((location) => (
+          {isLoadingLocations ? <TableSkeleton columns={4} rows={5} /> : locations.length === 0 ? (
+            <EmptyState title="Sin ubicaciones registradas" description="Registra un espacio municipal para utilizarlo en los eventos." />
+          ) : locations.map((location) => (
             <div className="admin-table-row" key={location.id}>
               <span>
                 <strong aria-label={location.nombre} title={location.nombre}>
@@ -6239,6 +6504,7 @@ function NewEventView({
   onBack,
   onRequestAction,
   onValidationIssue,
+  operatives = [],
 }) {
   const formRef = useRef(null);
   const [capacityMode, setCapacityMode] = useState('defined');
@@ -6248,7 +6514,10 @@ function NewEventView({
   const [surveyEnabled, setSurveyEnabled] = useState(false);
   const [surveyCommentsEnabled, setSurveyCommentsEnabled] = useState(false);
   const [eventStartValue, setEventStartValue] = useState('');
+  const [requiresControl, setRequiresControl] = useState(true);
+  const [selectedOperativeIds, setSelectedOperativeIds] = useState([]);
   const [checklistEvent, setChecklistEvent] = useState(() => ({
+    requiereControlAsistencia: true,
     resources: {},
     state: 'BORRADOR',
   }));
@@ -6268,8 +6537,11 @@ function NewEventView({
     setSurveyEnabled(isNamedChecked(form, 'surveyEnabled'));
     setSurveyCommentsEnabled(isNamedChecked(form, 'surveyCommentsEnabled'));
     setEventStartValue(getNamedFormValue(form, 'eventStart'));
+    setRequiresControl(isNamedChecked(form, 'requiresAttendanceControl'));
+    setSelectedOperativeIds(getSelectedOperativeIdsFromForm(form));
     setChecklistEvent(
       getChecklistEventFromForm(form, {
+        requiereControlAsistencia: true,
         resources: {},
         state: 'BORRADOR',
       }, { categories, locations }),
@@ -6408,6 +6680,19 @@ function NewEventView({
             surveyEnabled={surveyEnabled}
           />
 
+          <AttendanceControlSection requiresControl />
+
+          {requiresControl && (
+            <OperativeAssignmentSection
+              operatives={operatives}
+              selectedIds={selectedOperativeIds}
+              onSelectionChange={(ids) => {
+                setSelectedOperativeIds(ids);
+                window.setTimeout(syncChecklistFromForm, 0);
+              }}
+            />
+          )}
+
           <article className="event-form-section event-content-section" id="contenido-evento">
             <div className="form-section-heading">
               <span className="section-kicker">Contenido del evento</span>
@@ -6486,7 +6771,7 @@ function NewEventView({
                   key={item.positiveLabel}
                 >
                   <span aria-hidden="true" />
-                  {item.positiveLabel}
+                  {item.label ?? item.positiveLabel}
                 </p>
               ))}
             </div>
@@ -6526,6 +6811,7 @@ function EditEventView({
   onRequestAction,
   onRequestDelete,
   onValidationIssue,
+  operatives = [],
 }) {
   const formRef = useRef(null);
   const initialCapacityMode = Number(event.aforoMaximo ?? event.spots ?? 0) > 0 ? 'defined' : 'none';
@@ -6544,6 +6830,8 @@ function EditEventView({
   const [surveyEnabled, setSurveyEnabled] = useState(Boolean(event.encuestaSatisfaccionHabilitada));
   const [surveyCommentsEnabled, setSurveyCommentsEnabled] = useState(Boolean(event.encuestaComentarioHabilitado));
   const [eventStartValue, setEventStartValue] = useState(() => getEventStartDateTimeValue(event));
+  const [requiresControl, setRequiresControl] = useState(() => requiresAttendanceControl(event));
+  const [selectedOperativeIds, setSelectedOperativeIds] = useState(() => event.operativosAsignadosIds ?? []);
   const [checklistEvent, setChecklistEvent] = useState(() => eventWithMunicipalArea);
   const [hasFormChanges, setHasFormChanges] = useState(false);
   const checklist = getEventChecklist(checklistEvent, {
@@ -6562,6 +6850,8 @@ function EditEventView({
     setSurveyEnabled(isNamedChecked(formRef.current, 'surveyEnabled'));
     setSurveyCommentsEnabled(isNamedChecked(formRef.current, 'surveyCommentsEnabled'));
     setEventStartValue(getNamedFormValue(formRef.current, 'eventStart'));
+    setRequiresControl(isNamedChecked(formRef.current, 'requiresAttendanceControl'));
+    setSelectedOperativeIds(getSelectedOperativeIdsFromForm(formRef.current));
     setChecklistEvent(getChecklistEventFromForm(formRef.current, eventWithMunicipalArea, { categories, locations }));
   }
 
@@ -6732,6 +7022,20 @@ function EditEventView({
             surveyCommentsEnabled={surveyCommentsEnabled}
             surveyEnabled={surveyEnabled}
           />
+
+          <AttendanceControlSection requiresControl={requiresControl} />
+
+          {requiresControl && (
+            <OperativeAssignmentSection
+              operatives={operatives}
+              selectedIds={selectedOperativeIds}
+              onSelectionChange={(ids) => {
+                setSelectedOperativeIds(ids);
+                setHasFormChanges(true);
+                window.setTimeout(syncChecklistFromForm, 0);
+              }}
+            />
+          )}
 
           <article className="event-form-section event-content-section" id="contenido-evento">
             <div className="form-section-heading">

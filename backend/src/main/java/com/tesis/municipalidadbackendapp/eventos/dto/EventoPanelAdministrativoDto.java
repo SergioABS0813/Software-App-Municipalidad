@@ -20,14 +20,24 @@ public record EventoPanelAdministrativoDto(
         Integer aforoMaximo,
         Byte edadMin,
         Byte edadMax,
+        Boolean requiereControlAsistencia,
         LocalDateTime actualizadoEn,
         Integer completitud,
         List<AlertaFichaEventoPanelAdministrativoDto> alertas,
+        List<CriterioFichaEventoPanelAdministrativoDto> criteriosFicha,
         List<ItemOrdenadoEventoPanelAdministrativoDto> agenda,
         List<ItemOrdenadoEventoPanelAdministrativoDto> requisitos,
-        List<RecursoEventoPanelAdministrativoDto> recursos
+        List<RecursoEventoPanelAdministrativoDto> recursos,
+        List<UsuarioOperativoDto> operativosAsignados
 ) {
     public record AlertaFichaEventoPanelAdministrativoDto(String tipo, String mensaje) {}
+    public record CriterioFichaEventoPanelAdministrativoDto(
+            String codigo,
+            String nombre,
+            Boolean completo,
+            Boolean requerido,
+            String estadoTexto
+    ) {}
     public record CategoriaEventoPanelAdministrativoDto(Integer id, String nombre) {}
     public record ItemOrdenadoEventoPanelAdministrativoDto(Integer orden, String descripcion) {}
     public record RecursoEventoPanelAdministrativoDto(String tipoRecurso, String urlRecurso, String nombreArchivo) {}

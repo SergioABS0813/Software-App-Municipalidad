@@ -30,6 +30,18 @@ public interface UsuarioRepository extends JpaRepository<Usuario,Integer> {
     @Query("""
         SELECT u
         FROM Usuario u
+        WHERE u.activo = 1
+        AND (
+            UPPER(u.rol.codigo) = 'OPERATIVO'
+            OR UPPER(u.rol.nombre) = 'OPERATIVO'
+        )
+        ORDER BY u.nombre ASC
+    """)
+    List<Usuario> findOperativosActivos();
+
+    @Query("""
+        SELECT u
+        FROM Usuario u
         WHERE (:rolId IS NULL OR u.rol.id = :rolId)
         AND (:texto IS NULL OR :texto = ''
             OR LOWER(u.nombre) LIKE LOWER(CONCAT('%', :texto, '%'))

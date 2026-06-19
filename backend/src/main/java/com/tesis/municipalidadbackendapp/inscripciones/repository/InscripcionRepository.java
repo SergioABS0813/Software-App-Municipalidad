@@ -9,6 +9,8 @@ import java.util.List;
 
 public interface InscripcionRepository extends JpaRepository<Inscripcion, Integer> {
 
+    List<Inscripcion> findByEventoId(Integer eventoId);
+
     @Query("""
         SELECT i
         FROM Inscripcion i

@@ -20,7 +20,9 @@ public record EventoRegistroRequest(
         String metaTipo,
         Float metaValor,
         Boolean encuestaSatisfaccionHabilitado,
+        Boolean requiereControlAsistencia,
         Boolean enviarRevision,
+        List<Integer> operativosAsignadosIds,
         List<ItemOrdenadoRequest> agenda,
         List<ItemOrdenadoRequest> requisitos,
         List<RecursoRequest> recursos

@@ -5,6 +5,7 @@ import com.tesis.municipalidadbackendapp.organizacion.entity.AreaMunicipal;
 import com.tesis.municipalidadbackendapp.organizacion.service.AreaMunicipalService;
 import com.tesis.municipalidadbackendapp.usuariosinternos.dto.RolConfiguracionDto;
 import com.tesis.municipalidadbackendapp.usuariosinternos.dto.UsuarioConfiguracionDto;
+import com.tesis.municipalidadbackendapp.eventos.dto.UsuarioOperativoDto;
 import com.tesis.municipalidadbackendapp.usuariosinternos.dto.UsuarioRequest;
 import com.tesis.municipalidadbackendapp.usuariosinternos.dto.UsuarioResponse;
 import com.tesis.municipalidadbackendapp.usuariosinternos.dto.UsuarioResponseVerDto;
@@ -160,6 +161,23 @@ public class UsuarioService {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("nombre").ascending());
         return usuarioRepository.buscarPorNombreCorreoORol(texto, rolId, pageable)
                 .map(this::mapToUsuarioConfiguracionDto);
+    }
+
+    public List<UsuarioOperativoDto> listarOperativosActivos() {
+        return usuarioRepository.findOperativosActivos().stream()
+                .map(usuario -> new UsuarioOperativoDto(
+                        usuario.getId(),
+                        usuario.getNombre(),
+                        "",
+                        usuario.getDni(),
+                        usuario.getEmail(),
+                        usuario.getRol() != null
+                                ? (usuario.getRol().getCodigo() != null && !usuario.getRol().getCodigo().isBlank()
+                                    ? usuario.getRol().getCodigo()
+                                    : usuario.getRol().getNombre())
+                                : ""
+                ))
+                .toList();
     }
 
     public UsuarioResponseVerDto obtenerUsuarioInternoPorId(Integer id) {
