@@ -6,6 +6,7 @@ import {
   validarTokenValoracion,
 } from '../../services/valoracionesService';
 import './ValoracionEventoPage.css';
+import LoadingButton from '../../components/feedback/LoadingButton';
 
 const statusContent = {
   RESPONDIDO: {
@@ -168,14 +169,16 @@ function ValoracionEventoPage() {
 
             <StarRating disabled={isSubmitting} value={rating} onChange={setRating} />
 
-            <button
+            <LoadingButton
               className="rating-submit-button"
               disabled={rating < 1 || isSubmitting}
+              loading={isSubmitting}
+              loadingLabel="Enviando..."
               type="button"
               onClick={submitRating}
             >
               {isSubmitting ? 'Enviando...' : 'Enviar valoración'}
-            </button>
+            </LoadingButton>
           </article>
         ) : (
           <StatusCard {...(statusContent[pageState] ?? statusContent.INVALIDO)} />

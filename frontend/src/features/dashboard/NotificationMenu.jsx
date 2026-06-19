@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ErrorState, ListSkeleton } from '../../components/feedback/LoadingStates';
+import '../../components/feedback/LoadingButton.css';
 
 function BellIcon() {
   return (
@@ -134,11 +135,15 @@ export default function NotificationMenu({
             ) : visibleNotifications.map((notification) => (
               <article
                 aria-label={`Abrir notificación: ${notification.title ?? notification.type}`}
-                className={`notification-item ${notification.unread ? 'is-unread' : 'is-read'}`}
+                aria-busy={pendingReadIds.includes(notification.id) || undefined}
+                aria-disabled={pendingReadIds.includes(notification.id) || undefined}
+                className={`notification-item ${notification.unread ? 'is-unread' : 'is-read'} ${pendingReadIds.includes(notification.id) ? 'is-pending' : ''}`}
                 key={notification.id}
                 role="button"
                 tabIndex={0}
-                onClick={() => openNotification(notification)}
+                onClick={() => {
+                  if (!pendingReadIds.includes(notification.id)) openNotification(notification);
+                }}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
@@ -156,7 +161,9 @@ export default function NotificationMenu({
                   </span>
                   <p>{notification.message}</p>
                 </div>
-                {notification.unread && (
+                {pendingReadIds.includes(notification.id) ? (
+                  <span className="loading-button-spinner" aria-label="Marcando notificaci?n" />
+                ) : notification.unread && (
                   <span aria-hidden="true" className="notification-unread-indicator" />
                 )}
               </article>

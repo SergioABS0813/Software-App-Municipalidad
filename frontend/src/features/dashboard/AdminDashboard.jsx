@@ -32,6 +32,7 @@ import {
 } from '../../services/dashboardService';
 import { getApiErrorMessage } from '../../services/api/api';
 import { CardSkeleton, EmptyState, ErrorState, EventFormSkeleton, TableSkeleton } from '../../components/feedback/LoadingStates';
+import LoadingButton from '../../components/feedback/LoadingButton';
 
 function getManagementStats(events) {
   return [
@@ -1892,7 +1893,7 @@ function AdminDashboard({ onLogout, user }) {
   }
 
   async function confirmPendingEventAction() {
-    if (!pendingEventAction) {
+    if (!pendingEventAction || isSavingEventAction) {
       return;
     }
 
@@ -1955,7 +1956,7 @@ function AdminDashboard({ onLogout, user }) {
   }
 
   async function confirmDeleteDraftEvent() {
-    if (!eventToDelete) {
+    if (!eventToDelete || isDeletingEventAction) {
       return;
     }
 
@@ -3721,6 +3722,7 @@ function NeighborAccountsPage({ adminUserName }) {
   const [listNotice, setListNotice] = useState('');
   const [isLoadingNeighbors, setIsLoadingNeighbors] = useState(true);
   const [isLoadingNeighborDetail, setIsLoadingNeighborDetail] = useState(false);
+  const [isSavingNeighborContact, setIsSavingNeighborContact] = useState(false);
   const modalNeighbor = useMemo(() => {
     if (!selectedNeighbor) {
       return null;
@@ -3832,7 +3834,7 @@ function NeighborAccountsPage({ adminUserName }) {
   // }
 
   const closeNeighborDetailModal = useCallback(() =>{
-    if(actionModal){
+    if(actionModal || isSavingNeighborContact){
       return;
     }
 
@@ -3841,10 +3843,10 @@ function NeighborAccountsPage({ adminUserName }) {
     setNotice('');
 
 
-  }, [actionModal]);
+  }, [actionModal, isSavingNeighborContact]);
 
   useEffect(() => {
-    if (!modalNeighbor) {
+    if (!modalNeighbor || isSavingNeighborContact) {
       return undefined;
     }
 
@@ -3859,7 +3861,7 @@ function NeighborAccountsPage({ adminUserName }) {
     return () => {
       document.removeEventListener('keydown', closeNeighborModalOnEscape);
     };
-  }, [modalNeighbor, closeNeighborDetailModal]);
+  }, [modalNeighbor, closeNeighborDetailModal, isSavingNeighborContact]);
 
   function startContactEdit() {
     if (!modalNeighbor) {
@@ -3875,7 +3877,7 @@ function NeighborAccountsPage({ adminUserName }) {
   }
 
   async function saveContactEdit() {
-    if (!modalNeighbor) {
+    if (!modalNeighbor || isSavingNeighborContact) {
       return;
     }
 
@@ -3884,6 +3886,7 @@ function NeighborAccountsPage({ adminUserName }) {
       return;
     }
 
+    setIsSavingNeighborContact(true);
     try {
       const detail = await actualizarContactoCuentaVecinal(modalNeighbor.id, {
         correo: contactDraft.correo.trim(),
@@ -3909,6 +3912,8 @@ function NeighborAccountsPage({ adminUserName }) {
       setNotice('Contacto actualizado correctamente. Se notificó al vecino por correo.');
     } catch (error) {
       setNotice(getApiErrorMessage(error, 'No se pudo actualizar el contacto.'));
+    } finally {
+      setIsSavingNeighborContact(false);
     }
   }
 
@@ -4070,6 +4075,7 @@ function NeighborAccountsPage({ adminUserName }) {
               setActionModal(action);
             }}
             onSaveContact={saveContactEdit}
+            isSavingContact={isSavingNeighborContact}
             onStartEdit={startContactEdit}
           />
         )}
@@ -4092,6 +4098,7 @@ function NeighborDetailModal({
   actionNotice,
   contactDraft,
   editingContact,
+  isSavingContact = false,
   neighbor,
   onCancelEdit,
   onClose,
@@ -4202,12 +4209,12 @@ function NeighborDetailModal({
         <footer className="neighbor-detail-footer">
           {editingContact ? (
             <>
-              <button className="neighbor-secondary-action" type="button" onClick={onCancelEdit}>
+              <button className="neighbor-secondary-action" disabled={isSavingContact} type="button" onClick={onCancelEdit}>
                 Cancelar
               </button>
-              <button className="neighbor-primary-action" type="button" onClick={onSaveContact}>
+              <LoadingButton className="neighbor-primary-action" loading={isSavingContact} loadingLabel="Guardando?" onClick={onSaveContact}>
                 Guardar cambios
-              </button>
+              </LoadingButton>
             </>
           ) : (
             <>
@@ -4293,6 +4300,8 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
   const [userNotice, setUserNotice] = useState('');
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [usersError, setUsersError] = useState('');
+  const [isSavingUser, setIsSavingUser] = useState(false);
+  const [isTogglingUserState, setIsTogglingUserState] = useState(false);
   const [openedTargetUserId, setOpenedTargetUserId] = useState(null);
 
   useEffect(()=>{
@@ -4438,6 +4447,9 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
   }, [openedTargetUserId, roleCatalog, targetUserDetailId, users]);
 
   const saveUser = async () => {
+    if (isSavingUser) {
+      return;
+    }
     const errors = validateUserForm(userFormData, userModalMode);
 
     if (Object.keys(errors).length > 0) {
@@ -4456,22 +4468,16 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
       rol: userFormData.rol,
     };
 
-    if (userModalMode === 'edit' && selectedUser) {
-      try {
+    setIsSavingUser(true);
+    try {
+      if (userModalMode === 'edit' && selectedUser) {
         await actualizarUsuarioInterno(selectedUser.id, {
           email: normalizedUser.correo,
           areaMunicipalId: normalizedUser.areaId,
           rolId: Number(userFormData.rolId),
         });
         setUsersReloadKey((currentKey) => currentKey + 1);
-      } catch (error) {
-        setUserFormErrors({
-          general: getApiErrorMessage(error, 'No se pudo actualizar el usuario.'),
-        });
-        return;
-      }
-    } else {
-      try {
+      } else {
         await guardarUsuarioInterno({
           dni: userFormData.dni.trim(),
           nombre: userFormData.nombre.trim(),
@@ -4481,24 +4487,25 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
         });
         setUsersPage((currentPage) => ({ ...currentPage, number: 0 }));
         setUsersReloadKey((currentKey) => currentKey + 1);
-      } catch (error) {
-        setUserFormErrors({
-          general: getApiErrorMessage(error, 'No se pudo guardar el usuario.'),
-        });
-        return;
       }
+      closeUserModal();
+    } catch (error) {
+      setUserFormErrors({
+        general: getApiErrorMessage(error, 'No se pudo guardar el usuario.'),
+      });
+    } finally {
+      setIsSavingUser(false);
     }
-
-    closeUserModal();
   };
 
   const toggleUserState = async () => {
-    if (!selectedUser) {
+    if (!selectedUser || isTogglingUserState) {
       return;
     }
 
     const nextState = selectedUser.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
 
+    setIsTogglingUserState(true);
     try {
       await actualizarEstadoUsuarioInterno(selectedUser.id, nextState);
       setUsersReloadKey((currentKey) => currentKey + 1);
@@ -4507,6 +4514,8 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
       setUserFormErrors({
         general: getApiErrorMessage(error, 'No se pudo actualizar el estado del usuario.'),
       });
+    } finally {
+      setIsTogglingUserState(false);
     }
   };
 
@@ -4585,6 +4594,8 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
           formData={userFormData}
           identityNotice={identityLookupNotice}
           mode={userModalMode}
+          isSaving={isSavingUser}
+          isTogglingState={isTogglingUserState}
           passwordResetNotice={passwordResetNotice}
           roles={roleCatalog}
           user={selectedUser}
@@ -4719,6 +4730,8 @@ function UserFormModal({
   errors,
   formData,
   identityNotice,
+  isSaving = false,
+  isTogglingState = false,
   mode,
   onClose,
   onFieldChange,
@@ -4738,7 +4751,7 @@ function UserFormModal({
       : '');
 
   return (
-    <div className="modal-backdrop neighbor-detail-backdrop user-detail-backdrop" role="presentation" onMouseDown={onClose}>
+    <div className="modal-backdrop neighbor-detail-backdrop user-detail-backdrop" role="presentation" onMouseDown={isSaving || isTogglingState ? undefined : onClose}>
       <section
         className="neighbor-detail-modal user-detail-modal"
         role="dialog"
@@ -4749,7 +4762,7 @@ function UserFormModal({
         <header className="neighbor-detail-header user-detail-header">
           <div className="neighbor-detail-kicker-row">
             <span className="section-kicker">Configuración</span>
-            <button className="neighbor-modal-close" type="button" aria-label="Cerrar usuario" onClick={onClose}>
+            <button className="neighbor-modal-close" disabled={isSaving || isTogglingState} type="button" aria-label="Cerrar usuario" onClick={onClose}>
               ×
             </button>
           </div>
@@ -4883,22 +4896,24 @@ function UserFormModal({
         <footer className="neighbor-detail-footer user-detail-footer">
           <span className="user-footer-state-action">
             {isEditing && (
-              <button
+              <LoadingButton
                 className={user?.estado === 'ACTIVO' ? 'neighbor-primary-action is-danger' : 'neighbor-primary-action is-positive'}
-                type="button"
+                loading={isTogglingState}
+                loadingLabel={user?.estado === 'ACTIVO' ? 'Desactivando?' : 'Activando?'}
+                disabled={isSaving}
                 onClick={onToggleState}
               >
                 {user?.estado === 'ACTIVO' ? 'Desactivar usuario' : 'Activar usuario'}
-              </button>
+              </LoadingButton>
             )}
           </span>
           <span className="user-footer-main-actions">
-            <button className="neighbor-secondary-action" type="button" onClick={onClose}>
+            <button className="neighbor-secondary-action" disabled={isSaving || isTogglingState} type="button" onClick={onClose}>
               Cancelar
             </button>
-            <button className="neighbor-primary-action" type="button" onClick={onSave}>
+            <LoadingButton className="neighbor-primary-action" disabled={isTogglingState} loading={isSaving} loadingLabel={isEditing ? 'Guardando?' : 'Creando?'} onClick={onSave}>
               {isEditing ? 'Guardar cambios' : 'Guardar usuario'}
-            </button>
+            </LoadingButton>
           </span>
         </footer>
       </section>
@@ -5036,6 +5051,7 @@ function SettingsCategoriesPage({ onEventCatalogChanged }) {
   const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
   const [categoriesReloadKey, setCategoriesReloadKey] = useState(0);
 
   useEffect(() => {
@@ -5122,6 +5138,9 @@ function SettingsCategoriesPage({ onEventCatalogChanged }) {
   };
 
   const saveCategory = async () => {
+    if (isSavingCategory) {
+      return;
+    }
     const normalizedName = categoryFormValue.trim();
 
     if (!normalizedName) {
@@ -5172,10 +5191,11 @@ function SettingsCategoriesPage({ onEventCatalogChanged }) {
   };
 
   const confirmCategoryDelete = async () => {
-    if (!categoryToDelete) {
+    if (!categoryToDelete || isDeletingCategory) {
       return;
     }
 
+    setIsDeletingCategory(true);
     try {
       await eliminarCategoriaConfiguracion(categoryToDelete.id);
       setCategoryToDelete(null);
@@ -5188,6 +5208,8 @@ function SettingsCategoriesPage({ onEventCatalogChanged }) {
       setCategoryNotice(
         getApiErrorMessage(error, 'No se pudo eliminar la categoría.'),
       );
+    } finally {
+      setIsDeletingCategory(false);
     }
   };
 
@@ -5275,6 +5297,7 @@ function SettingsCategoriesPage({ onEventCatalogChanged }) {
       {categoryToDelete && (
         <CategoryDeleteModal
           category={categoryToDelete}
+          isDeleting={isDeletingCategory}
           onCancel={() => setCategoryToDelete(null)}
           onConfirm={confirmCategoryDelete}
         />
@@ -5310,18 +5333,18 @@ function CategoryFormModal({ error, isSaving, onCancel, onSave, onValueChange, v
           <button className="back-button" type="button" disabled={isSaving} onClick={onCancel}>
             Cancelar
           </button>
-          <button className="primary-button" type="button" disabled={isSaving} onClick={onSave}>
+          <LoadingButton className="primary-button" loading={isSaving} loadingLabel="Creando..." onClick={onSave}>
             {isSaving ? 'Guardando...' : 'Guardar categoría'}
-          </button>
+          </LoadingButton>
         </div>
       </section>
     </div>
   );
 }
 
-function CategoryDeleteModal({ category, onCancel, onConfirm }) {
+function CategoryDeleteModal({ category, isDeleting = false, onCancel, onConfirm }) {
   return (
-    <div className="modal-backdrop category-modal-backdrop" role="presentation" onMouseDown={onCancel}>
+    <div className="modal-backdrop category-modal-backdrop" role="presentation" onMouseDown={isDeleting ? undefined : onCancel}>
       <section
         className="confirm-modal category-modal category-delete-modal location-delete-modal"
         role="dialog"
@@ -5335,12 +5358,12 @@ function CategoryDeleteModal({ category, onCancel, onConfirm }) {
           ¿Deseas eliminar la categoría "{category.nombre}"? Esta acción no se puede deshacer.
         </p>
         <div className="modal-actions">
-          <button className="back-button" type="button" onClick={onCancel}>
+          <button className="back-button" disabled={isDeleting} type="button" onClick={onCancel}>
             Cancelar
           </button>
-          <button className="primary-button danger-action" type="button" onClick={onConfirm}>
+          <LoadingButton className="primary-button danger-action" loading={isDeleting} loadingLabel="Eliminando..." onClick={onConfirm}>
             Eliminar categoría
-          </button>
+          </LoadingButton>
         </div>
       </section>
     </div>
@@ -5363,6 +5386,9 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
   const [locationFormErrors, setLocationFormErrors] = useState({});
   const [locationNotice, setLocationNotice] = useState('');
   const [isLoadingLocations, setIsLoadingLocations] = useState(true);
+  const [isSavingLocation, setIsSavingLocation] = useState(false);
+  const [isTogglingLocationState, setIsTogglingLocationState] = useState(false);
+  const [isDeletingLocation, setIsDeletingLocation] = useState(false);
   const [locationsReloadKey, setLocationsReloadKey] = useState(0);
   const isLocationModalOpen = Boolean(locationModalMode);
 
@@ -5488,6 +5514,9 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
   };
 
   const saveLocation = async () => {
+    if (isSavingLocation) {
+      return;
+    }
     const errors = validateLocationForm(locationFormData);
 
     if (Object.keys(errors).length > 0) {
@@ -5498,6 +5527,7 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
     const normalizedLocation = normalizeLocationFromForm(locationFormData, selectedLocation);
 
     if (locationModalMode === 'create') {
+      setIsSavingLocation(true);
       try {
         await guardarUbicacionConfiguracion({
           direccion: normalizedLocation.direccion,
@@ -5515,6 +5545,8 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
         closeLocationModal();
       } catch (error) {
         setLocationFormErrors(getLocationBackendErrors(error));
+      } finally {
+        setIsSavingLocation(false);
       }
 
       return;
@@ -5538,12 +5570,13 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
   };
 
   const toggleSelectedLocationState = async () => {
-    if (!selectedLocation) {
+    if (!selectedLocation || isTogglingLocationState) {
       return;
     }
 
     const nextState = selectedLocation.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
 
+    setIsTogglingLocationState(true);
     try {
       const updatedLocationResponse = await actualizarEstadoUbicacionConfiguracion(
         selectedLocation.id,
@@ -5565,6 +5598,8 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
       setLocationFormErrors({
         general: getApiErrorMessage(error, 'No se pudo actualizar el estado de la ubicación.'),
       });
+    } finally {
+      setIsTogglingLocationState(false);
     }
   };
 
@@ -5581,10 +5616,11 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
   };
 
   const confirmLocationDelete = async () => {
-    if (!locationToDelete) {
+    if (!locationToDelete || isDeletingLocation) {
       return;
     }
 
+    setIsDeletingLocation(true);
     try {
       await eliminarUbicacionConfiguracion(locationToDelete.id);
       setLocationToDelete(null);
@@ -5597,6 +5633,8 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
       setLocationNotice(
         getApiErrorMessage(error, 'No se pudo eliminar la ubicación.'),
       );
+    } finally {
+      setIsDeletingLocation(false);
     }
   };
 
@@ -5692,6 +5730,8 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
           formData={locationFormData}
           location={selectedLocation}
           mode={locationModalMode}
+          isSaving={isSavingLocation}
+          isTogglingState={isTogglingLocationState}
           onClose={closeLocationModal}
           onEdit={openLocationEdit}
           onFormChange={setLocationFormData}
@@ -5702,6 +5742,7 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
 
       {locationToDelete && (
         <LocationDeleteModal
+          isDeleting={isDeletingLocation}
           location={locationToDelete}
           onCancel={() => setLocationToDelete(null)}
           onConfirm={confirmLocationDelete}
@@ -5742,9 +5783,9 @@ function getLocationBackendErrors(error) {
   return { general: message };
 }
 
-function LocationDeleteModal({ location, onCancel, onConfirm }) {
+function LocationDeleteModal({ isDeleting = false, location, onCancel, onConfirm }) {
   return (
-    <div className="modal-backdrop category-modal-backdrop" role="presentation" onMouseDown={onCancel}>
+    <div className="modal-backdrop category-modal-backdrop" role="presentation" onMouseDown={isDeleting ? undefined : onCancel}>
       <section
         className="confirm-modal category-modal category-delete-modal location-delete-modal"
         role="dialog"
@@ -5758,12 +5799,12 @@ function LocationDeleteModal({ location, onCancel, onConfirm }) {
           ¿Deseas eliminar la ubicación "{location.nombre}"? Esta acción no se puede deshacer.
         </p>
         <div className="modal-actions">
-          <button className="back-button" type="button" onClick={onCancel}>
+          <button className="back-button" disabled={isDeleting} type="button" onClick={onCancel}>
             Cancelar
           </button>
-          <button className="primary-button danger-action" type="button" onClick={onConfirm}>
+          <LoadingButton className="primary-button danger-action" loading={isDeleting} loadingLabel="Eliminando..." onClick={onConfirm}>
             Eliminar ubicación
-          </button>
+          </LoadingButton>
         </div>
       </section>
     </div>
@@ -6100,6 +6141,8 @@ function LocationDetailModal({
   formData,
   location,
   mode,
+  isSaving = false,
+  isTogglingState = false,
   onClose,
   onEdit,
   onFormChange,
@@ -6122,7 +6165,7 @@ function LocationDetailModal({
       aria-modal="true"
       className="modal-backdrop neighbor-detail-backdrop location-detail-backdrop"
       role="dialog"
-      onMouseDown={onClose}
+      onMouseDown={isSaving || isTogglingState ? undefined : onClose}
     >
       <section
         className={`neighbor-detail-modal location-detail-modal ${isEditing ? 'is-editing' : 'is-viewing'}`}
@@ -6210,29 +6253,30 @@ function LocationDetailModal({
         <footer className="neighbor-detail-footer">
           {isEditing ? (
             <>
-              <button className="neighbor-secondary-action" type="button" onClick={onClose}>
+              <button className="neighbor-secondary-action" disabled={isSaving} type="button" onClick={onClose}>
                 Cancelar
               </button>
-              <button className="neighbor-primary-action" type="button" onClick={onSave}>
+              <LoadingButton className="neighbor-primary-action" loading={isSaving} loadingLabel="Creando..." onClick={onSave}>
                 Guardar ubicación
-              </button>
+              </LoadingButton>
             </>
           ) : (
             <>
               <button className="neighbor-secondary-action" type="button" onClick={onEdit}>
                 Editar ubicación
               </button>
-              <button
+              <LoadingButton
                 className={
                   visibleLocation?.estado === 'ACTIVO'
                     ? 'neighbor-primary-action is-danger'
                     : 'neighbor-primary-action is-positive'
                 }
-                type="button"
+                loading={isTogglingState}
+                loadingLabel={visibleLocation?.estado === 'ACTIVO' ? 'Desactivando...' : 'Activando...'}
                 onClick={onToggleState}
               >
                 {visibleLocation?.estado === 'ACTIVO' ? 'Desactivar ubicación' : 'Activar ubicación'}
-              </button>
+              </LoadingButton>
             </>
           )}
         </footer>
@@ -7236,9 +7280,9 @@ function DeleteDraftEventModal({ event, isDeleting = false, onCancel, onConfirm 
           <button className="back-button" disabled={isDeleting} type="button" onClick={onCancel}>
             Cancelar
           </button>
-          <button className="primary-button danger-action" disabled={isDeleting} type="button" onClick={onConfirm}>
-            {isDeleting ? 'Eliminando...' : 'Eliminar evento'}
-          </button>
+          <LoadingButton className="primary-button danger-action" loading={isDeleting} loadingLabel="Eliminando..." onClick={onConfirm}>
+            Eliminar evento
+          </LoadingButton>
         </div>
       </section>
     </div>
@@ -7279,9 +7323,14 @@ function ConfirmEventActionModal({ action, isSaving = false, onCancel, onConfirm
           <button className="back-button" disabled={isSaving} type="button" onClick={onCancel}>
             Revisar datos
           </button>
-          <button className="primary-button" disabled={isSaving} type="button" onClick={onConfirm}>
-            {isSaving ? 'Guardando...' : confirmLabel}
-          </button>
+          <LoadingButton
+            className="primary-button"
+            loading={isSaving}
+            loadingLabel={isReview ? 'Enviando...' : 'Guardando...'}
+            onClick={onConfirm}
+          >
+            {confirmLabel}
+          </LoadingButton>
         </div>
       </section>
     </div>

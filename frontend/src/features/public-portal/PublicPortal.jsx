@@ -15,6 +15,7 @@ import PublicEventDetail from './PublicEventDetail';
 import './PublicPortal.css';
 import { SESSION_EXPIRED_MESSAGE } from '../../services/api/api';
 import {recuperarContrasena} from '../../services/publicPortalService';
+import LoadingButton from '../../components/feedback/LoadingButton';
 
 const institutionalUsers = [
   {
@@ -305,6 +306,8 @@ function getInitialSelectedEvent() {
 }
 
 function PublicPortal() {
+  const [authState, setAuthState] = useState('checking');
+  const [authError, setAuthError] = useState('');
   const [currentView, setCurrentView] = useState(getInitialPortalView);
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [searchTerm, setSearchTerm] = useState('');
@@ -323,7 +326,7 @@ function PublicPortal() {
     let isMounted = true;
 
     initKeycloak()
-      .then((authenticated) => {
+      .then(async (authenticated) => {
         if (!isMounted) {
           return;
         }
@@ -333,19 +336,44 @@ function PublicPortal() {
 
           if (user) {
             openInstitutionalDashboard(user);
+            setAuthState('ready');
+          } else {
+            setAuthError('Tu cuenta no tiene un rol habilitado para ingresar al sistema.');
+            setAuthState('error');
           }
 
           return;
         }
 
-        if (window.location.pathname === '/login') {
-          void loginWithKeycloak(
-            sessionStorage.getItem('postLoginRedirect') ?? eventsListPath,
+        const currentPath = window.location.pathname;
+        const requiresAuthentication = [
+          '/login', '/admin', '/directivo', '/operativo',
+        ].includes(currentPath);
+
+        if (requiresAuthentication) {
+          setAuthState('redirecting');
+          await loginWithKeycloak(
+            sessionStorage.getItem('postLoginRedirect') ?? currentPath,
           );
+          return;
         }
+
+        setAuthState('ready');
       })
       .catch((error) => {
         console.error('No se pudo inicializar Keycloak', error);
+        if (isMounted) {
+          const isProtectedPath = [
+            '/login', '/admin', '/directivo', '/operativo',
+          ].includes(window.location.pathname);
+
+          if (isProtectedPath) {
+            setAuthError('No pudimos verificar tu sesión. Intenta nuevamente.');
+            setAuthState('error');
+          } else {
+            setAuthState('ready');
+          }
+        }
       });
 
     return () => {
@@ -475,7 +503,13 @@ function PublicPortal() {
     setSelectedEvent(null);
     setIsConfirmOpen(false);
     setIsLoginRequiredOpen(false);
-    void loginWithKeycloak(getCurrentInternalPath());
+    setAuthError('');
+    setAuthState('redirecting');
+    loginWithKeycloak(getCurrentInternalPath()).catch((error) => {
+      console.error('No se pudo abrir el inicio de sesión', error);
+      setAuthError('No pudimos abrir el inicio de sesión. Intenta nuevamente.');
+      setAuthState('error');
+    });
   }
 
   function openRegister() {
@@ -483,7 +517,13 @@ function PublicPortal() {
     setSelectedEvent(null);
     setIsConfirmOpen(false);
     setIsLoginRequiredOpen(false);
-    void registerWithKeycloak(getCurrentInternalPath());
+    setAuthError('');
+    setAuthState('redirecting');
+    registerWithKeycloak(getCurrentInternalPath()).catch((error) => {
+      console.error('No se pudo abrir el registro', error);
+      setAuthError('No pudimos abrir el registro. Intenta nuevamente.');
+      setAuthState('error');
+    });
   }
 
   function openRecoverPassword() {
@@ -517,14 +557,22 @@ function PublicPortal() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     if (keycloak.authenticated) {
-      void logoutFromKeycloak();
+      setAuthState('redirecting');
+      logoutFromKeycloak().catch((error) => {
+        console.error('No se pudo cerrar la sesión', error);
+        setAuthError('No pudimos cerrar la sesión. Intenta nuevamente.');
+        setAuthState('error');
+      });
     }
   }
 
   function openInstitutionalDashboard(user) {
     if (user.role === 'VECINO') {
       const citizenUser = saveCitizenSession(user);
-      const redirectTo = sessionStorage.getItem('postLoginRedirect') ?? eventsListPath;
+      const requestedRedirect = sessionStorage.getItem('postLoginRedirect') ?? eventsListPath;
+      const redirectTo = requestedRedirect === eventsListPath || requestedRedirect.startsWith('/eventos/')
+        ? requestedRedirect
+        : eventsListPath;
       const redirectEventId = redirectTo.match(/^\/eventos\/(.+)$/)?.[1];
       const redirectEvent = events.find((event) => String(event.id) === redirectEventId);
 
@@ -560,6 +608,16 @@ function PublicPortal() {
     sessionStorage.removeItem('postLoginRedirect');
     window.history.replaceState(null, '', pathByRole[user.role] ?? '/admin');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  if (authState !== 'ready') {
+    return (
+      <AuthTransition
+        error={authError}
+        onRetry={() => window.location.reload()}
+        redirecting={authState === 'redirecting'}
+      />
+    );
   }
 
   return (
@@ -665,6 +723,23 @@ function PublicPortal() {
           }}
         />
       )}
+    </main>
+  );
+}
+
+function AuthTransition({ error, onRetry, redirecting }) {
+  const message = error || (redirecting
+    ? 'Estamos preparando el acceso seguro a tu cuenta.'
+    : 'Estamos verificando tu sesión y perfil.');
+
+  return (
+    <main className={'auth-transition'} role={error ? 'alert' : 'status'} aria-live={'polite'}>
+      <section className={'auth-transition-card'}>
+        <span className={'auth-transition-spinner'} aria-hidden={true}></span>
+        <h1>{error ? 'No se pudo verificar la sesión' : 'Ingresando al sistema...'}</h1>
+        <p>{message}</p>
+        {error ? <button type={'button'} onClick={onRetry}>Reintentar</button> : null}
+      </section>
     </main>
   );
 }
@@ -1138,6 +1213,7 @@ function RecoverPasswordPage({ onBack, onLogin }) {
   const [formSuccess, setFormSuccess] = useState('');
   const [isNewPasswordVisible, setIsNewPasswordVisible] = useState(false);
   const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
+  const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
 
   function updateVerificationField(field, value) {
     const nextValue = field === 'dni' ? value.replace(/\D/g, '').slice(0, 8) : value;
@@ -1163,6 +1239,10 @@ function RecoverPasswordPage({ onBack, onLogin }) {
   async function verifyAccount(event) {
     event.preventDefault();
 
+    if (isRecoveringPassword) {
+      return;
+    }
+
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const correo = verificationData.correo.trim().toLowerCase();
     const dni = verificationData.dni.trim();
@@ -1187,8 +1267,8 @@ function RecoverPasswordPage({ onBack, onLogin }) {
       return;
     }
 
+    setIsRecoveringPassword(true);
     try {
-      console.log("aca")
       await recuperarContrasena(correo, dni);
 
       setFormError('');
@@ -1201,6 +1281,8 @@ function RecoverPasswordPage({ onBack, onLogin }) {
       setFormError(
         'No se pudo procesar la solicitud. Inténtalo nuevamente.'
       );
+    } finally {
+      setIsRecoveringPassword(false);
     }
 
   }
@@ -1270,9 +1352,9 @@ function RecoverPasswordPage({ onBack, onLogin }) {
             />
           </label>
 
-          <button className="primary-button" type="submit">
+          <LoadingButton className="primary-button" loading={isRecoveringPassword} loadingLabel="Enviando..." type="submit">
             Verificar datos
-          </button>
+          </LoadingButton>
 
           {verifiedUser && !formSuccess && (
             <section className="recover-password-step" aria-label="Actualizar contraseña">
@@ -1525,13 +1607,15 @@ function VecinoRegisterPage({ onBack, onLogin }) {
                   value={formData.dni}
                   onChange={(event) => updateField('dni', event.target.value)}
                 />
-                <button
+                <LoadingButton
                   disabled={!/^\d{8}$/.test(formData.dni) || isSearchingIdentity}
+                  loading={isSearchingIdentity}
+                  loadingLabel="Buscando..."
                   type="button"
                   onClick={searchIdentity}
                 >
                   {isSearchingIdentity ? 'Buscando...' : 'Buscar'}
-                </button>
+                </LoadingButton>
               </span>
               {identityResult && (
                 <span className="identity-verified-message">

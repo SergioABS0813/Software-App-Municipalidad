@@ -732,6 +732,12 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.admin-stats > .skeleton-card-grid {
+  gap: 14px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .admin-stat-card,
 .admin-panel,
 .admin-table-panel {
@@ -3838,6 +3844,10 @@
     grid-template-columns: 1fr 1fr;
   }
 
+  .admin-stats > .skeleton-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .admin-filters {
     grid-template-columns: 1fr;
   }
@@ -3846,6 +3856,10 @@
 @media (max-width: 720px) {
   .admin-main {
     padding: 20px;
+  }
+
+  .admin-stats > .skeleton-card-grid {
+    grid-template-columns: 1fr;
   }
 
   .admin-topbar,
