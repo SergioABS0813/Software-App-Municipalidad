@@ -1,0 +1,70 @@
+#!/bin/sh
+set -e
+
+: "${MYSQL_HOST:?Falta MYSQL_HOST}"
+: "${MYSQL_PORT:?Falta MYSQL_PORT}"
+: "${MYSQL_USER:?Falta MYSQL_USER}"
+: "${MYSQL_PASSWORD:?Falta MYSQL_PASSWORD}"
+: "${MYSQL_DATABASE:?Falta MYSQL_DATABASE}"
+
+: "${POSTGRES_HOST:?Falta POSTGRES_HOST}"
+: "${POSTGRES_PORT:?Falta POSTGRES_PORT}"
+: "${POSTGRES_DATABASE:?Falta POSTGRES_DATABASE}"
+: "${KC_DB_USERNAME:?Falta KC_DB_USERNAME}"
+: "${KC_DB_PASSWORD:?Falta KC_DB_PASSWORD}"
+
+: "${GOOGLE_APPLICATION_CREDENTIALS:?Falta GOOGLE_APPLICATION_CREDENTIALS}"
+: "${GCS_BUCKET_BACKUPS:?Falta GCS_BUCKET_BACKUPS}"
+
+# Service Account GCS
+gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
+
+
+FECHA_DIA=$(date +%F)
+FECHA_MES=$(date +%Y-%m)
+
+BACKUP_DIR="/tmp/backups"
+mkdir -p "$BACKUP_DIR"
+
+ARCHIVO_MYSQL_DIARIO="mysql-${MYSQL_DATABASE}-${FECHA_DIA}.sql.gz"
+ARCHIVO_POSTGRES_DIARIO="postgres-keycloak-${FECHA_DIA}.sql.gz"
+
+mysqldump \
+  --ssl=0 \
+  -h "$MYSQL_HOST" \
+  -P "$MYSQL_PORT" \
+  -u "$MYSQL_USER" \
+  -p"$MYSQL_PASSWORD" \
+  "$MYSQL_DATABASE" | gzip > "$BACKUP_DIR/$ARCHIVO_MYSQL_DIARIO"
+
+gcloud storage cp "$BACKUP_DIR/$ARCHIVO_MYSQL_DIARIO" \
+  "gs://$GCS_BUCKET_BACKUPS/mysql/diario/$ARCHIVO_MYSQL_DIARIO"
+
+PGPASSWORD="$KC_DB_PASSWORD" pg_dump \
+  -h "$POSTGRES_HOST" \
+  -p "$POSTGRES_PORT" \
+  -U "$KC_DB_USERNAME" \
+  -d "$POSTGRES_DATABASE" \
+  | gzip > "$BACKUP_DIR/$ARCHIVO_POSTGRES_DIARIO"
+
+gcloud storage cp "$BACKUP_DIR/$ARCHIVO_POSTGRES_DIARIO" \
+  "gs://$GCS_BUCKET_BACKUPS/postgresql/keycloak/diario/$ARCHIVO_POSTGRES_DIARIO"
+
+HOY=$(date +%d)
+ULTIMO_DIA=$(date -d "$(date +%Y-%m-01) +1 month -1 day" +%d)
+
+if [ "$HOY" = "$ULTIMO_DIA" ]; then
+  ARCHIVO_MYSQL_MENSUAL="mysql-${MYSQL_DATABASE}-${FECHA_MES}.sql.gz"
+  ARCHIVO_POSTGRES_MENSUAL="postgres-keycloak-${FECHA_MES}.sql.gz"
+
+  cp "$BACKUP_DIR/$ARCHIVO_MYSQL_DIARIO" "$BACKUP_DIR/$ARCHIVO_MYSQL_MENSUAL"
+  cp "$BACKUP_DIR/$ARCHIVO_POSTGRES_DIARIO" "$BACKUP_DIR/$ARCHIVO_POSTGRES_MENSUAL"
+
+  gcloud storage cp "$BACKUP_DIR/$ARCHIVO_MYSQL_MENSUAL" \
+    "gs://$GCS_BUCKET_BACKUPS/mysql/mensual/$ARCHIVO_MYSQL_MENSUAL"
+
+  gcloud storage cp "$BACKUP_DIR/$ARCHIVO_POSTGRES_MENSUAL" \
+    "gs://$GCS_BUCKET_BACKUPS/postgresql/keycloak/mensual/$ARCHIVO_POSTGRES_MENSUAL"
+fi
+
+rm -rf "$BACKUP_DIR"

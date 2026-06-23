@@ -81,11 +81,14 @@
 }
 
 .admin-shell.is-sidebar-collapsed .admin-brand span,
-.admin-shell.is-sidebar-collapsed .admin-user-copy {
+.admin-shell.is-sidebar-collapsed .admin-user-copy,
+.admin-shell.is-sidebar-transitioning .admin-brand span,
+.admin-shell.is-sidebar-transitioning .admin-user-copy {
   opacity: 0;
   overflow: hidden;
   pointer-events: none;
   position: absolute;
+  visibility: hidden;
   white-space: nowrap;
   width: 0;
 }
@@ -99,26 +102,54 @@
 
 .admin-shell.is-sidebar-collapsed .admin-nav a,
 .admin-shell.is-sidebar-collapsed .admin-nav-logout,
-.admin-shell.is-sidebar-collapsed .admin-nav-link {
+.admin-shell.is-sidebar-collapsed .admin-nav-link,
+.admin-shell.is-sidebar-transitioning .admin-nav a,
+.admin-shell.is-sidebar-transitioning .admin-nav-logout,
+.admin-shell.is-sidebar-transitioning .admin-nav-link {
   align-items: center;
   display: flex;
+  font-size: 0;
   justify-content: center;
   min-height: 42px;
   overflow: hidden;
   padding-left: 0;
   padding-right: 0;
-  text-indent: 120%;
+  text-indent: 0;
   white-space: nowrap;
 }
 
-.admin-shell.is-sidebar-collapsed .admin-nav a::first-letter,
-.admin-shell.is-sidebar-collapsed .admin-nav-logout::first-letter,
-.admin-shell.is-sidebar-collapsed .admin-nav-link::first-letter {
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav-link::after,
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav-logout::after {
+  align-items: center;
+  color: currentColor;
+  content: '•';
+  display: inline-flex;
+  font-size: 1rem;
+  font-weight: 800;
+  height: 28px;
+  justify-content: center;
+  line-height: 1;
   text-indent: 0;
+  width: 28px;
 }
 
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav[aria-label='Navegacion administrativa'] > .admin-nav-link:nth-child(1)::after { content: '▣'; }
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav[aria-label='Navegacion administrativa'] > .admin-nav-link:nth-child(2)::after { content: '♙'; }
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav-group > .admin-nav-link::after { content: '⚙'; }
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav-logout::after { content: '↪'; }
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav[aria-label^='Secciones'] > .admin-nav-link:nth-child(1)::after { content: 'DG'; }
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav[aria-label^='Secciones'] > .admin-nav-link:nth-child(2)::after { content: 'PR'; }
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav[aria-label^='Secciones'] > .admin-nav-link:nth-child(3)::after { content: 'AS'; }
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav[aria-label^='Secciones'] > .admin-nav-link:nth-child(4)::after { content: 'OP'; }
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav[aria-label^='Secciones'] > .admin-nav-link:nth-child(5)::after { content: 'EV'; }
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav[aria-label^='Secciones'] > .admin-nav-link:nth-child(6)::after { content: 'CO'; }
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav[aria-label^='Secciones'] > .admin-nav-link:nth-child(7)::after { content: 'UB'; }
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav[aria-label^='Secciones'] > .admin-nav-link:nth-child(8)::after { content: 'RE'; }
+
 .admin-shell.is-sidebar-collapsed .admin-nav-submenu,
-.admin-shell.is-sidebar-collapsed .admin-nav-chevron {
+.admin-shell.is-sidebar-collapsed .admin-nav-chevron,
+.admin-shell.is-sidebar-transitioning .admin-nav-submenu,
+.admin-shell.is-sidebar-transitioning .admin-nav-chevron {
   display: none;
 }
 
@@ -133,6 +164,13 @@
   gap: 10px;
   padding: 0;
   text-align: left;
+}
+
+.admin-brand span,
+.admin-user-copy {
+  opacity: 1;
+  transition: opacity 0.12s ease;
+  visibility: visible;
 }
 
 .admin-brand strong,
@@ -271,6 +309,11 @@
   color: var(--brand-primary);
   font-weight: 650;
   padding-left: 18px;
+}
+
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav a.active,
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav-link.active {
+  padding-left: 0;
 }
 
 .admin-nav a.active::before,
@@ -1148,11 +1191,6 @@
 .state-badge.state-observed {
   --state-bg: #fff0e8;
   --state-color: #c2410c;
-}
-
-.state-badge.state-reobserved {
-  --state-bg: #e0f2fe;
-  --state-color: #0a56c2;
 }
 
 .state-badge.state-finished {
@@ -4045,6 +4083,40 @@
 
   .admin-shell.is-sidebar-collapsed .admin-sidebar {
     padding: 24px 14px;
+  }
+
+  .admin-shell.is-sidebar-collapsed .admin-brand {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .admin-shell.is-sidebar-collapsed .admin-user-card {
+    gap: 0;
+    grid-template-columns: 1fr;
+    justify-items: center;
+    padding: 10px 0;
+  }
+
+  .admin-shell.is-sidebar-collapsed .admin-brand span,
+  .admin-shell.is-sidebar-collapsed .admin-user-copy {
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    visibility: hidden;
+    width: 0;
+  }
+
+  .admin-shell.is-sidebar-collapsed .admin-nav a,
+  .admin-shell.is-sidebar-collapsed .admin-nav-logout,
+  .admin-shell.is-sidebar-collapsed .admin-nav-link {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .admin-shell.is-sidebar-collapsed .admin-nav-submenu,
+  .admin-shell.is-sidebar-collapsed .admin-nav-chevron {
+    display: none;
   }
 
   .sidebar-collapse-button {

@@ -1,8 +1,31 @@
 services:
-  #frontend:
-    #build: ../frontend
-  #backend:
-    #build: ../backend
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        VITE_API_BASE_URL: /api
+        VITE_KEYCLOAK_URL: http://localhost:7000
+    container_name: frontend-municipalidad
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+      - keycloak
+  backend:
+    build: ../backend
+    container_name: backend-municipalidad
+    env_file:
+      - ../backend/.env
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://host.docker.internal:3306/muni_san_miguel_v2?useSSL=false&serverTimezone=America/Lima&allowPublicKeyRetrieval=true
+      KEYCLOAK_ADMIN_SERVER_URL: http://keycloak:8080
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/municipalidad-gestion-eventos/protocol/openid-connect/certs
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - keycloak
   keycloak:
     image: quay.io/keycloak/keycloak:26.6.3 #imagen de keycloak
     container_name: keycloak
@@ -28,6 +51,15 @@ services:
       - POSTGRES_PASSWORD=${KC_DB_PASSWORD}
     volumes:
       - postgres_keycloak_data:/var/lib/postgresql/data
+  backup:
+    build: ./backup-cron
+    container_name: backup-cron
+    env_file:
+      - ./.env
+    volumes:
+      - ../credentials/gcp-backup-key.json:/app/credentials/gcp-backup-key.json:ro
+    depends_on:
+      - postgres-keycloak
 
 volumes:
   postgres_keycloak_data:

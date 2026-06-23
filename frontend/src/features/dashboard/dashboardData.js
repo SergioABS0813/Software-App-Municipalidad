@@ -133,11 +133,9 @@ const eventStateLabels = {
   CANCELADO: 'Cancelado',
   CERRADO: 'Cerrado',
   EN_CURSO: 'En curso',
-  EN_REVISION: 'Para revisión',
   PARA_REVISION: 'Para revisión',
   FINALIZADO: 'Finalizado',
   OBSERVADO: 'Observado',
-  OBSERVADO_EN_REVISION: 'Reenviado',
   APROBADO: 'Aprobado',
   PUBLICADO: 'Publicado',
 };
@@ -206,23 +204,17 @@ function calculateEventCompleteness(event) {
 }
 
 export const adminEvents = events.map((event, index) => {
-  const state = ['FINALIZADO', 'OBSERVADO_EN_REVISION', 'FINALIZADO', 'BORRADOR', 'PUBLICADO'][index];
+  const state = ['FINALIZADO', 'PARA_REVISION', 'FINALIZADO', 'BORRADOR', 'PUBLICADO'][index];
   const lastUpdate = ['Hoy, 9:30 a.m.', 'Ayer, 4:10 p.m.', 'Lun, 11:20 a.m.', 'Pendiente', 'Hoy, 8:45 a.m.'][index];
   const operationalData = eventOperationalData[index];
   const adminEvent = {
     ...event,
     ...operationalData,
     lastUpdate,
-    resentToReviewAt:
-      state === 'OBSERVADO_EN_REVISION'
+    sentToReviewAt:
+      state === 'PARA_REVISION'
         ? operationalData.lastUpdatedAt
         : undefined,
-    sentToReviewAt:
-      state === 'EN_REVISION'
-        ? operationalData.lastUpdatedAt
-        : state === 'OBSERVADO_EN_REVISION'
-          ? '2026-06-03T15:30:00'
-          : undefined,
     state,
   };
 

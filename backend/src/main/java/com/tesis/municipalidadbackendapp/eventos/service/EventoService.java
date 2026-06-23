@@ -5,6 +5,10 @@ import com.tesis.municipalidadbackendapp.bitacora.entity.BitacoraAccion;
 import com.tesis.municipalidadbackendapp.bitacora.service.BitacoraAccionService;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoPanelAdministrativoDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoRegistroRequest;
+import com.tesis.municipalidadbackendapp.eventos.dto.ConteosRevisionDirectivaDto;
+import com.tesis.municipalidadbackendapp.eventos.dto.EventoRevisionDirectivaDetalleDto;
+import com.tesis.municipalidadbackendapp.eventos.dto.EventoRevisionDirectivaResumenDto;
+import com.tesis.municipalidadbackendapp.eventos.dto.ResumenCardsDirectivoDto;
 import com.tesis.municipalidadbackendapp.eventos.entity.AgendaEvento;
 import com.tesis.municipalidadbackendapp.eventos.entity.Categoria;
 import com.tesis.municipalidadbackendapp.eventos.entity.EstadoEvento;
@@ -33,6 +37,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -81,6 +86,51 @@ public class EventoService {
         ).map(this::toPanelAdministrativoDto);
     }
 
+    public Page<EventoRevisionDirectivaResumenDto> obtenerEventosRevisionDirectiva(
+            String estado,
+            int page
+    ) {
+        List<String> estados = obtenerEstadosFiltroRevisionDirectiva(estado);
+        PageRequest pageable = PageRequest.of(
+                Math.max(page, 0),
+                5,
+                Sort.by(Sort.Direction.ASC, "eventoActualizadoEn")
+                        .and(Sort.by(Sort.Direction.ASC, "id"))
+        );
+
+        return eventoRepository.findAllRevisionDirectiva(estados, pageable)
+                .map(this::toRevisionDirectivaResumenDto);
+    }
+
+    public ConteosRevisionDirectivaDto obtenerConteosRevisionDirectiva() {
+        int pendientes = eventoRepository.countByEstadoEventoCodigo("PARA_REVISION");
+        int observados = eventoRepository.countByEstadoEventoCodigo("OBSERVADO");
+        return new ConteosRevisionDirectivaDto(pendientes + observados, pendientes, observados);
+    }
+
+    public EventoRevisionDirectivaDetalleDto obtenerDetalleRevisionDirectiva(Integer id) {
+        Evento evento = eventoRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evento no encontrado"));
+        String estado = evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : "";
+
+        if (!List.of("PARA_REVISION", "OBSERVADO").contains(estado)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "El evento no esta disponible en revision directiva");
+        }
+
+        return toRevisionDirectivaDetalleDto(evento);
+    }
+
+    private List<String> obtenerEstadosFiltroRevisionDirectiva(String estado) {
+        String filtro = hasText(estado) ? estado.trim().toUpperCase() : "TODOS";
+
+        return switch (filtro) {
+            case "TODOS" -> List.of("PARA_REVISION", "OBSERVADO");
+            case "PENDIENTES", "PARA_REVISION" -> List.of("PARA_REVISION");
+            case "OBSERVADOS", "OBSERVADO" -> List.of("OBSERVADO");
+            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Filtro de revision no valido");
+        };
+    }
+
     private EventoPanelAdministrativoDto toPanelAdministrativoDto(Evento evento) {
         return new EventoPanelAdministrativoDto(
                 evento.getId(),
@@ -111,6 +161,71 @@ public class EventoService {
         );
     }
 
+    private EventoRevisionDirectivaResumenDto toRevisionDirectivaResumenDto(Evento evento) {
+        return new EventoRevisionDirectivaResumenDto(
+                evento.getId(),
+                evento.getTitulo(),
+                evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : null,
+                evento.getCategoria() != null ? evento.getCategoria().getNombre() : null,
+                toLocalDateTime(evento.getFechaHoraInicio()),
+                toLocalDateTime(evento.getFechaHoraFin()),
+                evento.getUbicacion() != null ? evento.getUbicacion().getNombre() : null,
+                toLocalDateTime(evento.getEventoActualizadoEn() != null
+                        ? evento.getEventoActualizadoEn()
+                        : evento.getTiempoActualizado())
+        );
+    }
+
+    private EventoRevisionDirectivaDetalleDto toRevisionDirectivaDetalleDto(Evento evento) {
+        Ubicacion ubicacion = evento.getUbicacion();
+        EventoRevisionDirectivaDetalleDto.UbicacionDetalleDto ubicacionDto = ubicacion == null
+                ? null
+                : new EventoRevisionDirectivaDetalleDto.UbicacionDetalleDto(
+                        ubicacion.getId(),
+                        ubicacion.getNombre(),
+                        ubicacion.getDireccion(),
+                        ubicacion.getReferencia(),
+                        ubicacion.getLatitud(),
+                        ubicacion.getLongitud()
+                );
+        EventoRevisionDirectivaDetalleDto.ObservacionDetalleDto observacionDto =
+                observacionEventoRepository.findTopByEventoIdOrderByFechaObservacionDesc(evento.getId())
+                        .map(observacion -> new EventoRevisionDirectivaDetalleDto.ObservacionDetalleDto(
+                                observacion.getId(),
+                                observacion.getObservacion(),
+                                observacion.getEstado(),
+                                toLocalDateTime(observacion.getFechaObservacion()),
+                                observacion.getUsuario() != null ? observacion.getUsuario().getNombre() : null
+                        ))
+                        .orElse(null);
+
+        return new EventoRevisionDirectivaDetalleDto(
+                evento.getId(),
+                evento.getTitulo(),
+                evento.getDescripcionBreve(),
+                evento.getDescripcion(),
+                toLocalDateTime(evento.getFechaHoraInicio()),
+                toLocalDateTime(evento.getFechaHoraFin()),
+                evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : null,
+                evento.getCategoria() != null ? evento.getCategoria().getNombre() : null,
+                evento.getAreaMunicipal() != null ? evento.getAreaMunicipal().getNombre() : null,
+                evento.getCostoReferencial(),
+                evento.getAforoMaximo(),
+                evento.getEdadMin(),
+                evento.getEdadMax(),
+                requiereControlAsistencia(evento),
+                toLocalDateTime(evento.getEventoActualizadoEn() != null
+                        ? evento.getEventoActualizadoEn()
+                        : evento.getTiempoActualizado()),
+                ubicacionDto,
+                obtenerAgendaDto(evento),
+                obtenerRequisitosDto(evento),
+                obtenerRecursosDto(evento),
+                eventoOperativoService.listarOperativosAsignados(evento),
+                observacionDto
+        );
+    }
+
     public Integer obtenerNumeroEventosActivosDesdeHoy() {
         Instant ahora = Instant.now();
         return eventoRepository.countByEstadoEvento_CodigoAndFechaHoraFinGreaterThanEqual(
@@ -124,11 +239,30 @@ public class EventoService {
     }
 
     public Integer obtenerNumeroEventosParaRevision(){
-        return eventoRepository.countByEstadoEventoCodigoIn(List.of("PARA_REVISION", "EN_REVISION", "OBSERVADO_EN_REVISION"));
+        return eventoRepository.countByEstadoEventoCodigo("PARA_REVISION");
     }
 
     public Integer obtenerNumeroEventosObservados(){
         return eventoRepository.countByEstadoEventoCodigo("OBSERVADO");
+    }
+
+    public ResumenCardsDirectivoDto obtenerResumenCardsDirectivo() {
+        RangoMesActual rangoMesActual = obtenerRangoMesActual();
+
+        return new ResumenCardsDirectivoDto(
+                obtenerNumeroEventosParaRevision(),
+                obtenerNumeroEventosObservados(),
+                toIntegerCount(eventoRepository.countByEstadoCodigoInAndFechaActualizacionBetween(
+                        List.of("PUBLICADO", "APROBADO"),
+                        rangoMesActual.inicio(),
+                        rangoMesActual.fin()
+                )),
+                toIntegerCount(eventoRepository.countByEstadoCodigoInAndFechaActualizacionBetween(
+                        List.of("FINALIZADO", "CERRADO"),
+                        rangoMesActual.inicio(),
+                        rangoMesActual.fin()
+                ))
+        );
     }
 
     @Transactional
@@ -189,6 +323,9 @@ public class EventoService {
                 httpServletRequest
         );
         notificacionService.notificarEventoCreadoAdministradores(eventoGuardado, usuario, bitacoraAccion);
+        if (esEstadoRevision(estadoCodigo)) {
+            notificacionService.notificarEventoPendienteRevisionDirectivos(eventoGuardado, usuario, bitacoraAccion);
+        }
 
         return toPanelAdministrativoDto(eventoGuardado);
     }
@@ -293,7 +430,7 @@ public class EventoService {
             );
         }
 
-        bitacoraAccionService.guardarAccion(
+        BitacoraAccion bitacoraAccion = bitacoraAccionService.guardarAccion(
                 "ACTUALIZAR_EVENTO",
                 "EVENTO",
                 eventoGuardado.getId(),
@@ -302,6 +439,7 @@ public class EventoService {
                 usuario,
                 httpServletRequest
         );
+        notificarRevisionDirectivaSiCorresponde(eventoGuardado, usuario, bitacoraAccion, estadoAnterior, estadoCodigo);
 
         return toPanelAdministrativoDto(eventoGuardado);
     }
@@ -336,6 +474,46 @@ public class EventoService {
                 usuario,
                 httpServletRequest
         );
+
+        return toPanelAdministrativoDto(eventoGuardado);
+    }
+
+    @Transactional
+    public EventoPanelAdministrativoDto cancelarEventoDirectivo(
+            Integer id,
+            String motivo,
+            HttpServletRequest httpServletRequest
+    ) {
+        Usuario usuario = usuarioAutenticadoService.obtenerUsuarioAutenticado();
+        Evento evento = eventoRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evento no encontrado"));
+        String estadoAnterior = evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : "";
+
+        if ("CANCELADO".equals(estadoAnterior)) {
+            return toPanelAdministrativoDto(evento);
+        }
+
+        EstadoEvento estadoCancelado = obtenerEstadoEvento("CANCELADO");
+        Instant ahora = Instant.now();
+        evento.setEstadoEvento(estadoCancelado);
+        evento.setTiempoActualizado(ahora);
+        evento.setEventoActualizadoEn(ahora);
+
+        Evento eventoGuardado = eventoRepository.save(evento);
+        String motivoNormalizado = normalizarTexto(motivo);
+        BitacoraAccion bitacoraAccion = bitacoraAccionService.guardarAccion(
+                "CANCELAR_EVENTO_DIRECTIVO",
+                "EVENTO",
+                eventoGuardado.getId(),
+                "Se cancelo el evento \"" + valorDetalle(eventoGuardado.getTitulo()) + "\" de estado "
+                        + valorDetalle(estadoAnterior)
+                        + (motivoNormalizado != null ? ". Motivo: " + motivoNormalizado : ""),
+                usuario,
+                httpServletRequest
+        );
+
+        notificacionService.notificarEventoCanceladoAdministradores(eventoGuardado, usuario, bitacoraAccion);
+        notificacionService.notificarEventoCanceladoDirectivos(eventoGuardado, usuario, bitacoraAccion);
 
         return toPanelAdministrativoDto(eventoGuardado);
     }
@@ -576,20 +754,36 @@ public class EventoService {
                 && "BORRADOR".equals(evento.getEstadoEvento().getCodigo());
     }
 
+    private void notificarRevisionDirectivaSiCorresponde(
+            Evento evento,
+            Usuario usuario,
+            BitacoraAccion bitacoraAccion,
+            String estadoAnterior,
+            String estadoCodigo
+    ) {
+        if (!esEstadoRevision(estadoCodigo) || esEstadoRevision(estadoAnterior)) {
+            return;
+        }
+
+        if ("OBSERVADO".equals(estadoAnterior)) {
+            notificacionService.notificarEventoCorregidoRevisionDirectivos(evento, usuario, bitacoraAccion);
+            return;
+        }
+
+        notificacionService.notificarEventoPendienteRevisionDirectivos(evento, usuario, bitacoraAccion);
+    }
+
+    private boolean esEstadoRevision(String estadoCodigo) {
+        return "PARA_REVISION".equals(estadoCodigo);
+    }
+
     private String valorDetalle(String valor) {
         return hasText(valor) ? valor.trim() : "Sin título";
     }
 
     private EstadoEvento obtenerEstadoEvento(String codigo) {
         return estadoEventoRepository.findByCodigo(codigo)
-                .orElseGet(() -> {
-                    if ("PARA_REVISION".equals(codigo)) {
-                        return estadoEventoRepository.findByCodigo("EN_REVISION")
-                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "No existe el estado PARA_REVISION"));
-                    }
-
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No existe el estado " + codigo);
-                });
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "No existe el estado " + codigo));
     }
 
     private String obtenerCodigoEstadoFinalEvento() {
@@ -681,6 +875,22 @@ public class EventoService {
     private LocalDateTime toLocalDateTime(Instant instant) {
         return instant == null ? null : LocalDateTime.ofInstant(instant, ZONA_LIMA);
     }
+
+    private Integer toIntegerCount(Long value) {
+        return value == null ? 0 : Math.toIntExact(value);
+    }
+
+    private RangoMesActual obtenerRangoMesActual() {
+        ZonedDateTime inicioMes = ZonedDateTime.now(ZONA_LIMA)
+                .withDayOfMonth(1)
+                .toLocalDate()
+                .atStartOfDay(ZONA_LIMA);
+        ZonedDateTime inicioMesSiguiente = inicioMes.plusMonths(1);
+
+        return new RangoMesActual(inicioMes.toInstant(), inicioMesSiguiente.toInstant());
+    }
+
+    private record RangoMesActual(Instant inicio, Instant fin) {}
 
     private EventoPanelAdministrativoDto.CategoriaEventoPanelAdministrativoDto toCategoriaPanelAdministrativoDto(Evento evento) {
         if (evento == null || evento.getCategoria() == null) {

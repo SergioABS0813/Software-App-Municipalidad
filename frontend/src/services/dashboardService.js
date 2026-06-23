@@ -149,6 +149,12 @@ export async function getNotificacionesAdministrador({ soloNoLeidas = false } = 
     return response.data;
 }
 
+export async function getNotificacionesDirectivo({ soloNoLeidas = false } = {}){
+    const endpoint = soloNoLeidas ? "notificacion/no_leidas" : "notificacion/todas";
+    const response = await api.get(endpoint);
+    return response.data;
+}
+
 export async function marcarNotificacionComoLeida(id){
     const response = await api.patch(`notificacion/${id}/leer`);
     return response.data;
@@ -156,5 +162,32 @@ export async function marcarNotificacionComoLeida(id){
 
 export async function getEventosOperativoHoy(){
     const response = await api.get("operativo/eventos/hoy");
+    return response.data;
+}
+
+export async function getResumenCardsDirectivo(){
+    const response = await api.get("eventos/directivo/cards");
+    return response.data;
+}
+
+export async function getEventosRevisionDirectiva({ estado = 'TODOS', page = 0 } = {}){
+    const response = await api.get("eventos/directivo/revision", {
+        params: { estado, page },
+    });
+    return response.data;
+}
+
+export async function getConteosRevisionDirectiva(){
+    const response = await api.get("eventos/directivo/revision/conteos");
+    return response.data;
+}
+
+export async function getDetalleRevisionDirectiva(id){
+    const response = await api.get(`eventos/directivo/revision/${id}`);
+    return response.data;
+}
+
+export async function cancelarEventoDirectivo(id, { motivo = '' } = {}){
+    const response = await api.patch(`eventos/directivo/operacion/${id}/cancelar`, { motivo });
     return response.data;
 }

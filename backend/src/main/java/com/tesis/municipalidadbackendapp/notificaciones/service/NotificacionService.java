@@ -84,6 +84,75 @@ public class NotificacionService {
         );
     }
 
+    public void notificarEventoPendienteRevisionDirectivos(Evento evento, Usuario administrador, BitacoraAccion bitacoraAccion) {
+        notificarDirectivos(
+                "Evento pendiente de revision",
+                "%s envio \"%s\" a revision directiva.".formatted(nombreUsuario(administrador), tituloEvento(evento)),
+                "EVENTO_PENDIENTE_REVISION",
+                "/directivo/eventos/%d/revision".formatted(evento.getId()),
+                administrador,
+                bitacoraAccion
+        );
+    }
+
+    public void notificarEventoCorregidoRevisionDirectivos(Evento evento, Usuario administrador, BitacoraAccion bitacoraAccion) {
+        notificarDirectivos(
+                "Evento corregido para nueva revision",
+                "%s corrigio \"%s\" y lo envio nuevamente a revision.".formatted(nombreUsuario(administrador), tituloEvento(evento)),
+                "EVENTO_CORREGIDO_REVISION",
+                "/directivo/eventos/%d/revision".formatted(evento.getId()),
+                administrador,
+                bitacoraAccion
+        );
+    }
+
+    public void notificarEventoPublicadoDirectivos(Evento evento, Usuario directivo, BitacoraAccion bitacoraAccion) {
+        notificarDirectivos(
+                "Evento publicado por otro directivo",
+                "%s publico el evento \"%s\".".formatted(nombreUsuario(directivo), tituloEvento(evento)),
+                "EVENTO_PUBLICADO_DIRECTIVO",
+                "/directivo/eventos/%d/reporte".formatted(evento.getId()),
+                directivo,
+                bitacoraAccion,
+                true
+        );
+    }
+
+    public void notificarEventoObservadoDirectivos(Evento evento, Usuario directivo, BitacoraAccion bitacoraAccion) {
+        notificarDirectivos(
+                "Evento observado por otro directivo",
+                "%s observo el evento \"%s\".".formatted(nombreUsuario(directivo), tituloEvento(evento)),
+                "EVENTO_OBSERVADO_DIRECTIVO",
+                "/directivo/eventos/%d/revision".formatted(evento.getId()),
+                directivo,
+                bitacoraAccion,
+                true
+        );
+    }
+
+    public void notificarEventoCanceladoDirectivos(Evento evento, Usuario usuario, BitacoraAccion bitacoraAccion) {
+        notificarDirectivos(
+                "Evento cancelado",
+                "%s cancelo el evento \"%s\".".formatted(nombreUsuario(usuario), tituloEvento(evento)),
+                "EVENTO_CANCELADO_DIRECTIVO",
+                "/directivo/eventos/%d/reporte".formatted(evento.getId()),
+                usuario,
+                bitacoraAccion,
+                true
+        );
+    }
+
+    public void notificarEventoProximoIniciarDirectivos(Evento evento, Usuario sistema, BitacoraAccion bitacoraAccion) {
+        notificarDirectivos(
+                "Evento proximo a iniciar",
+                "\"%s\" inicia pronto a las %s.".formatted(tituloEvento(evento), horaInicio(evento)),
+                "EVENTO_PROXIMO_INICIAR",
+                "/directivo/eventos/%d/reporte".formatted(evento.getId()),
+                sistema,
+                bitacoraAccion
+        );
+    }
+
     public void notificarEventoPublicadoAdministradores(Evento evento, Usuario directivo, BitacoraAccion bitacoraAccion) {
         notificarAdministradores(
                 "Evento publicado",
@@ -183,11 +252,47 @@ public class NotificacionService {
             BitacoraAccion bitacoraAccion,
             boolean excluirUsuarioOrigen
     ) {
+        notificarRol("ADMINISTRADOR", titulo, mensaje, tipo, urlDestino, usuarioOrigen, bitacoraAccion, excluirUsuarioOrigen);
+    }
+
+    private void notificarDirectivos(
+            String titulo,
+            String mensaje,
+            String tipo,
+            String urlDestino,
+            Usuario usuarioOrigen,
+            BitacoraAccion bitacoraAccion
+    ) {
+        notificarDirectivos(titulo, mensaje, tipo, urlDestino, usuarioOrigen, bitacoraAccion, false);
+    }
+
+    private void notificarDirectivos(
+            String titulo,
+            String mensaje,
+            String tipo,
+            String urlDestino,
+            Usuario usuarioOrigen,
+            BitacoraAccion bitacoraAccion,
+            boolean excluirUsuarioOrigen
+    ) {
+        notificarRol("DIRECTIVO", titulo, mensaje, tipo, urlDestino, usuarioOrigen, bitacoraAccion, excluirUsuarioOrigen);
+    }
+
+    private void notificarRol(
+            String rol,
+            String titulo,
+            String mensaje,
+            String tipo,
+            String urlDestino,
+            Usuario usuarioOrigen,
+            BitacoraAccion bitacoraAccion,
+            boolean excluirUsuarioOrigen
+    ) {
         if (usuarioOrigen == null || bitacoraAccion == null) {
             return;
         }
 
-        usuarioRepository.findByRolCodigoOrNombre("ADMINISTRADOR").forEach(usuarioDestino -> {
+        usuarioRepository.findByRolCodigoOrNombre(rol).forEach(usuarioDestino -> {
             if (excluirUsuarioOrigen && usuarioOrigen.getId() != null && usuarioOrigen.getId().equals(usuarioDestino.getId())) {
                 return;
             }

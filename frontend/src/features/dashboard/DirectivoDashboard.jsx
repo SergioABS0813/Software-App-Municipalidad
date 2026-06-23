@@ -1,8 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import municipalLogo from '../../assets/images/municipalidad-logo.png';
 import eventReviewPlaceholder from '../../assets/images/event-review-placeholder.png';
 import { adminEvents, formatEventState } from './dashboardData';
 import NotificationMenu from './NotificationMenu';
+import { CardSkeleton, EmptyState, ErrorState, TableSkeleton } from '../../components/feedback/LoadingStates';
+import { getApiErrorMessage } from '../../services/api/api';
+import {
+  cancelarEventoDirectivo,
+  getConteosRevisionDirectiva,
+  getDetalleRevisionDirectiva,
+  getEventosRevisionDirectiva,
+  getNotificacionesDirectivo,
+  getResumenCardsDirectivo,
+  marcarNotificacionComoLeida,
+} from '../../services/dashboardService';
 import './AdminDashboard.css';
 import './DirectivoDashboard.css';
 
@@ -28,9 +39,128 @@ function formatDirectiveUserRole(role) {
   return role === 'DIRECTIVO' ? 'Directivo' : role ?? 'Directivo';
 }
 
-const reviewEvents = adminEvents.filter((event) =>
-  ['EN_REVISION', 'OBSERVADO_EN_REVISION', 'OBSERVADO'].includes(event.state),
-);
+function formatDirectiveNotificationTime(value) {
+  if (!value) {
+    return '';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat('es-PE', {
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'short',
+  }).format(date);
+}
+
+function mapDirectiveNotificationFromApi(notification) {
+  return {
+    id: notification.id,
+    message: notification.mensaje ?? notification.message ?? '',
+    title: notification.titulo ?? notification.title ?? notification.tipo ?? '',
+    time: formatDirectiveNotificationTime(notification.fechaCreacion),
+    type: notification.tipo ?? notification.type ?? '',
+    unread: !(notification.leida ?? notification.read ?? false),
+    urlDestino: notification.urlDestino ?? notification.destinationUrl ?? '',
+  };
+}
+
+function formatDirectiveEventDate(value) {
+  const date = value ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime())
+    ? new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'short', weekday: 'short' }).format(date)
+    : 'Fecha no especificada';
+}
+
+function formatDirectiveEventTime(value) {
+  const date = value ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime())
+    ? new Intl.DateTimeFormat('es-PE', { hour: 'numeric', minute: '2-digit' }).format(date)
+    : 'Horario no especificado';
+}
+
+function formatDirectiveDuration(startValue, endValue) {
+  const start = startValue ? new Date(startValue) : null;
+  const end = endValue ? new Date(endValue) : null;
+
+  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+    return 'No especificada';
+  }
+
+  const totalMinutes = Math.round((end.getTime() - start.getTime()) / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return [hours > 0 ? `${hours} ${hours === 1 ? 'hora' : 'horas'}` : '', minutes > 0 ? `${minutes} min` : '']
+    .filter(Boolean)
+    .join(' ');
+}
+
+function mapDirectiveReviewSummaryFromApi(event) {
+  return {
+    category: event.categoriaNombre ?? 'Sin categoría',
+    date: formatDirectiveEventDate(event.fechaHoraInicio),
+    id: event.id,
+    lastUpdatedAt: event.actualizadoEn,
+    state: event.estadoCodigo,
+    title: event.titulo ?? 'Evento sin título',
+    venue: event.ubicacionNombre ?? 'Ubicación pendiente',
+  };
+}
+
+function mapDirectiveReviewDetailFromApi(event) {
+  const resources = (event.recursos ?? []).reduce((mappedResources, resource) => {
+    if (resource?.tipoRecurso) {
+      mappedResources[resource.tipoRecurso] = resource.urlRecurso || resource.nombreArchivo || true;
+    }
+    return mappedResources;
+  }, {});
+  const minimumAge = Number(event.edadMin);
+  const maximumAge = Number(event.edadMax);
+  const hasTargetAudience = Number.isFinite(minimumAge) && Number.isFinite(maximumAge) && maximumAge > minimumAge;
+
+  return {
+    accent: 'teal',
+    address: event.ubicacion?.direccion ?? '',
+    aforoMaximo: event.aforoMaximo,
+    agenda: (event.agenda ?? []).map((item) => item.descripcion).filter(Boolean),
+    audience: hasTargetAudience ? `${minimumAge}-${maximumAge} años` : 'Público general',
+    category: event.categoriaNombre ?? 'Sin categoría',
+    coordinates: {
+      lat: event.ubicacion?.latitud,
+      lng: event.ubicacion?.longitud,
+    },
+    date: formatDirectiveEventDate(event.fechaHoraInicio),
+    descripcion_breve: event.descripcionBreve ?? '',
+    description: event.descripcion ?? '',
+    duration: formatDirectiveDuration(event.fechaHoraInicio, event.fechaHoraFin),
+    id: event.id,
+    imageUrl: resources.IMAGEN_PORTADA && typeof resources.IMAGEN_PORTADA === 'string'
+      ? resources.IMAGEN_PORTADA
+      : null,
+    lastUpdatedAt: event.actualizadoEn,
+    locationReference: event.ubicacion?.referencia ?? '',
+    operativosAsignados: event.operativosAsignados ?? [],
+    organizer: event.areaMunicipalNombre ?? '',
+    previousObservation: event.ultimaObservacion ? {
+      author: event.ultimaObservacion.usuarioNombre ?? 'Directivo',
+      comment: event.ultimaObservacion.observacion,
+      dateTime: event.ultimaObservacion.fechaObservacion,
+      role: 'Directivo',
+    } : null,
+    referenceCost: event.costoReferencial,
+    requirements: (event.requisitos ?? []).map((item) => item.descripcion).filter(Boolean),
+    resources,
+    state: event.estadoCodigo,
+    summary: event.descripcionBreve ?? '',
+    time: formatDirectiveEventTime(event.fechaHoraInicio),
+    title: event.titulo ?? 'Evento sin título',
+    venue: event.ubicacion?.nombre ?? 'Ubicación pendiente',
+  };
+}
 
 function getAforoMaximo(event) {
   if (event.aforoMaximo === null) {
@@ -87,261 +217,99 @@ const reviewFilters = [
   },
   {
     label: 'Pendientes',
-    value: 'EN_REVISION',
+    value: 'PENDIENTES',
   },
   {
     label: 'Observados',
-    value: 'OBSERVADO',
+    value: 'OBSERVADOS',
   },
 ];
 
-const reviewableStates = ['EN_REVISION', 'OBSERVADO_EN_REVISION'];
-const relativeTimeReference = new Date('2026-06-06T13:45:00');
+const reviewableStates = ['PARA_REVISION'];
+const emptyDirectiveStatsSummary = {
+  observados: 0,
+  porRevisar: 0,
+  publicadosDelMes: 0,
+  reportesDelMes: 0,
+};
 
-const directiveNotifications = [
-  {
-    id: 'directive-review-1',
-    time: 'Hace 10 min',
-    message: 'Carlos Ramírez envió "Festival Cultural Barrial" a revisión.',
-    type: 'Evento enviado a revisión',
-    unread: true,
-  },
-  {
-    id: 'directive-review-2',
-    time: 'Ayer',
-    message: 'Carlos Ramírez corrigió "Carrera Vecinal 5K" y la volvió a enviar a revisión.',
-    type: 'Evento reenviado',
-    unread: true,
-  },
-  {
-    id: 'directive-review-3',
-    time: 'Hoy',
-    message: 'Nuevo evento pendiente de decisión.',
-    type: 'Pendiente de revisión',
-    unread: true,
-  },
-  {
-    id: 'directive-review-4',
-    time: '05 jun. 2026',
-    message: 'Tienes eventos para revisión que requieren decisión directiva.',
-    type: 'Recordatorio de revisión',
-    unread: false,
-  },
-];
-
-const eventHistoryItems = [
-  {
-    id: 1,
-    eventId: 2,
-    type: 'CREATED',
-    title: 'Evento creado',
-    actorName: 'Carlos Ramírez',
-    actorRole: 'Administrador',
-    dateTime: '2026-06-02T09:10:00',
-    message: 'Se registró la ficha inicial del evento.',
-    userComment: null,
-    tone: 'neutral',
-  },
-  {
-    id: 2,
-    eventId: 2,
-    type: 'SENT_TO_REVIEW',
-    title: 'Evento enviado a revisión',
-    actorName: 'Carlos Ramírez',
-    actorRole: 'Administrador',
-    dateTime: '2026-06-03T15:30:00',
-    message: 'La ficha fue enviada para evaluación directiva.',
-    userComment: null,
-    tone: 'review',
-  },
-  {
-    id: 3,
-    eventId: 2,
-    type: 'OBSERVED',
-    title: 'Evento observado',
-    actorName: 'Mariana Fuentes',
-    actorRole: 'Directivo',
-    dateTime: '2026-06-04T11:45:00',
-    message: null,
-    userComment: 'Precisar el lugar exacto del evento y corregir la descripción para indicar el público objetivo.',
-    tone: 'warning',
-  },
-  {
-    id: 4,
-    eventId: 2,
-    type: 'UPDATED',
-    title: 'Ficha actualizada',
-    actorName: 'Carlos Ramírez',
-    actorRole: 'Administrador',
-    dateTime: '2026-06-05T10:25:00',
-    message: 'La ficha del evento fue actualizada.',
-    userComment: null,
-    tone: 'neutral',
-  },
-  {
-    id: 5,
-    eventId: 2,
-    type: 'CORRECTION_COMMENT',
-    title: 'Corrección registrada',
-    actorName: 'Carlos Ramírez',
-    actorRole: 'Administrador',
-    dateTime: '2026-06-05T10:32:00',
-    message: null,
-    userComment: 'Se precisó el ambiente donde se realizará el taller.',
-    tone: 'neutral',
-  },
-  {
-    id: 6,
-    eventId: 2,
-    type: 'RESENT_TO_REVIEW',
-    title: 'Evento reenviado para revisión',
-    actorName: 'Carlos Ramírez',
-    actorRole: 'Administrador',
-    dateTime: '2026-06-05T10:40:00',
-    message: 'La ficha corregida fue enviada nuevamente para evaluación directiva.',
-    userComment: null,
-    tone: 'review',
-  },
-  {
-    id: 7,
-    eventId: 5,
-    type: 'CREATED',
-    title: 'Evento creado',
-    actorName: 'Ana Torres',
-    actorRole: 'Administrador',
-    dateTime: '2026-06-01T08:50:00',
-    message: 'Se registró la ficha inicial del evento.',
-    userComment: null,
-    tone: 'neutral',
-  },
-  {
-    id: 8,
-    eventId: 5,
-    type: 'SAVED_DRAFT',
-    title: 'Guardado como borrador',
-    actorName: 'Ana Torres',
-    actorRole: 'Administrador',
-    dateTime: '2026-06-01T09:20:00',
-    message: 'El evento fue guardado como borrador.',
-    userComment: null,
-    tone: 'neutral',
-  },
-  {
-    id: 9,
-    eventId: 5,
-    type: 'SENT_TO_REVIEW',
-    title: 'Evento enviado a revisión',
-    actorName: 'Ana Torres',
-    actorRole: 'Administrador',
-    dateTime: '2026-06-06T08:45:00',
-    message: 'La ficha fue enviada para evaluación directiva.',
-    userComment: null,
-    tone: 'review',
-  },
-  {
-    id: 10,
-    eventId: 1,
-    type: 'APPROVED',
-    title: 'Evento aprobado',
-    actorName: 'Mariana Fuentes',
-    actorRole: 'Directivo',
-    dateTime: '2026-05-18T10:30:00',
-    message: 'El evento fue aprobado para su publicación.',
-    userComment: 'La propuesta está alineada con la agenda cultural del distrito.',
-    tone: 'success',
-  },
-  {
-    id: 11,
-    eventId: 1,
-    type: 'PUBLISHED',
-    title: 'Evento publicado',
-    actorName: 'Sistema',
-    actorRole: 'Sistema',
-    dateTime: '2026-05-18T10:45:00',
-    message: 'El evento fue publicado en la plataforma ciudadana.',
-    userComment: null,
-    tone: 'success',
-  },
-  {
-    id: 12,
-    eventId: 4,
-    type: 'CANCELLED',
-    title: 'Evento cancelado',
-    actorName: 'Sistema',
-    actorRole: 'Sistema',
-    dateTime: '2026-06-07T16:15:00',
-    message: 'El evento fue cancelado.',
-    userComment: 'No se confirmó la disponibilidad del punto de partida.',
-    tone: 'danger',
-  },
-];
-
-const currentMonthReference = new Date('2026-05-28T12:00:00');
-const directiveApprovalAudit = [
-  // Mock temporal: reemplazar por fecha_aprobación desde backend/API.
-  ...adminEvents
-    .filter((event) => event.state === 'PUBLICADO')
-    .map((event, index) => ({
-      eventId: event.id,
-      approvedAt: ['2026-05-18T10:30:00', '2026-04-22T16:45:00'][index] ?? '2026-05-21T09:00:00',
-    })),
-  ...eventReports.map((report) => ({
-    eventId: report.id,
-    approvedAt: report.approvedAt,
-  })),
-];
-
-function isDateInMonth(dateValue, referenceDate = currentMonthReference) {
-  const date = new Date(dateValue);
-
-  return (
-    !Number.isNaN(date.getTime()) &&
-    date.getFullYear() === referenceDate.getFullYear() &&
-    date.getMonth() === referenceDate.getMonth()
-  );
+function buildDirectiveStats(summary = emptyDirectiveStatsSummary) {
+  return [
+    {
+      icon: FileSearchIcon,
+      label: 'Por revisar',
+      tone: 'is-decision',
+      trend: 'pendientes de decisión',
+      value: Number(summary.porRevisar ?? 0),
+    },
+    {
+      icon: MessageWarningIcon,
+      label: 'Observados',
+      tone: 'is-returned',
+      trend: 'devueltos al administrador',
+      value: Number(summary.observados ?? 0),
+    },
+    {
+      icon: BadgeCheckIcon,
+      label: 'Publicados del mes',
+      tone: 'is-month-approved',
+      trend: 'aprobados en el mes actual',
+      value: Number(summary.publicadosDelMes ?? 0),
+    },
+    {
+      icon: ChartColumnIcon,
+      label: 'Reportes del mes',
+      tone: 'is-month-report',
+      trend: 'eventos con reporte',
+      value: Number(summary.reportesDelMes ?? 0),
+    },
+  ];
 }
-
-const directiveStats = [
-  {
-    icon: FileSearchIcon,
-    label: 'Por revisar',
-    tone: 'is-decision',
-    trend: 'pendientes de decisión',
-    value: adminEvents.filter((event) => reviewableStates.includes(event.state)).length,
-  },
-  {
-    icon: MessageWarningIcon,
-    label: 'Observados',
-    tone: 'is-returned',
-    trend: 'devueltos al administrador',
-    value: adminEvents.filter((event) => event.state === 'OBSERVADO').length,
-  },
-  {
-    icon: BadgeCheckIcon,
-    label: 'Publicados del mes',
-    tone: 'is-month-approved',
-    trend: 'aprobados en el mes actual',
-    value: directiveApprovalAudit.filter((approval) =>
-      isDateInMonth(approval.approvedAt),
-    ).length,
-  },
-  {
-    icon: ChartColumnIcon,
-    label: 'Reportes del mes',
-    tone: 'is-month-report',
-    trend: 'eventos con reporte',
-    value: eventReports.filter((report) => isDateInMonth(report.generatedAtDate)).length,
-  },
-];
 
 const reviewResourceLabels = [
   ['IMAGEN_PORTADA', 'Portada ciudadana'],
   ['AFICHE', 'Afiche oficial'],
-  ['DOCUMENTO', 'Documento adjunto'],
   ['VIDEO', 'Video referencial'],
 ];
 
-function formatRelativeTime(dateValue, referenceDate = relativeTimeReference) {
+const directiveOperativeDirectory = {
+  'operativo-1': { fullName: 'Carlos Ramirez', role: 'Operativo' },
+  'operativo-2': { fullName: 'Lucía Mendoza', role: 'Operativo' },
+};
+
+function getAssignedOperatives(event) {
+  const assignedOperatives = Array.isArray(event.operativosAsignados)
+    ? event.operativosAsignados
+    : [];
+
+  return assignedOperatives.map((operative, index) => {
+    if (operative && typeof operative === 'object') {
+      const id = operative.usuarioId ?? operative.id ?? `operativo-${index + 1}`;
+      const fullName = operative.fullName
+        || operative.nombreCompleto
+        || [operative.nombres, operative.apellidos].filter(Boolean).join(' ')
+        || operative.email
+        || `Usuario operativo ${index + 1}`;
+
+      return {
+        email: operative.email ?? operative.correo ?? '',
+        fullName,
+        id,
+        role: operative.role ?? operative.rol ?? 'Operativo',
+      };
+    }
+
+    const id = String(operative);
+    return {
+      ...directiveOperativeDirectory[id],
+      fullName: directiveOperativeDirectory[id]?.fullName ?? `Usuario operativo ${index + 1}`,
+      id,
+      role: directiveOperativeDirectory[id]?.role ?? 'Operativo',
+    };
+  });
+}
+
+function formatRelativeTime(dateValue, referenceDate = new Date()) {
   const date = new Date(dateValue);
 
   if (Number.isNaN(date.getTime())) {
@@ -375,16 +343,8 @@ function formatRelativeTime(dateValue, referenceDate = relativeTimeReference) {
 }
 
 function getReviewTimeMetric(event) {
-  if (event.state === 'EN_REVISION') {
+  if (event.state === 'PARA_REVISION') {
     const dateValue = event.sentToReviewAt ?? event.lastUpdatedAt;
-
-    return {
-      value: dateValue ? formatRelativeTime(dateValue) : null,
-    };
-  }
-
-  if (event.state === 'OBSERVADO_EN_REVISION') {
-    const dateValue = event.resentToReviewAt ?? event.lastUpdatedAt;
 
     return {
       value: dateValue ? formatRelativeTime(dateValue) : null,
@@ -416,7 +376,7 @@ function getResourceKind(type) {
 
 function getResourceValue(event, type) {
   if (type === 'VIDEO') {
-    return event.resources?.[type] ?? event.videoUrl ?? true;
+    return event.resources?.[type] ?? event.videoUrl ?? null;
   }
 
   return event.resources?.[type];
@@ -447,19 +407,79 @@ function getEventMapsUrl(event) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationQuery)}`;
 }
 
-function getExecutiveReviewDescription(event) {
-  const executiveDescriptions = {
-    2: 'Taller de marinera orientado a jóvenes para fortalecer coordinación corporal y trabajo en pareja.',
-  };
+function getDisplayValue(value, fallback) {
+  return value !== undefined && value !== null && String(value).trim().length > 0
+    ? String(value).trim()
+    : fallback;
+}
 
-  return executiveDescriptions[event.id] ?? event.summary ?? event.description;
+function parseClockMinutes(value) {
+  const match = String(value ?? '').match(/(\d{1,2})(?::(\d{2}))?\s*(a\.m\.|p\.m\.)?/i);
+
+  if (!match) {
+    return null;
+  }
+
+  let hours = Number(match[1]);
+  const minutes = Number(match[2] ?? 0);
+  const period = match[3]?.toLowerCase();
+
+  if (period === 'p.m.' && hours < 12) {
+    hours += 12;
+  }
+
+  if (period === 'a.m.' && hours === 12) {
+    hours = 0;
+  }
+
+  return hours * 60 + minutes;
+}
+
+function parseDurationMinutes(value) {
+  const hoursMatch = String(value ?? '').match(/(\d+(?:[.,]\d+)?)\s*hora/i);
+  const minutesMatch = String(value ?? '').match(/(\d+)\s*min/i);
+  const hours = hoursMatch ? Number(hoursMatch[1].replace(',', '.')) : 0;
+  const minutes = minutesMatch ? Number(minutesMatch[1]) : 0;
+  const totalMinutes = hours * 60 + minutes;
+
+  return totalMinutes > 0 ? totalMinutes : null;
+}
+
+function formatClockMinutes(totalMinutes) {
+  const normalizedMinutes = totalMinutes % (24 * 60);
+  const hours24 = Math.floor(normalizedMinutes / 60);
+  const minutes = normalizedMinutes % 60;
+  const period = hours24 >= 12 ? 'p.m.' : 'a.m.';
+  const hours12 = hours24 % 12 || 12;
+
+  return `${hours12}:${String(minutes).padStart(2, '0')} ${period}`;
+}
+
+function getDirectiveScheduleLabel(event) {
+  const date = getDisplayValue(event.date, 'Fecha no especificada');
+  const time = getDisplayValue(event.time, 'Horario no especificado');
+  const startMinutes = parseClockMinutes(event.time);
+  const durationMinutes = parseDurationMinutes(event.duration);
+
+  if (startMinutes === null || durationMinutes === null) {
+    return `${date} · ${time}`;
+  }
+
+  return `${date} · ${formatClockMinutes(startMinutes)} - ${formatClockMinutes(startMinutes + durationMinutes)}`;
+}
+
+function getReferenceCostLabel(event) {
+  const referenceCost = Number(event.referenceCost);
+
+  return Number.isFinite(referenceCost) && referenceCost > 0
+    ? `S/ ${referenceCost.toLocaleString('es-PE')}`
+    : 'No especificado';
 }
 
 function getDirectiveStateTone(state) {
   const stateToneMap = {
-    EN_REVISION: 'state-review',
+    PARA_REVISION: 'state-review',
     OBSERVADO: 'state-observed',
-    OBSERVADO_EN_REVISION: 'state-reobserved',
     APROBADO: 'state-published',
     PUBLICADO: 'state-published',
   };
@@ -472,20 +492,136 @@ function DirectivoDashboard({ onLogout, user }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSidebarDrawerOpen, setIsSidebarDrawerOpen] = useState(false);
   const [reviewFilter, setReviewFilter] = useState('TODOS');
+  const [reviewItems, setReviewItems] = useState([]);
+  const [reviewCounts, setReviewCounts] = useState({ todos: 0, pendientes: 0, observados: 0 });
+  const [reviewPage, setReviewPage] = useState({ number: 0, totalElements: 0, totalPages: 0 });
+  const [isLoadingReviewEvents, setIsLoadingReviewEvents] = useState(true);
+  const [reviewEventsError, setReviewEventsError] = useState('');
+  const [isLoadingReviewDetail, setIsLoadingReviewDetail] = useState(false);
   const [selectedReviewEvent, setSelectedReviewEvent] = useState(null);
   const [selectedReportEvent, setSelectedReportEvent] = useState(null);
   const [pendingDecision, setPendingDecision] = useState(null);
+  const [isSavingDecision, setIsSavingDecision] = useState(false);
+  const [decisionError, setDecisionError] = useState('');
   const [activeReviewSection, setActiveReviewSection] = useState('ficha-directiva');
+  const [directiveStatsSummary, setDirectiveStatsSummary] = useState(emptyDirectiveStatsSummary);
+  const [isLoadingDirectiveStats, setIsLoadingDirectiveStats] = useState(true);
+  const [directiveStatsError, setDirectiveStatsError] = useState('');
+  const [directiveNotificationItems, setDirectiveNotificationItems] = useState([]);
+  const [directiveNotificationCounts, setDirectiveNotificationCounts] = useState({ total: 0, unread: 0 });
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+  const [notificationError, setNotificationError] = useState('');
+  const [notificationFilter, setNotificationFilter] = useState('all');
   const directiveUser = user ?? fallbackDirectiveUser;
   const directiveUserName = directiveUser.fullName || directiveUser.name || 'Sergio Bustamante';
-  const filteredReviewEvents =
-    reviewFilter === 'TODOS'
-      ? reviewEvents
-      : reviewEvents.filter((event) =>
-        reviewFilter === 'EN_REVISION'
-          ? reviewableStates.includes(event.state)
-          : event.state === reviewFilter,
-      );
+
+  const loadReviewEvents = useCallback(async () => {
+    setIsLoadingReviewEvents(true);
+    setReviewEventsError('');
+
+    try {
+      const [pageData, countsData] = await Promise.all([
+        getEventosRevisionDirectiva({ estado: reviewFilter, page: reviewPage.number }),
+        getConteosRevisionDirectiva(),
+      ]);
+      setReviewItems((pageData.content ?? []).map(mapDirectiveReviewSummaryFromApi));
+      setReviewPage((currentPage) => ({
+        ...currentPage,
+        number: pageData.number ?? 0,
+        totalElements: pageData.totalElements ?? 0,
+        totalPages: pageData.totalPages ?? 0,
+      }));
+      setReviewCounts({
+        observados: countsData.observados ?? 0,
+        pendientes: countsData.pendientes ?? 0,
+        todos: countsData.todos ?? 0,
+      });
+    } catch (error) {
+      setReviewItems([]);
+      setReviewEventsError(getApiErrorMessage(error, 'No se pudieron cargar los eventos para revisión.'));
+    } finally {
+      setIsLoadingReviewEvents(false);
+    }
+  }, [reviewFilter, reviewPage.number]);
+
+  const loadDirectiveNotifications = useCallback((nextFilter = notificationFilter) => {
+    const soloNoLeidas = nextFilter === 'unread';
+    setIsLoadingNotifications(true);
+    setNotificationError('');
+
+    return getNotificacionesDirectivo({ soloNoLeidas })
+      .then((data) => {
+        const notifications = Array.isArray(data.notificaciones)
+          ? data.notificaciones.map(mapDirectiveNotificationFromApi)
+          : [];
+
+        setDirectiveNotificationItems(notifications);
+        setDirectiveNotificationCounts({
+          total: data.total ?? notifications.length,
+          unread: data.noLeidas ?? notifications.filter((notification) => notification.unread).length,
+        });
+      })
+      .catch((error) => {
+        console.error('No se pudieron cargar las notificaciones directivas.', error);
+        setDirectiveNotificationItems([]);
+        setDirectiveNotificationCounts({ total: 0, unread: 0 });
+        setNotificationError(getApiErrorMessage(error, 'No se pudieron cargar las notificaciones.'));
+      })
+      .finally(() => setIsLoadingNotifications(false));
+  }, [notificationFilter]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadDirectiveStats() {
+      setIsLoadingDirectiveStats(true);
+      setDirectiveStatsError('');
+
+      try {
+        const data = await getResumenCardsDirectivo();
+
+        if (isMounted) {
+          setDirectiveStatsSummary({
+            observados: data?.observados ?? 0,
+            porRevisar: data?.porRevisar ?? 0,
+            publicadosDelMes: data?.publicadosDelMes ?? 0,
+            reportesDelMes: data?.reportesDelMes ?? 0,
+          });
+        }
+      } catch (error) {
+        if (isMounted) {
+          setDirectiveStatsSummary(emptyDirectiveStatsSummary);
+          setDirectiveStatsError(getApiErrorMessage(error, 'No se pudieron cargar las métricas directivas.'));
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingDirectiveStats(false);
+        }
+      }
+    }
+
+    loadDirectiveStats();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      loadDirectiveNotifications(notificationFilter);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadDirectiveNotifications, notificationFilter]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      loadReviewEvents();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadReviewEvents]);
 
   useEffect(() => {
     if (!isSidebarDrawerOpen) {
@@ -523,6 +659,145 @@ function DirectivoDashboard({ onLogout, user }) {
 
   function closeSidebarDrawer() {
     setIsSidebarDrawerOpen(false);
+  }
+
+  function handleNotificationFilterChange(nextFilter) {
+    setNotificationFilter(nextFilter);
+  }
+
+  async function handleNotificationRead(notification) {
+    const wasUnread = Boolean(notification?.unread);
+
+    if (notification?.id) {
+      await marcarNotificacionComoLeida(notification.id);
+    }
+
+    setDirectiveNotificationItems((currentItems) =>
+      currentItems.map((currentNotification) =>
+        currentNotification.id === notification?.id
+          ? { ...currentNotification, unread: false }
+          : currentNotification,
+      ),
+    );
+
+    if (wasUnread) {
+      setDirectiveNotificationCounts((currentCounts) => ({
+        ...currentCounts,
+        unread: Math.max(0, currentCounts.unread - 1),
+      }));
+    }
+  }
+
+  async function openDirectiveReviewEvent(eventId) {
+    setIsLoadingReviewDetail(true);
+    setReviewEventsError('');
+
+    try {
+      const detail = await getDetalleRevisionDirectiva(eventId);
+      setSelectedReviewEvent(mapDirectiveReviewDetailFromApi(detail));
+      setSelectedReportEvent(null);
+      setCurrentDirectiveView('review');
+      setActiveReviewSection('ficha-directiva');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      setReviewEventsError(getApiErrorMessage(error, 'No se pudo cargar el detalle del evento.'));
+    } finally {
+      setIsLoadingReviewDetail(false);
+    }
+  }
+
+  function findDirectiveReportById(eventId) {
+    return eventReports.find((report) => String(report.id) === String(eventId)) ?? null;
+  }
+
+  async function handleNotificationOpen(notification) {
+    const destination = notification?.urlDestino;
+
+    if (!destination) {
+      return;
+    }
+
+    window.history.pushState(null, '', destination);
+
+    const eventMatch = destination.match(/^\/directivo\/eventos\/([^/]+)\/(revision|reporte)$/);
+    if (!eventMatch) {
+      return;
+    }
+
+    const [, eventId, action] = eventMatch;
+
+    if (action === 'reporte') {
+      const report = findDirectiveReportById(eventId);
+      if (report) {
+        setSelectedReportEvent(report);
+        setSelectedReviewEvent(null);
+        setCurrentDirectiveView('reports');
+        setActiveReviewSection('report-section');
+      } else {
+        setSelectedReportEvent(null);
+        setSelectedReviewEvent(null);
+        setCurrentDirectiveView('reports');
+      }
+      return;
+    }
+
+    await openDirectiveReviewEvent(eventId);
+  }
+
+  const directiveNotificationMenu = (
+    <NotificationMenu
+      error={notificationError}
+      isLoading={isLoadingNotifications}
+      notifications={directiveNotificationItems}
+      totalCount={directiveNotificationCounts.total}
+      unreadCount={directiveNotificationCounts.unread}
+      onFilterChange={handleNotificationFilterChange}
+      onNotificationOpen={handleNotificationOpen}
+      onNotificationRead={handleNotificationRead}
+      onRetry={() => loadDirectiveNotifications(notificationFilter)}
+    />
+  );
+
+  function applyCancelledState(event) {
+    return event ? { ...event, state: 'CANCELADO' } : event;
+  }
+
+  async function handleDirectiveDecisionConfirm(decisionResult) {
+    if (!pendingDecision || isSavingDecision) {
+      return;
+    }
+
+    if (pendingDecision.type !== 'cancel') {
+      setPendingDecision(null);
+      setSelectedReviewEvent(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    try {
+      setIsSavingDecision(true);
+      setDecisionError('');
+      await cancelarEventoDirectivo(pendingDecision.eventId, {
+        motivo: decisionResult.comment,
+      });
+      setSelectedReviewEvent((currentEvent) =>
+        String(currentEvent?.id) === String(pendingDecision.eventId)
+          ? applyCancelledState(currentEvent)
+          : currentEvent,
+      );
+      setSelectedReportEvent((currentReport) =>
+        String(currentReport?.id) === String(pendingDecision.eventId)
+          ? applyCancelledState(currentReport)
+          : currentReport,
+      );
+      setPendingDecision(null);
+      loadDirectiveNotifications(notificationFilter);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      setDecisionError(getApiErrorMessage(error, 'No se pudo cancelar el evento.'));
+    } finally {
+      setIsSavingDecision(false);
+    }
   }
 
   return (
@@ -710,10 +985,21 @@ function DirectivoDashboard({ onLogout, user }) {
               setSelectedReviewEvent(null);
               setActiveReviewSection('ficha-directiva');
             }}
-            onDecision={setPendingDecision}
+            onDecision={(decision) => {
+              setDecisionError('');
+              setPendingDecision(decision);
+            }}
           />
         ) : selectedReportEvent ? (
           <EventReportView
+            onCancelEvent={(report) => {
+              setDecisionError('');
+              setPendingDecision({
+                eventId: report.id,
+                eventTitle: report.title,
+                type: 'cancel',
+              });
+            }}
             report={selectedReportEvent}
             onActiveSectionChange={setActiveReviewSection}
             onBack={() => setSelectedReportEvent(null)}
@@ -722,6 +1008,7 @@ function DirectivoDashboard({ onLogout, user }) {
           <>
             {currentDirectiveView === 'reports' ? (
               <ReportsDashboardView
+                notificationMenu={directiveNotificationMenu}
                 reports={eventReports}
                 onSelectReport={(report) => {
                   setSelectedReportEvent(report);
@@ -730,10 +1017,24 @@ function DirectivoDashboard({ onLogout, user }) {
               />
             ) : (
               <DirectiveReviewDashboard
-                filteredReviewEvents={filteredReviewEvents}
+                directiveStatsSummary={directiveStatsSummary}
+                directiveStatsError={directiveStatsError}
+                isLoadingReviewDetail={isLoadingReviewDetail}
+                isLoadingReviewEvents={isLoadingReviewEvents}
+                isLoadingDirectiveStats={isLoadingDirectiveStats}
+                notificationMenu={directiveNotificationMenu}
+                reviewCounts={reviewCounts}
+                reviewEvents={reviewItems}
+                reviewEventsError={reviewEventsError}
                 reviewFilter={reviewFilter}
-                onFilterChange={setReviewFilter}
-                onSelectReview={setSelectedReviewEvent}
+                reviewPage={reviewPage}
+                onFilterChange={(nextFilter) => {
+                  setReviewFilter(nextFilter);
+                  setReviewPage((currentPage) => ({ ...currentPage, number: 0 }));
+                }}
+                onPageChange={(page) => setReviewPage((currentPage) => ({ ...currentPage, number: page }))}
+                onRetry={loadReviewEvents}
+                onSelectReview={(event) => openDirectiveReviewEvent(event.id)}
               />
             )}
           </>
@@ -742,12 +1043,13 @@ function DirectivoDashboard({ onLogout, user }) {
         {pendingDecision && (
           <DirectiveDecisionModal
             decision={pendingDecision}
-            onCancel={() => setPendingDecision(null)}
-            onConfirm={() => {
+            error={decisionError}
+            isSaving={isSavingDecision}
+            onCancel={() => {
+              setDecisionError('');
               setPendingDecision(null);
-              setSelectedReviewEvent(null);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
+            onConfirm={handleDirectiveDecisionConfirm}
           />
         )}
       </main>
@@ -756,23 +1058,28 @@ function DirectivoDashboard({ onLogout, user }) {
 }
 
 function DirectiveReviewDashboard({
-  filteredReviewEvents,
+  directiveStatsError,
+  directiveStatsSummary,
+  isLoadingReviewDetail,
+  isLoadingReviewEvents,
+  isLoadingDirectiveStats,
+  notificationMenu,
+  reviewCounts,
+  reviewEvents,
+  reviewEventsError,
   reviewFilter,
+  reviewPage,
   onFilterChange,
+  onPageChange,
+  onRetry,
   onSelectReview,
 }) {
-  const reviewFilterCounts = reviewFilters.reduce((counts, filter) => {
-    counts[filter.value] =
-      filter.value === 'TODOS'
-        ? reviewEvents.length
-        : reviewEvents.filter((event) =>
-          filter.value === 'EN_REVISION'
-            ? reviewableStates.includes(event.state)
-            : event.state === filter.value,
-        ).length;
-
-    return counts;
-  }, {});
+  const directiveStats = buildDirectiveStats(directiveStatsSummary);
+  const reviewFilterCounts = {
+    TODOS: reviewCounts.todos,
+    PENDIENTES: reviewCounts.pendientes,
+    OBSERVADOS: reviewCounts.observados,
+  };
 
   return (
     <>
@@ -782,12 +1089,12 @@ function DirectiveReviewDashboard({
           <h1 id="directive-title">Supervisión municipal de eventos</h1>
         </div>
         <div className="admin-topbar-actions">
-          <NotificationMenu notifications={directiveNotifications} />
+          {notificationMenu}
         </div>
       </header>
 
       <section className="admin-stats" aria-label="Resumen directivo">
-        {directiveStats.map((stat) => (
+        {isLoadingDirectiveStats ? <CardSkeleton count={4} /> : directiveStats.map((stat) => (
           <article
             className={`admin-stat-card management-stat-card directive-stat-card ${stat.tone}`}
             key={stat.label}
@@ -803,6 +1110,9 @@ function DirectiveReviewDashboard({
           </article>
         ))}
       </section>
+      {directiveStatsError && (
+        <p className="settings-inline-notice" role="alert">{directiveStatsError}</p>
+      )}
 
       <section
         className="admin-table-panel admin-table-featured"
@@ -839,7 +1149,13 @@ function DirectiveReviewDashboard({
             <span>Pendiente desde</span>
             <span>Revisión</span>
           </div>
-          {filteredReviewEvents.map((event) => (
+          {isLoadingReviewEvents ? (
+            <TableSkeleton columns={5} rows={5} />
+          ) : reviewEventsError ? (
+            <ErrorState description={reviewEventsError} onRetry={onRetry} />
+          ) : reviewEvents.length === 0 ? (
+            <EmptyState title={'No hay eventos en este filtro'} description={'No se encontraron eventos para revisión directiva.'} />
+          ) : reviewEvents.map((event) => (
             <div className="admin-table-row" key={event.id}>
               <span>
                 <strong>{event.title}</strong>
@@ -858,6 +1174,7 @@ function DirectiveReviewDashboard({
                 <button
                   aria-label={`Revisar ${event.title}`}
                   className="table-icon-action"
+                  disabled={isLoadingReviewDetail}
                   title="Revisar ficha"
                   type="button"
                   onClick={() => {
@@ -870,6 +1187,28 @@ function DirectiveReviewDashboard({
               </span>
             </div>
           ))}
+        </div>
+        <div className={'settings-pagination'}>
+          <button
+            className={'back-button'}
+            disabled={[reviewPage.number === 0, isLoadingReviewEvents].some(Boolean)}
+            type={'button'}
+            onClick={() => onPageChange(Math.max(0, reviewPage.number - 1))}
+          >
+            Anterior
+          </button>
+          <span>
+            Página {reviewPage.totalPages === 0 ? 0 : reviewPage.number + 1} de {reviewPage.totalPages}
+            {' '}· {reviewPage.totalElements} eventos
+          </span>
+          <button
+            className={'back-button'}
+            disabled={[reviewPage.number + 1 >= reviewPage.totalPages, isLoadingReviewEvents].some(Boolean)}
+            type={'button'}
+            onClick={() => onPageChange(reviewPage.number + 1)}
+          >
+            Siguiente
+          </button>
         </div>
       </section>
     </>
@@ -935,7 +1274,7 @@ function safePercent(numerator, denominator) {
   return Math.round((numerator / denominator) * 100);
 }
 
-function ReportsDashboardView({ reports, onSelectReport }) {
+function ReportsDashboardView({ notificationMenu, reports, onSelectReport }) {
   const availableReportYears = [
     ...new Set(
       reports
@@ -1161,7 +1500,7 @@ function ReportsDashboardView({ reports, onSelectReport }) {
           <p>Consulta métricas acumuladas, rankings y reportes individuales de los eventos municipales.</p>
         </div>
         <div className="admin-topbar-actions">
-          <NotificationMenu notifications={directiveNotifications} />
+          {notificationMenu}
         </div>
       </header>
 
@@ -1455,7 +1794,7 @@ function slugify(value) {
     .replace(/(^-|-$)/g, '');
 }
 
-function EventReportView({ report, onActiveSectionChange, onBack }) {
+function EventReportView({ report, onActiveSectionChange, onBack, onCancelEvent }) {
   const effectiveValidations = report.qrValidated + report.manualValidated;
   const qrValidationRate = effectiveValidations > 0
     ? Math.round((report.qrValidated / effectiveValidations) * 100)
@@ -1651,9 +1990,20 @@ function EventReportView({ report, onActiveSectionChange, onBack }) {
           <span className="section-kicker">Reporte por evento</span>
           <h1 id="event-report-title">{report.title}</h1>
         </div>
-        <button className="admin-new-event-action event-form-top-action" type="button" onClick={onBack}>
-          Volver
-        </button>
+        <div className="directive-review-topbar-actions">
+          {report.state === 'PUBLICADO' && (
+            <button
+              className="table-text-action observe"
+              type="button"
+              onClick={() => onCancelEvent?.(report)}
+            >
+              Cancelar evento
+            </button>
+          )}
+          <button className="admin-new-event-action event-form-top-action" type="button" onClick={onBack}>
+            Volver
+          </button>
+        </div>
       </header>
 
       <section
@@ -1870,13 +2220,6 @@ function EventHistoryIcon({ type }) {
         <path d="M12 2 15 8l6 .9-4.5 4.3 1.1 6.1L12 16.4 6.4 19.3l1.1-6.1L3 8.9 9 8Z" />
       </>
     ),
-    RESENT_TO_REVIEW: (
-      <>
-        <path d="m22 2-7 20-4-9-9-4Z" />
-        <path d="M22 2 11 13" />
-        <path d="M7 22h6" />
-      </>
-    ),
     SAVED_DRAFT: (
       <>
         <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
@@ -2003,6 +2346,7 @@ function ReviewInfoList({ items }) {
                 item.value
               )}
             </dd>
+            {item.hint ? <small className={'directive-info-hint'}>{item.hint}</small> : null}
           </div>
         </div>
       ))}
@@ -2089,48 +2433,62 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
   const [previewResource, setPreviewResource] = useState(null);
   const aforoMaximo = getAforoMaximo(event);
   const canDecide = reviewableStates.includes(event.state);
+  const canCancelEvent = event.state !== 'CANCELADO';
   const reviewTimeMetric = getReviewTimeMetric(event);
-  const shouldShowPreviousObservation =
-    event.state === 'OBSERVADO_EN_REVISION' && event.previousObservation;
-  const eventHistory = eventHistoryItems
-    .filter((historyItem) => historyItem.eventId === event.id)
-    .sort((firstItem, secondItem) =>
-      new Date(secondItem.dateTime).getTime() - new Date(firstItem.dateTime).getTime(),
-    );
+  const shouldShowPreviousObservation = Boolean(event.previousObservation);
+  const eventHistory = event.previousObservation ? [{
+    actorName: event.previousObservation.author,
+    actorRole: event.previousObservation.role,
+    dateTime: event.previousObservation.dateTime,
+    id: `observation-${event.id}`,
+    message: null,
+    title: 'Observación registrada',
+    tone: 'warning',
+    type: 'OBSERVED',
+    userComment: event.previousObservation.comment,
+  }] : [];
   const mainInfoItems = [
-    {
-      icon: 'calendar',
-      label: 'Fecha y hora',
-      value: `${event.date} · ${event.time}`,
-    },
     {
       icon: 'clock',
       label: 'Duración',
-      value: event.duration,
+      value: getDisplayValue(event.duration, 'No especificada'),
+    },
+    {
+      icon: 'note',
+      label: 'Costo referencial',
+      hint: 'Gasto estimado del evento para la municipalidad.',
+      value: getReferenceCostLabel(event),
     },
     {
       icon: 'audience',
       label: 'Público objetivo',
-      value: event.audience,
+      value: getDisplayValue(event.audience, 'Público general'),
     },
   ];
-  const locationInfoItems = [
+  const metadataItems = [
+    {
+      icon: 'district',
+      label: 'Área responsable',
+      value: getDisplayValue(event.organizer, 'Área no especificada'),
+    },
+    {
+      icon: 'calendar',
+      label: 'Fecha y hora',
+      value: getDirectiveScheduleLabel(event),
+    },
     {
       icon: 'location',
       label: 'Lugar',
-      value: event.venue,
+      value: getDisplayValue(event.venue, 'Lugar no especificado'),
       href: getEventMapsUrl(event),
-      ariaLabel: `Abrir ${event.venue} en Google Maps`,
+      ariaLabel: `Abrir ${getDisplayValue(event.venue, 'ubicación del evento')} en Google Maps`,
     },
     {
-      icon: 'route',
-      label: 'Dirección',
-      value: event.address,
-    },
-    {
-      icon: 'reference',
-      label: 'Referencia',
-      value: event.locationReference || 'Pendiente de completar',
+      icon: 'audience',
+      label: 'Aforo',
+      value: hasAforoMaximo(event)
+        ? `${aforoMaximo} participantes`
+        : 'Aforo no asignado',
     },
   ];
 
@@ -2181,7 +2539,7 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
     <section className="directive-review-view" aria-labelledby="review-event-title">
       <header className="admin-topbar">
         <div>
-          <span className="section-kicker">Ficha para revisión</span>
+          <span className="section-kicker">Ficha de revisión</span>
           <h1 id="review-event-title">{event.title}</h1>
         </div>
         <div className="directive-review-topbar-actions">
@@ -2194,7 +2552,7 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
 
       <section className="directive-review-hero" id="ficha-directiva" ref={fichaRef}>
         <div className={`directive-review-media media-${event.accent}`}>
-          <img alt="" src={eventReviewPlaceholder} />
+          <img alt="" src={event.imageUrl || eventReviewPlaceholder} />
           <span>{event.category}</span>
         </div>
         <article className="admin-panel directive-review-summary">
@@ -2214,27 +2572,17 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
               )}
             </div>
           </div>
-          <p>{getExecutiveReviewDescription(event)}</p>
-          <dl className="directive-facts">
-            <div>
-              <dt>Área responsable</dt>
-              <dd>{event.organizer}</dd>
-            </div>
-            <div>
-              <dt>Fecha</dt>
-              <dd>{event.date} · {event.time}</dd>
-            </div>
-            <div>
-              <dt>Lugar</dt>
-              <dd>{event.venue}</dd>
-            </div>
-            {hasAforoMaximo(event) && (
-              <div>
-                <dt>Aforo</dt>
-                <dd>{aforoMaximo} participantes</dd>
-              </div>
-            )}
-          </dl>
+          <div className={'directive-description-grid'}>
+            <section>
+              <span>Descripción</span>
+              <p>{getDisplayValue(event.description, 'Descripción no especificada.')}</p>
+            </section>
+            <section>
+              <span>Descripción breve</span>
+              <p>{getDisplayValue(event.descripcion_breve ?? event.summary, 'Descripción breve no especificada.')}</p>
+            </section>
+          </div>
+          <ReviewInfoList items={metadataItems} />
           <div className="directive-review-checks" aria-label="Indicadores de revisión">
             <span>Corrección atendida</span>
           </div>
@@ -2256,19 +2604,13 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
         </article>
       )}
 
-      <section className="directive-review-grid">
-        <article className="admin-panel">
-          <span className="section-kicker">Datos del evento</span>
-          <h2>Información principal</h2>
-          <ReviewInfoList items={mainInfoItems} />
-        </article>
-
-        <article className="admin-panel">
-          <span className="section-kicker">Ubicación</span>
-          <h2>Lugar y referencia</h2>
-          <ReviewInfoList items={locationInfoItems} />
-        </article>
+      <section className="admin-panel directive-personal-info">
+        <span className="section-kicker">Información personal</span>
+        <h2>Datos complementarios del evento</h2>
+        <ReviewInfoList items={mainInfoItems} />
       </section>
+
+      <DirectiveOperativeAssignments event={event}></DirectiveOperativeAssignments>
 
       <section className="admin-panel" id="recursos-directivos" ref={recursosRef}>
         <div className="admin-panel-heading">
@@ -2363,28 +2705,88 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
           </p>
         </div>
         <div className="directive-decision-actions">
-          <button
-            className="table-text-action approve"
-            disabled={!canDecide}
-            type="button"
-            onClick={() => onDecision({ eventTitle: event.title, type: 'approve' })}
-          >
-            Aprobar
-          </button>
+          {canDecide && (
+            <>
+              <button
+                className="table-text-action approve"
+                type="button"
+                onClick={() => onDecision({ eventId: event.id, eventTitle: event.title, type: 'approve' })}
+              >
+                Aprobar
+              </button>
+              <button
+                className="table-text-action observe"
+                type="button"
+                onClick={() => onDecision({
+                  eventId: event.id,
+                  eventTitle: event.title,
+                  previousObservation: event.previousObservation ?? null,
+                  type: 'observe',
+                })}
+              >
+                Observar
+              </button>
+            </>
+          )}
           <button
             className="table-text-action observe"
-            disabled={!canDecide}
+            disabled={!canCancelEvent}
             type="button"
             onClick={() => onDecision({
+              eventId: event.id,
               eventTitle: event.title,
-              previousObservation: event.previousObservation ?? null,
-              type: 'observe',
+              type: 'cancel',
             })}
           >
-            Observar
+            Cancelar
           </button>
         </div>
       </section>
+    </section>
+  );
+}
+
+function DirectiveOperativeAssignments({ event }) {
+  const operatives = getAssignedOperatives(event);
+  const assignmentSummary = operatives.length === 1
+    ? '1 usuario operativo asignado'
+    : `${operatives.length} usuarios operativos asignados`;
+
+  return (
+    <section className={'admin-panel operative-assignment-section directive-operative-review'} aria-label={'Personal operativo asignado'}>
+      <div className={'form-section-heading'}>
+        <span className={'section-kicker'}>Personal operativo</span>
+        <h2>Personal operativo asignado</h2>
+        <p>Usuarios responsables del control de asistencia de este evento.</p>
+      </div>
+
+      {operatives.length > 0 ? (
+        <div className={'area-combobox operative-assignment-combobox directive-operative-readonly'}>
+          <div className={'area-combobox-input directive-operative-summary'}>{assignmentSummary}</div>
+          <div className={'operative-assignment-selected'}>
+            {operatives.map((operative) => (
+              <span key={operative.id}>{operative.fullName}</span>
+            ))}
+          </div>
+          <div className={'directive-operative-list'}>
+            {operatives.map((operative) => (
+              <article className={'directive-operative-card'} key={operative.id}>
+                <span className={'admin-user-avatar'} aria-hidden={true}>
+                  {getDirectiveUserInitials(operative.fullName)}
+                </span>
+                <span>
+                  <strong>{operative.fullName}</strong>
+                  <small>{operative.role}{operative.email ? ` · ${operative.email}` : ''}</small>
+                </span>
+              </article>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className={'settings-inline-notice'}>
+          Este evento no tiene personal operativo asignado.
+        </p>
+      )}
     </section>
   );
 }
@@ -2505,13 +2907,14 @@ function ResourcePreviewModal({ resource, onClose }) {
   );
 }
 
-function DirectiveDecisionModal({ decision, onCancel, onConfirm }) {
+function DirectiveDecisionModal({ decision, error = '', isSaving = false, onCancel, onConfirm }) {
   const isApproval = decision.type === 'approve';
+  const isCancellation = decision.type === 'cancel';
   const [observationComment, setObservationComment] = useState('');
   const canSubmitDecision = isApproval || observationComment.trim().length > 0;
 
   function submitDecision() {
-    if (!canSubmitDecision) {
+    if (!canSubmitDecision || isSaving) {
       return;
     }
 
@@ -2530,7 +2933,7 @@ function DirectiveDecisionModal({ decision, onCancel, onConfirm }) {
         role="dialog"
       >
         <span className="section-kicker">
-          {isApproval ? 'Aprobar evento' : 'Observar evento'}
+          {isApproval ? 'Aprobar evento' : isCancellation ? 'Cancelar evento' : 'Observar evento'}
         </span>
         <h2 id="directive-decision-title">
           {isApproval
@@ -2554,13 +2957,14 @@ function DirectiveDecisionModal({ decision, onCancel, onConfirm }) {
             />
           </label>
         )}
+        {error && <p className="settings-inline-notice" role="alert">{error}</p>}
         <div className="modal-actions">
-          <button className="back-button" type="button" onClick={onCancel}>
+          <button className="back-button" disabled={isSaving} type="button" onClick={onCancel}>
             Cancelar
           </button>
           <button
             className="primary-button"
-            disabled={!canSubmitDecision}
+            disabled={!canSubmitDecision || isSaving}
             type="button"
             onClick={submitDecision}
           >

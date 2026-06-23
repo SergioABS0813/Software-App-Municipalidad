@@ -56,7 +56,7 @@ function getManagementStats(events) {
       tone: 'is-review',
       trend: 'pendientes del directivo',
       value: events.filter((event) =>
-        ['EN_REVISION', 'PARA_REVISION', 'OBSERVADO_EN_REVISION'].includes(event.state),
+        event.state === 'PARA_REVISION',
       ).length,
     },
     {
@@ -606,10 +606,8 @@ function getEventStateTone(state) {
     BORRADOR: 'state-draft',
     CANCELADO: 'state-cancelled',
     CERRADO: 'state-closed',
-    EN_REVISION: 'state-review',
     FINALIZADO: 'state-finished',
     OBSERVADO: 'state-observed',
-    OBSERVADO_EN_REVISION: 'state-reobserved',
     APROBADO: 'state-published',
     PUBLICADO: 'state-published',
   };
@@ -1422,6 +1420,7 @@ function AdminDashboard({ onLogout, user }) {
     window.location.pathname.startsWith('/admin/configuracion'),
   );
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarTransitioning, setIsSidebarTransitioning] = useState(false);
   const [isSidebarDrawerOpen, setIsSidebarDrawerOpen] = useState(false);
   const [eventItems, setEventItems] = useState([]);
   const [eventCategoryCatalog, setEventCategoryCatalog] = useState([]);
@@ -1465,12 +1464,20 @@ function AdminDashboard({ onLogout, user }) {
   const pendingPopoverRef = useRef(null);
   const manualFormSectionRef = useRef(null);
   const manualFormSectionTimeoutRef = useRef(null);
+  const sidebarTransitionTimeoutRef = useRef(null);
   const isEventFormView =
     currentAdminView === 'new-event' || currentAdminView === 'edit-event';
   const isSettingsView = currentAdminView.startsWith('settings-');
   const adminUser = user ?? fallbackAdminUser;
   const adminUserName = getUserDisplayName(adminUser);
   const managementStats = useMemo(() => getManagementStats(eventItems), [eventItems]);
+
+  useEffect(() => () => {
+    if (sidebarTransitionTimeoutRef.current) {
+      window.clearTimeout(sidebarTransitionTimeoutRef.current);
+    }
+  }, []);
+
   const managementStateOptions = useMemo(
     () => [
       { label: 'Todos', value: 'Todos' },
@@ -1746,7 +1753,16 @@ function AdminDashboard({ onLogout, user }) {
       return;
     }
 
+    if (sidebarTransitionTimeoutRef.current) {
+      window.clearTimeout(sidebarTransitionTimeoutRef.current);
+    }
+
+    setIsSidebarTransitioning(true);
     setIsSidebarCollapsed((isCollapsed) => !isCollapsed);
+    sidebarTransitionTimeoutRef.current = window.setTimeout(() => {
+      setIsSidebarTransitioning(false);
+      sidebarTransitionTimeoutRef.current = null;
+    }, 240);
   }
 
   function closeSidebarDrawer() {
@@ -1910,7 +1926,7 @@ function AdminDashboard({ onLogout, user }) {
       setEventDeleteNotice(
         pendingEventAction.mode === 'edit'
           ? 'Evento actualizado correctamente.'
-          : savedEvent.estadoCodigo === 'PARA_REVISION' || savedEvent.estadoCodigo === 'EN_REVISION'
+          : savedEvent.estadoCodigo === 'PARA_REVISION'
             ? 'Evento registrado y enviado a revisión.'
             : 'Evento registrado como borrador.',
       );
@@ -1997,6 +2013,7 @@ function AdminDashboard({ onLogout, user }) {
       className={[
         'admin-shell',
         isSidebarCollapsed ? 'is-sidebar-collapsed' : '',
+        isSidebarTransitioning ? 'is-sidebar-transitioning' : '',
         isSidebarDrawerOpen ? 'is-sidebar-drawer-open' : '',
       ].filter(Boolean).join(' ')}
       aria-labelledby="admin-title"
@@ -2488,7 +2505,6 @@ function EventReviewStatusView({ event, onBack }) {
           <span className="section-kicker">Estado actual</span>
           <h2>{formatEventState(event.state)}</h2>
           <p>{getStateSummaryText(event.state)}</p>
-          {event.resentToReviewAt && <small>Reenviado: {event.resentToReviewAt}</small>}
           {event.sentToReviewAt && <small>Enviado: {event.sentToReviewAt}</small>}
         </article>
 
@@ -3124,9 +3140,7 @@ function getStateSummaryText(state) {
     BORRADOR: 'Completa la ficha para enviarla a revisión.',
     CANCELADO: 'Evento cancelado.',
     CERRADO: 'Evento cerrado.',
-    EN_REVISION: 'Pendiente de revisión directiva.',
     PARA_REVISION: 'Pendiente de revisión directiva.',
-    OBSERVADO_EN_REVISION: 'Ficha corregida y reenviada al directivo.',
     FINALIZADO: 'Evento cerrado.',
     OBSERVADO: 'Requiere correcciones antes de reenviar.',
     PUBLICADO: 'Visible en el portal ciudadano.',
@@ -3154,7 +3168,7 @@ function getAdminEventActionConfig(event) {
     };
   }
 
-  if (['EN_REVISION', 'PARA_REVISION', 'APROBADO'].includes(event.state)) {
+  if (['PARA_REVISION', 'APROBADO'].includes(event.state)) {
     return {
       icon: ClipboardCheckLineIcon,
       label: `Ver estado de revision de ${event.title}`,
@@ -7359,11 +7373,11 @@ function getEventActionDescription(actionType, isCreate) {
   }
 
   if (actionType === 'review-changes') {
-    return 'La ficha corregida pasará a EN_REVISION para que el usuario directivo pueda aprobarla u observarla.';
+    return 'La ficha corregida pasará a PARA_REVISION para que el usuario directivo pueda aprobarla u observarla.';
   }
 
   if (actionType === 'review') {
-    return 'El evento pasará a EN_REVISION para que el usuario directivo pueda aprobarlo u observarlo antes de publicarlo.';
+    return 'El evento pasará a PARA_REVISION para que el usuario directivo pueda aprobarlo u observarlo antes de publicarlo.';
   }
 
   return isCreate

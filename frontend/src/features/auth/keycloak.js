@@ -1,9 +1,9 @@
 import Keycloak from "keycloak-js";
 
 const keycloak = new Keycloak({
-    url: "http://localhost:7000",
-    realm: "municipalidad-gestion-eventos",
-    clientId: "municipalidad-frontend",
+    url: import.meta.env.VITE_KEYCLOAK_URL ?? "http://localhost:7000",
+    realm: import.meta.env.VITE_KEYCLOAK_REALM ?? "municipalidad-gestion-eventos",
+    clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID ?? "municipalidad-frontend",
 });
 
 let initPromise;

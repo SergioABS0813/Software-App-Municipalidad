@@ -46,6 +46,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/valoraciones/responder").permitAll()
                         .requestMatchers("/api/valoraciones/admin/**").hasAnyRole("ADMINISTRADOR", "DIRECTIVO")
                         .requestMatchers("/api/eventos/admin/operacion/*/finalizar").hasAnyRole("ADMINISTRADOR", "DIRECTIVO")
+                        .requestMatchers("/api/eventos/directivo/**").hasRole("DIRECTIVO")
                         .requestMatchers("/api/eventos/admin/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/estado_evento/admin/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/notificacion/**").hasAnyRole("ADMINISTRADOR", "DIRECTIVO", "OPERATIVO")

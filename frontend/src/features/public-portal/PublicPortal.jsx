@@ -307,6 +307,7 @@ function getInitialSelectedEvent() {
 
 function PublicPortal() {
   const [authState, setAuthState] = useState('checking');
+  const [authMode, setAuthMode] = useState('auth-check');
   const [authError, setAuthError] = useState('');
   const [currentView, setCurrentView] = useState(getInitialPortalView);
   const [selectedCategory, setSelectedCategory] = useState('Todos');
@@ -351,6 +352,7 @@ function PublicPortal() {
         ].includes(currentPath);
 
         if (requiresAuthentication) {
+          setAuthMode('login');
           setAuthState('redirecting');
           await loginWithKeycloak(
             sessionStorage.getItem('postLoginRedirect') ?? currentPath,
@@ -495,7 +497,14 @@ function PublicPortal() {
     setIsLoginRequiredOpen(false);
     setLoginNotice('');
     setIsConfirmOpen(false);
-    void loginWithKeycloak(redirectTo);
+    setAuthError('');
+    setAuthMode('login');
+    setAuthState('redirecting');
+    loginWithKeycloak(redirectTo).catch((error) => {
+      console.error('No se pudo abrir el inicio de sesión', error);
+      setAuthError('No pudimos abrir el inicio de sesión. Intenta nuevamente.');
+      setAuthState('error');
+    });
   }
 
   function openLogin(notice = '') {
@@ -504,6 +513,7 @@ function PublicPortal() {
     setIsConfirmOpen(false);
     setIsLoginRequiredOpen(false);
     setAuthError('');
+    setAuthMode('login');
     setAuthState('redirecting');
     loginWithKeycloak(getCurrentInternalPath()).catch((error) => {
       console.error('No se pudo abrir el inicio de sesión', error);
@@ -518,6 +528,7 @@ function PublicPortal() {
     setIsConfirmOpen(false);
     setIsLoginRequiredOpen(false);
     setAuthError('');
+    setAuthMode('login');
     setAuthState('redirecting');
     registerWithKeycloak(getCurrentInternalPath()).catch((error) => {
       console.error('No se pudo abrir el registro', error);
@@ -546,6 +557,9 @@ function PublicPortal() {
   }
 
   function logoutUser() {
+    setAuthError('');
+    setAuthMode('logout');
+    setAuthState('redirecting');
     clearCitizenSession();
     setAuthenticatedUser(null);
     setCurrentView('portal');
@@ -557,12 +571,13 @@ function PublicPortal() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     if (keycloak.authenticated) {
-      setAuthState('redirecting');
       logoutFromKeycloak().catch((error) => {
         console.error('No se pudo cerrar la sesión', error);
         setAuthError('No pudimos cerrar la sesión. Intenta nuevamente.');
         setAuthState('error');
       });
+    } else {
+      window.setTimeout(() => setAuthState('ready'), 300);
     }
   }
 
@@ -614,8 +629,8 @@ function PublicPortal() {
     return (
       <AuthTransition
         error={authError}
+        mode={authMode}
         onRetry={() => window.location.reload()}
-        redirecting={authState === 'redirecting'}
       />
     );
   }
@@ -727,16 +742,24 @@ function PublicPortal() {
   );
 }
 
-function AuthTransition({ error, onRetry, redirecting }) {
-  const message = error || (redirecting
-    ? 'Estamos preparando el acceso seguro a tu cuenta.'
-    : 'Estamos verificando tu sesión y perfil.');
+function AuthTransition({ error, mode, onRetry }) {
+  const isLogout = mode === 'logout';
+  const isCheckingAuth = mode === 'auth-check';
+  const title = error
+    ? isLogout ? 'No se pudo cerrar la sesión' : 'No se pudo verificar la sesión'
+    : isLogout ? 'Saliendo del sistema...'
+      : isCheckingAuth ? 'Verificando tu sesión...'
+        : 'Ingresando al sistema...';
+  const message = error || (isLogout
+    ? 'Estamos cerrando tu sesión de forma segura.'
+    : isCheckingAuth ? 'Estamos verificando tu sesión y perfil.'
+      : 'Estamos preparando el acceso seguro a tu cuenta.');
 
   return (
     <main className={'auth-transition'} role={error ? 'alert' : 'status'} aria-live={'polite'}>
       <section className={'auth-transition-card'}>
         <span className={'auth-transition-spinner'} aria-hidden={true}></span>
-        <h1>{error ? 'No se pudo verificar la sesión' : 'Ingresando al sistema...'}</h1>
+        <h1>{title}</h1>
         <p>{message}</p>
         {error ? <button type={'button'} onClick={onRetry}>Reintentar</button> : null}
       </section>

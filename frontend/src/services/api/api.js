@@ -5,7 +5,7 @@ export const SESSION_EXPIRED_MESSAGE = 'Tu sesión ha expirado. Vuelve a iniciar
 
 // Dominio del backend
 const api = axios.create({
-    baseURL: 'http://localhost:8080/api'
+    baseURL: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api'
 });
 
 function notifySessionExpired() {

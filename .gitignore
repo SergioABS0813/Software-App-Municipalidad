@@ -24,3 +24,7 @@ dist-ssr
 *.sln
 *.sw?
 .env.*
+
+#Credenciales de Google
+infraestructura/backup-cron/credentials/
+*.json

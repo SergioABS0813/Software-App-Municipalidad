@@ -46,6 +46,33 @@ public interface EventoRepository extends JpaRepository<Evento, Integer> {
 
     Integer countByEstadoEventoCodigoIn(Collection<String> codigos);
 
+    @Query("""
+            select evento
+            from Evento evento
+            left join evento.estadoEvento estado
+            where estado.codigo in :codigos
+            """)
+    Page<Evento> findAllRevisionDirectiva(
+            @Param("codigos") Collection<String> codigos,
+            Pageable pageable
+    );
+
+    @Query("""
+            select count(evento)
+            from Evento evento
+            left join evento.estadoEvento estado
+            where estado.codigo in :codigos
+              and coalesce(evento.eventoActualizadoEn, evento.tiempoActualizado, evento.tiempoCreado)
+                  >= :inicio
+              and coalesce(evento.eventoActualizadoEn, evento.tiempoActualizado, evento.tiempoCreado)
+                  < :fin
+            """)
+    Long countByEstadoCodigoInAndFechaActualizacionBetween(
+            @Param("codigos") Collection<String> codigos,
+            @Param("inicio") Instant inicio,
+            @Param("fin") Instant fin
+    );
+
     Long countByUbicacionId(Integer ubicacionId);
 
     Long countByCategoriaId(Integer categoriaId);

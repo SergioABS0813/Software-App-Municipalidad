@@ -2,6 +2,10 @@ package com.tesis.municipalidadbackendapp.eventos.controller;
 
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoPanelAdministrativoDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoRegistroRequest;
+import com.tesis.municipalidadbackendapp.eventos.dto.ConteosRevisionDirectivaDto;
+import com.tesis.municipalidadbackendapp.eventos.dto.EventoRevisionDirectivaDetalleDto;
+import com.tesis.municipalidadbackendapp.eventos.dto.EventoRevisionDirectivaResumenDto;
+import com.tesis.municipalidadbackendapp.eventos.dto.ResumenCardsDirectivoDto;
 import com.tesis.municipalidadbackendapp.eventos.service.EventoService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -98,6 +102,43 @@ public class EventoController {
         return eventoService.obtenerNumeroEventosObservados();
     }
 
+    @GetMapping("directivo/cards")
+    public ResumenCardsDirectivoDto obtenerResumenCardsDirectivo() {
+        return eventoService.obtenerResumenCardsDirectivo();
+    }
+
+    @GetMapping("directivo/revision")
+    public Page<EventoRevisionDirectivaResumenDto> obtenerEventosRevisionDirectiva(
+            @RequestParam(defaultValue = "TODOS") String estado,
+            @RequestParam(defaultValue = "0") int page
+    ) {
+        return eventoService.obtenerEventosRevisionDirectiva(estado, page);
+    }
+
+    @GetMapping("directivo/revision/conteos")
+    public ConteosRevisionDirectivaDto obtenerConteosRevisionDirectiva() {
+        return eventoService.obtenerConteosRevisionDirectiva();
+    }
+
+    @GetMapping("directivo/revision/{id}")
+    public EventoRevisionDirectivaDetalleDto obtenerDetalleRevisionDirectiva(@PathVariable Integer id) {
+        return eventoService.obtenerDetalleRevisionDirectiva(id);
+    }
+
+    @PatchMapping("directivo/operacion/{id}/cancelar")
+    public EventoPanelAdministrativoDto cancelarEventoDirectivo(
+            @PathVariable Integer id,
+            @RequestBody(required = false) CancelarEventoRequest request,
+            HttpServletRequest httpServletRequest
+    ) {
+        return eventoService.cancelarEventoDirectivo(
+                id,
+                request != null ? request.motivo() : null,
+                httpServletRequest
+        );
+    }
+
+    public record CancelarEventoRequest(String motivo) {}
 
 
 
