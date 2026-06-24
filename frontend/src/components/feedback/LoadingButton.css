@@ -6,6 +6,7 @@
   position: relative;
   display: inline-grid;
   place-items: center;
+  min-width: max-content;
 }
 
 .loading-button-content,
@@ -25,6 +26,8 @@
 }
 
 .loading-button-progress {
+  position: absolute;
+  inset: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;

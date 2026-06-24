@@ -14,21 +14,28 @@ import java.time.Instant;
 @Table(name = "recurso_evento")
 public class RecursoEvento {
     @Id
-    @Column(name = "recurso_id", nullable = false)
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "recurso_id", nullable = false)
     private Integer id;
 
     @Size(max = 45)
     @Column(name = "tipo_recurso", length = 45)
     private String tipoRecurso;
 
-    @Size(max = 45)
-    @Column(name = "url_recurso", length = 45)
-    private String urlRecurso;
+    @Size(max = 500)
+    @Column(name = "object_path", length = 500)
+    private String objectPath;
 
-    @Size(max = 45)
-    @Column(name = "nombre_archivo", length = 45)
-    private String nombreArchivo;
+    @Size(max = 255)
+    @Column(name = "nombre_original", length = 255)
+    private String nombreOriginal;
+
+    @Size(max = 100)
+    @Column(name = "mime_type", length = 100)
+    private String mimeType;
+
+    @Column(name = "size_bytes")
+    private Long sizeBytes;
 
     @Column(name = "fecha_subida")
     private Instant fechaSubida;
@@ -37,5 +44,4 @@ public class RecursoEvento {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "evento_id", nullable = false)
     private Evento evento;
-
 }

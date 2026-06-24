@@ -177,7 +177,15 @@ function getEventMaterialResources(event) {
 }
 
 function getResourceUrl(resource) {
-  return resource?.url_recurso ?? resource?.url ?? '';
+  return resource?.signedUrl ?? resource?.url_recurso ?? resource?.url ?? '';
+}
+
+function isPdfResource(resource) {
+  const mimeType = resource?.mime_type ?? resource?.mimeType ?? '';
+  const resourceUrl = getResourceUrl(resource);
+  const fileName = resource?.nombre_archivo ?? resource?.nombreOriginal ?? '';
+
+  return mimeType === 'application/pdf' || /\.pdf($|[?#])/i.test(resourceUrl) || /\.pdf$/i.test(fileName);
 }
 
 function getVideoEmbedUrl(url) {
@@ -274,10 +282,25 @@ function EventMaterialPreview({ resource }) {
 
 function EventPosterPreview({ resource }) {
   const posterUrl = getResourceUrl(resource);
+  const posterName = resource.nombre_archivo ?? resource.nombreOriginal ?? 'Afiche oficial del evento';
+
+  if (isPdfResource(resource)) {
+    return (
+      <div className="event-poster-preview is-pdf">
+        <div className="event-poster-pdf-card">
+          <strong>Afiche en PDF</strong>
+          <span>{posterName}</span>
+        </div>
+        <a href={posterUrl} rel="noopener noreferrer" target="_blank">
+          Abrir afiche PDF
+        </a>
+      </div>
+    );
+  }
 
   return (
     <div className="event-poster-preview">
-      <img alt={resource.nombre_archivo ?? 'Afiche oficial del evento'} src={posterUrl} />
+      <img alt={posterName} src={posterUrl} />
       <a href={posterUrl} rel="noopener noreferrer" target="_blank">
         Ver afiche completo
       </a>

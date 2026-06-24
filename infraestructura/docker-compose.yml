@@ -22,6 +22,8 @@ services:
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/municipalidad-gestion-eventos/protocol/openid-connect/certs
     ports:
       - "8080:8080"
+    volumes:
+      - ../credentials/storage-eventos-key.json:/app/credentials/storage-eventos-key.json:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

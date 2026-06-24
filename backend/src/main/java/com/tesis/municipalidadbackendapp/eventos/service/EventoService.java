@@ -14,8 +14,8 @@ import com.tesis.municipalidadbackendapp.eventos.entity.Categoria;
 import com.tesis.municipalidadbackendapp.eventos.entity.EstadoEvento;
 import com.tesis.municipalidadbackendapp.eventos.entity.Evento;
 import com.tesis.municipalidadbackendapp.eventos.entity.ObservacionEvento;
-import com.tesis.municipalidadbackendapp.eventos.entity.RecursoEvento;
 import com.tesis.municipalidadbackendapp.eventos.entity.RequisitoEvento;
+import com.tesis.municipalidadbackendapp.eventos.entity.RecursoEvento;
 import com.tesis.municipalidadbackendapp.eventos.repository.*;
 import com.tesis.municipalidadbackendapp.notificaciones.service.NotificacionService;
 import com.tesis.municipalidadbackendapp.organizacion.entity.AreaMunicipal;
@@ -24,6 +24,7 @@ import com.tesis.municipalidadbackendapp.ubicacion.entity.Ubicacion;
 import com.tesis.municipalidadbackendapp.ubicacion.repository.UbicacionRepository;
 import com.tesis.municipalidadbackendapp.usuariosinternos.entity.Usuario;
 import com.tesis.municipalidadbackendapp.valoraciones.service.ValoracionEventoService;
+import com.tesis.municipalidadbackendapp.storage.CloudStorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -60,6 +61,7 @@ public class EventoService {
     private final NotificacionService notificacionService;
     private final ValoracionEventoService valoracionEventoService;
     private final EventoOperativoService eventoOperativoService;
+    private final CloudStorageService cloudStorageService;
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
 
     public Page<EventoPanelAdministrativoDto> obtenerEventosPanelAdministrativo(
@@ -306,7 +308,6 @@ public class EventoService {
         Evento eventoGuardado = eventoRepository.save(evento);
         guardarAgenda(eventoGuardado, request.agenda());
         guardarRequisitos(eventoGuardado, request.requisitos());
-        guardarRecursos(eventoGuardado, request.recursos());
         eventoOperativoService.sincronizarOperativos(
                 eventoGuardado,
                 requiereControlAsistencia(request) ? request.operativosAsignadosIds() : List.of(),
@@ -349,7 +350,6 @@ public class EventoService {
         observacionEventoRepository.deleteAll(observacionEventoRepository.findByEventoId(eventoId));
         agendaEventoRepository.deleteAll(agendaEventoRepository.findByEvento(evento));
         requisitoEventoRepository.deleteAll(requisitoEventoRepository.findByEvento(evento));
-        recursoEventoRepository.deleteAll(recursoEventoRepository.findByEvento(evento));
         eventoRepository.delete(evento);
 
         bitacoraAccionService.guardarAccion(
@@ -405,12 +405,10 @@ public class EventoService {
 
         agendaEventoRepository.deleteAll(agendaEventoRepository.findByEvento(evento));
         requisitoEventoRepository.deleteAll(requisitoEventoRepository.findByEvento(evento));
-        recursoEventoRepository.deleteAll(recursoEventoRepository.findByEvento(evento));
 
         Evento eventoGuardado = eventoRepository.save(evento);
         guardarAgenda(eventoGuardado, request.agenda());
         guardarRequisitos(eventoGuardado, request.requisitos());
-        guardarRecursos(eventoGuardado, request.recursos());
         eventoOperativoService.sincronizarOperativos(
                 eventoGuardado,
                 requiereControlAsistencia(request) ? request.operativosAsignadosIds() : List.of(),
@@ -618,6 +616,27 @@ public class EventoService {
                 && personalOperativoCompleto(request);
     }
 
+    private boolean estaCompletoParaRevision(EventoRegistroRequest request, Evento evento) {
+        return hasText(request.titulo())
+                && request.titulo().length() <= 100
+                && hasText(request.descripcionBreve())
+                && request.descripcionBreve().length() <= 45
+                && hasText(request.descripcion())
+                && request.categoriaId() != null
+                && request.areaMunicipalId() != null
+                && request.fechaHoraInicio() != null
+                && request.fechaHoraFin() != null
+                && request.fechaHoraFin().isAfter(request.fechaHoraInicio())
+                && request.costoReferencial() != null
+                && request.costoReferencial() >= 0
+                && request.ubicacionId() != null
+                && tieneAforoValido(request)
+                && tienePublicoValido(request)
+                && tieneItemsValidos(request.agenda())
+                && tieneItemsValidos(request.requisitos())
+                && (tieneRecursoPrincipal(request.recursos()) || tienePortada(evento))
+                && personalOperativoCompleto(request);
+    }
     private boolean tieneAforoValido(EventoRegistroRequest request) {
         return request.aforoMaximo() == null || request.aforoMaximo() >= 0;
     }
@@ -628,7 +647,7 @@ public class EventoService {
 
     private String obtenerEstadoActualizacion(Evento evento, EventoRegistroRequest request) {
         if (Boolean.TRUE.equals(request.enviarRevision())) {
-            return estaCompletoParaRevision(request) ? "PARA_REVISION" : "BORRADOR";
+            return estaCompletoParaRevision(request, evento) ? "PARA_REVISION" : "BORRADOR";
         }
 
         if (evento.getEstadoEvento() == null || !hasText(evento.getEstadoEvento().getCodigo())) {
@@ -683,7 +702,7 @@ public class EventoService {
         return recursos.stream().anyMatch(recurso ->
                 recurso != null
                         && "IMAGEN_PORTADA".equals(recurso.tipoRecurso())
-                        && (hasText(recurso.nombreArchivo()) || hasText(recurso.urlRecurso()))
+                        && (hasText(recurso.objectPath()) || hasText(recurso.nombreOriginal()))
         );
     }
 
@@ -861,13 +880,21 @@ public class EventoService {
                     RecursoEvento recursoEvento = new RecursoEvento();
                     recursoEvento.setEvento(evento);
                     recursoEvento.setTipoRecurso(normalizarTexto(recurso.tipoRecurso(), 45));
-                    recursoEvento.setUrlRecurso(normalizarTexto(recurso.urlRecurso(), 45));
-                    recursoEvento.setNombreArchivo(normalizarTexto(recurso.nombreArchivo(), 45));
+                    recursoEvento.setObjectPath(normalizarTexto(recurso.objectPath(), 500));
+                    recursoEvento.setNombreOriginal(normalizarTexto(recurso.nombreOriginal(), 255));
+                    recursoEvento.setMimeType(normalizarTexto(recurso.mimeType(), 100));
+                    recursoEvento.setSizeBytes(recurso.sizeBytes());
                     recursoEvento.setFechaSubida(Instant.now());
                     recursoEventoRepository.save(recursoEvento);
                 });
     }
 
+    private void eliminarRecursosEvento(Evento evento) {
+        recursoEventoRepository.findByEvento(evento).forEach(recurso -> {
+            cloudStorageService.eliminar(recurso.getObjectPath());
+            recursoEventoRepository.delete(recurso);
+        });
+    }
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
@@ -926,9 +953,13 @@ public class EventoService {
     private List<EventoPanelAdministrativoDto.RecursoEventoPanelAdministrativoDto> obtenerRecursosDto(Evento evento) {
         return recursoEventoRepository.findByEvento(evento).stream()
                 .map(recurso -> new EventoPanelAdministrativoDto.RecursoEventoPanelAdministrativoDto(
+                        recurso.getId(),
                         recurso.getTipoRecurso(),
-                        recurso.getUrlRecurso(),
-                        recurso.getNombreArchivo()
+                        recurso.getObjectPath(),
+                        recurso.getNombreOriginal(),
+                        recurso.getMimeType(),
+                        recurso.getSizeBytes(),
+                        cloudStorageService.generarSignedUrl(recurso.getObjectPath())
                 ))
                 .toList();
     }

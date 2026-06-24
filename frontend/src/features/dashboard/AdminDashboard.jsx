@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import municipalLogo from '../../assets/images/municipalidad-logo.png';
 import PublicEventDetail from '../public-portal/PublicEventDetail';
 import { formatEventState } from './dashboardData';
@@ -12,6 +12,7 @@ import {
   actualizarUsuarioInterno,
   eliminarCategoriaConfiguracion,
   eliminarEventoGestion,
+  eliminarRecursoEvento,
   eliminarUbicacionConfiguracion,
   getCuentaVecinalDetalle,
   getCuentasVecinales,
@@ -20,6 +21,7 @@ import {
   getEventosGestion,
   getUbicacionesConfiguracion,
   getNotificacionesAdministrador,
+  getRecursosEvento,
   getOperativosActivos,
   getUsuarioInternoDetalle,
   getUsuariosInternos,
@@ -29,6 +31,7 @@ import {
   guardarUsuarioInterno,
   guardarUbicacionConfiguracion,
   marcarNotificacionComoLeida,
+  subirRecursoEvento,
 } from '../../services/dashboardService';
 import { getApiErrorMessage } from '../../services/api/api';
 import { CardSkeleton, EmptyState, ErrorState, EventFormSkeleton, TableSkeleton } from '../../components/feedback/LoadingStates';
@@ -253,7 +256,7 @@ function mapManagementEventFromApi(event) {
       IMAGEN_PORTADA: resourceItems.some((resource) => resource?.tipoRecurso === 'IMAGEN_PORTADA'),
       VIDEO: resourceItems.some((resource) => resource?.tipoRecurso === 'VIDEO'),
     },
-    videoUrl: videoResource?.urlRecurso ?? '',
+    videoUrl: videoResource?.signedUrl ?? '',
   };
 }
 
@@ -292,54 +295,18 @@ function uniqueCatalogItems(items, getKey) {
   });
 }
 
-function getFileNameFromForm(form, name) {
+function getNamedFile(form, name) {
   const control = getNamedFormControl(form, name);
-
-  return control?.files?.[0]?.name ?? '';
+  return control?.files?.[0] ?? null;
 }
 
-function buildResourceRequestsFromForm(form, existingEvent = null) {
-  const resources = [];
-  const coverImageName = getFileNameFromForm(form, 'coverImage');
-  const posterName = getFileNameFromForm(form, 'poster');
-  const videoUrl = getNamedFormValue(form, 'videoUrl');
-  const existingResources = Array.isArray(existingEvent?.resourceItems)
-    ? existingEvent.resourceItems
-    : [];
-  const existingCover = existingResources.find((resource) => resource.tipoRecurso === 'IMAGEN_PORTADA');
-  const existingPoster = existingResources.find((resource) => resource.tipoRecurso === 'AFICHE');
-
-  if (coverImageName) {
-    resources.push({
-      tipoRecurso: 'IMAGEN_PORTADA',
-      nombreArchivo: coverImageName,
-      urlRecurso: null,
-    });
-  } else if (existingCover) {
-    resources.push(existingCover);
-  }
-
-  if (posterName) {
-    resources.push({
-      tipoRecurso: 'AFICHE',
-      nombreArchivo: posterName,
-      urlRecurso: null,
-    });
-  } else if (existingPoster) {
-    resources.push(existingPoster);
-  }
-
-  if (videoUrl) {
-    resources.push({
-      tipoRecurso: 'VIDEO',
-      nombreArchivo: null,
-      urlRecurso: videoUrl,
-    });
-  }
-
-  return resources;
+function buildResourceUploadRequestsFromForm(form) {
+  return [
+    { tipoRecurso: 'IMAGEN_PORTADA', archivo: getNamedFile(form, 'coverImage') },
+    { tipoRecurso: 'AFICHE', archivo: getNamedFile(form, 'poster') },
+    { tipoRecurso: 'VIDEO', archivo: getNamedFile(form, 'videoFile') },
+  ].filter((resource) => resource.archivo);
 }
-
 function emptyToNull(value) {
   return hasValue(value) ? value : null;
 }
@@ -362,7 +329,7 @@ function positiveCapacityOrZero(value) {
   return numericValue <= 0 ? 1 : numericValue;
 }
 
-function buildEventCreatePayload(form, actionType, existingEvent = null) {
+function buildEventCreatePayload(form, actionType) {
   const audienceType = getNamedFormValue(form, 'publico_tipo') || 'GENERAL';
   const capacityMode = getNamedFormValue(form, 'capacityMode');
   const attendanceGoalEnabled = isNamedChecked(form, 'attendanceGoalEnabled');
@@ -390,9 +357,10 @@ function buildEventCreatePayload(form, actionType, existingEvent = null) {
     operativosAsignadosIds: requiereControlAsistencia ? getSelectedOperativeIdsFromForm(form) : [],
     agenda: parseOrderedEventItems(getNamedFormValue(form, 'agenda_evento_json')),
     requisitos: parseOrderedEventItems(getNamedFormValue(form, 'requisitos_evento_json')),
-    recursos: buildResourceRequestsFromForm(form, existingEvent),
+    recursos: null,
   };
 }
+
 
 function getSelectedOperativeIdsFromForm(form) {
   if (!form) {
@@ -1241,7 +1209,7 @@ function getChecklistEventFromForm(form, event, catalogs = {}) {
       IMAGEN_PORTADA: Boolean(
         event.resources?.IMAGEN_PORTADA || hasNamedFile(form, 'coverImage'),
       ),
-      VIDEO: Boolean(event.resources?.VIDEO || getNamedFormValue(form, 'videoUrl')),
+      VIDEO: Boolean(event.resources?.VIDEO || getNamedFormValue(form, 'videoUrl') || hasNamedFile(form, 'videoFile')),
     },
     aforoMaximo:
       getNamedFormValue(form, 'capacityMode') === 'none'
@@ -1915,9 +1883,27 @@ function AdminDashboard({ onLogout, user }) {
 
     try {
       setIsSavingEventAction(true);
-      const savedEvent = pendingEventAction.mode === 'edit'
-        ? await actualizarEventoGestion(pendingEventAction.eventId, pendingEventAction.payload)
-        : await guardarEventoGestion(pendingEventAction.payload);
+      const shouldSendToReview = ['review', 'review-changes'].includes(pendingEventAction.type);
+      const firstPayload = shouldSendToReview
+        ? { ...pendingEventAction.payload, enviarRevision: false }
+        : pendingEventAction.payload;
+      let savedEvent = pendingEventAction.mode === 'edit'
+        ? await actualizarEventoGestion(pendingEventAction.eventId, firstPayload)
+        : await guardarEventoGestion(firstPayload);
+      const eventoId = savedEvent.id ?? pendingEventAction.eventId;
+
+      for (const resourceUpload of pendingEventAction.resourceUploads ?? []) {
+        await subirRecursoEvento(eventoId, resourceUpload.tipoRecurso, resourceUpload.archivo);
+      }
+
+      if (shouldSendToReview) {
+        savedEvent = await actualizarEventoGestion(eventoId, {
+          ...pendingEventAction.payload,
+          enviarRevision: true,
+          recursos: null,
+        });
+      }
+
       setPendingEventAction(null);
       setSelectedAdminEvent(null);
       setCurrentAdminView('dashboard');
@@ -1961,7 +1947,6 @@ function AdminDashboard({ onLogout, user }) {
       setIsSavingEventAction(false);
     }
   }
-
   function requestDeleteDraftEvent(event) {
     setEventDeleteNotice('');
     setEventToDelete(event);
@@ -2192,8 +2177,8 @@ function AdminDashboard({ onLogout, user }) {
             locations={eventLocationCatalog}
             operatives={eventOperativeCatalog}
             onBack={() => setCurrentAdminView('dashboard')}
-            onRequestAction={(type, payload) =>
-              setPendingEventAction({ mode: 'create', payload, type })
+            onRequestAction={(type, payload, resourceUploads) =>
+              setPendingEventAction({ mode: 'create', payload, resourceUploads, type })
             }
             onValidationIssue={setValidationIssue}
           />
@@ -2212,12 +2197,13 @@ function AdminDashboard({ onLogout, user }) {
               setSelectedAdminEvent(null);
               setCurrentAdminView('dashboard');
             }}
-            onRequestAction={(type, payload) =>
+            onRequestAction={(type, payload, resourceUploads) =>
               setPendingEventAction({
                 eventId: selectedAdminEvent.id,
                 eventTitle: selectedAdminEvent.title,
                 mode: 'edit',
                 payload,
+                resourceUploads,
                 type,
               })
             }
@@ -2851,6 +2837,125 @@ function DonutProgress({ value }) {
   );
 }
 
+function getResourceTypeLabel(tipoRecurso) {
+  const labels = {
+    AFICHE: 'Afiche',
+    DOCUMENTO: 'Documento',
+    EVIDENCIA: 'Evidencia',
+    IMAGEN_PORTADA: 'Portada',
+    VIDEO: 'Video',
+  };
+
+  return labels[tipoRecurso] ?? tipoRecurso ?? 'Recurso';
+}
+
+function getResourceFileSizeLabel(sizeBytes) {
+  const size = Number(sizeBytes);
+
+  if (!Number.isFinite(size) || size <= 0) {
+    return '';
+  }
+
+  if (size < 1024 * 1024) {
+    return `${Math.max(1, Math.round(size / 1024))} KB`;
+  }
+
+  return `${(size / (1024 * 1024)).toFixed(size >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+}
+
+function isImageResource(resource) {
+  return resource?.mimeType?.startsWith('image/') && resource?.signedUrl;
+}
+
+function isVideoResource(resource) {
+  return resource?.mimeType?.startsWith('video/') && resource?.signedUrl;
+}
+
+function ExistingEventResources({ deletingResourceId = null, error = '', isLoading = false, resources = [], onDelete, onRetry }) {
+  if (isLoading) {
+    return (
+      <div className="existing-resources-panel is-loading">
+        <span className="section-kicker">Recursos cargados</span>
+        <p>Actualizando recursos del evento...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="existing-resources-panel is-error">
+        <span className="section-kicker">Recursos cargados</span>
+        <p>{error}</p>
+        <button className="back-button" type="button" onClick={onRetry}>
+          Reintentar
+        </button>
+      </div>
+    );
+  }
+
+  if (!resources.length) {
+    return (
+      <div className="existing-resources-panel is-empty">
+        <span className="section-kicker">Recursos cargados</span>
+        <p>Este evento aún no tiene recursos asociados.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="existing-resources-panel">
+      <div className="existing-resources-heading">
+        <span className="section-kicker">Recursos cargados</span>
+        <strong>{resources.length} recurso{resources.length === 1 ? '' : 's'}</strong>
+      </div>
+      <div className="existing-resources-grid">
+        {resources.map((resource) => {
+          const fileSize = getResourceFileSizeLabel(resource.sizeBytes);
+          const typeLabel = getResourceTypeLabel(resource.tipoRecurso);
+          const title = resource.nombreOriginal || typeLabel;
+
+          return (
+            <article className="existing-resource-card" key={resource.id ?? resource.objectPath}>
+              {resource.id && (
+                <button
+                  aria-label={`Eliminar ${title}`}
+                  className="existing-resource-delete"
+                  disabled={deletingResourceId === resource.id}
+                  title="Eliminar recurso"
+                  type="button"
+                  onClick={() => onDelete?.(resource)}
+                >
+                  {deletingResourceId === resource.id ? '...' : '×'}
+                </button>
+              )}
+              <span className="existing-resource-preview">
+                {isImageResource(resource) ? (
+                  <img alt={title} src={resource.signedUrl} />
+                ) : isVideoResource(resource) ? (
+                  <video controls preload="metadata" src={resource.signedUrl} />
+                ) : (
+                  <strong>{typeLabel}</strong>
+                )}
+              </span>
+              <span className="existing-resource-copy">
+                <em>{typeLabel}</em>
+                <strong title={title}>{title}</strong>
+                <small>
+                  {[resource.mimeType, fileSize].filter(Boolean).join(' Â· ') || 'Metadata no disponible'}
+                </small>
+              </span>
+              {resource.signedUrl && (
+                <a className="existing-resource-link" href={resource.signedUrl} rel="noopener noreferrer" target="_blank">
+                  Abrir recurso
+                </a>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 function ResourceUploadCard({ accept, label, name, resourceType, showPreview = false }) {
   const [fileName, setFileName] = useState('');
   const [previewUrl, setPreviewUrl] = useState('');
@@ -2907,6 +3012,7 @@ function ResourceUploadCard({ accept, label, name, resourceType, showPreview = f
 
 function VideoResourceCard({ defaultValue = '' }) {
   const [videoUrl, setVideoUrl] = useState(defaultValue);
+  const [videoFileName, setVideoFileName] = useState('');
   const embedUrl = getVideoPreviewEmbedUrl(videoUrl);
 
   return (
@@ -2947,8 +3053,20 @@ function VideoResourceCard({ defaultValue = '' }) {
         />
         <small>
           Puedes usar un enlace de YouTube, Facebook o una URL de video compatible.
-          TODO: permitir carga directa de video si el backend lo soporta.
         </small>
+      </span>
+      <span className="video-resource-field">
+        Archivo de video
+        <input
+          accept="video/*"
+          name="videoFile"
+          type="file"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            setVideoFileName(file?.name ?? '');
+          }}
+        />
+        {videoFileName && <small>{videoFileName}</small>}
       </span>
     </label>
   );
@@ -4226,7 +4344,7 @@ function NeighborDetailModal({
               <button className="neighbor-secondary-action" disabled={isSavingContact} type="button" onClick={onCancelEdit}>
                 Cancelar
               </button>
-              <LoadingButton className="neighbor-primary-action" loading={isSavingContact} loadingLabel="Guardando?" onClick={onSaveContact}>
+              <LoadingButton className="neighbor-primary-action modal-loading-action" loading={isSavingContact} loadingLabel="Guardando..." onClick={onSaveContact}>
                 Guardar cambios
               </LoadingButton>
             </>
@@ -4239,7 +4357,7 @@ function NeighborDetailModal({
                 <button
                   className={
                     contextualAction.action === 'deactivate'
-                      ? 'neighbor-primary-action is-danger'
+                      ? 'neighbor-primary-action modal-loading-action is-danger'
                       : 'neighbor-primary-action'
                   }
                   type="button"
@@ -4911,9 +5029,9 @@ function UserFormModal({
           <span className="user-footer-state-action">
             {isEditing && (
               <LoadingButton
-                className={user?.estado === 'ACTIVO' ? 'neighbor-primary-action is-danger' : 'neighbor-primary-action is-positive'}
+                className={user?.estado === 'ACTIVO' ? 'neighbor-primary-action modal-loading-action is-danger' : 'neighbor-primary-action modal-loading-action is-positive'}
                 loading={isTogglingState}
-                loadingLabel={user?.estado === 'ACTIVO' ? 'Desactivando?' : 'Activando?'}
+                loadingLabel={user?.estado === 'ACTIVO' ? 'Desactivando...' : 'Activando...'}
                 disabled={isSaving}
                 onClick={onToggleState}
               >
@@ -4925,7 +5043,7 @@ function UserFormModal({
             <button className="neighbor-secondary-action" disabled={isSaving || isTogglingState} type="button" onClick={onClose}>
               Cancelar
             </button>
-            <LoadingButton className="neighbor-primary-action" disabled={isTogglingState} loading={isSaving} loadingLabel={isEditing ? 'Guardando?' : 'Creando?'} onClick={onSave}>
+            <LoadingButton className="neighbor-primary-action modal-loading-action" disabled={isTogglingState} loading={isSaving} loadingLabel={isEditing ? 'Guardando...' : 'Creando...'} onClick={onSave}>
               {isEditing ? 'Guardar cambios' : 'Guardar usuario'}
             </LoadingButton>
           </span>
@@ -6270,7 +6388,7 @@ function LocationDetailModal({
               <button className="neighbor-secondary-action" disabled={isSaving} type="button" onClick={onClose}>
                 Cancelar
               </button>
-              <LoadingButton className="neighbor-primary-action" loading={isSaving} loadingLabel="Creando..." onClick={onSave}>
+              <LoadingButton className="neighbor-primary-action modal-loading-action" loading={isSaving} loadingLabel="Guardando..." onClick={onSave}>
                 Guardar ubicación
               </LoadingButton>
             </>
@@ -6282,8 +6400,8 @@ function LocationDetailModal({
               <LoadingButton
                 className={
                   visibleLocation?.estado === 'ACTIVO'
-                    ? 'neighbor-primary-action is-danger'
-                    : 'neighbor-primary-action is-positive'
+                    ? 'neighbor-primary-action modal-loading-action is-danger'
+                    : 'neighbor-primary-action modal-loading-action is-positive'
                 }
                 loading={isTogglingState}
                 loadingLabel={visibleLocation?.estado === 'ACTIVO' ? 'Desactivando...' : 'Activando...'}
@@ -6607,6 +6725,15 @@ function NewEventView({
     setMissingReviewFields(getMissingReviewFields(form));
   }
 
+  function requestEventAction(actionType) {
+    const form = formRef.current;
+    onRequestAction(
+      actionType,
+      buildEventCreatePayload(form, actionType),
+      buildResourceUploadRequestsFromForm(form),
+    );
+  }
+
   function requestReview() {
     const missingFields = getMissingReviewFields(formRef.current);
 
@@ -6615,7 +6742,7 @@ function NewEventView({
       return;
     }
 
-    onRequestAction('review', buildEventCreatePayload(formRef.current, 'review'));
+    requestEventAction('review');
   }
 
   return (
@@ -6800,8 +6927,8 @@ function NewEventView({
                 showPreview
               />
               <ResourceUploadCard
-                accept="image/*"
-                label="Afiche"
+                accept=".pdf,image/jpeg,image/png"
+                label="Afiche (PDF, JPG o PNG)"
                 name="poster"
                 resourceType="AFICHE"
                 showPreview
@@ -6839,7 +6966,7 @@ function NewEventView({
             <button
               className="admin-secondary-action event-draft-action"
               type="button"
-              onClick={() => onRequestAction('draft', buildEventCreatePayload(formRef.current, 'draft'))}
+              onClick={() => requestEventAction('draft')}
             >
               Guardar borrador
             </button>
@@ -6876,11 +7003,33 @@ function EditEventView({
   const initialAudienceType =
     event.publico_tipo ?? (event.edad_minima || event.edad_maxima ? 'OBJETIVO' : 'GENERAL');
   const initialMunicipalArea = getMunicipalAreaByEvent(event, areas);
-  const eventWithMunicipalArea = {
+  const eventWithMunicipalArea = useMemo(() => ({
     ...event,
     area_municipal_id: event.area_municipal_id ?? initialMunicipalArea?.area_municipal_id ?? '',
     organizer: initialMunicipalArea?.nombre ?? event.organizer,
-  };
+  }), [event, initialMunicipalArea?.area_municipal_id, initialMunicipalArea?.nombre]);
+  const [eventResources, setEventResources] = useState(() =>
+    Array.isArray(event.resourceItems) ? event.resourceItems : [],
+  );
+  const [isLoadingResources, setIsLoadingResources] = useState(false);
+  const [resourceLoadError, setResourceLoadError] = useState('');
+  const [deletingResourceId, setDeletingResourceId] = useState(null);
+  const [resourceToDelete, setResourceToDelete] = useState(null);
+  const resourceFlags = useMemo(() => ({
+    AFICHE: eventResources.some((resource) => resource?.tipoRecurso === 'AFICHE'),
+    IMAGEN_PORTADA: eventResources.some((resource) => resource?.tipoRecurso === 'IMAGEN_PORTADA'),
+    VIDEO: eventResources.some((resource) => resource?.tipoRecurso === 'VIDEO'),
+  }), [eventResources]);
+  const currentVideoResource = eventResources.find((resource) => resource?.tipoRecurso === 'VIDEO');
+  const eventWithResources = useMemo(() => ({
+    ...eventWithMunicipalArea,
+    resourceItems: eventResources,
+    resources: {
+      ...(eventWithMunicipalArea.resources ?? {}),
+      ...resourceFlags,
+    },
+    videoUrl: currentVideoResource?.signedUrl ?? event.videoUrl ?? '',
+  }), [currentVideoResource?.signedUrl, event.videoUrl, eventResources, eventWithMunicipalArea, resourceFlags]);
   const [capacityMode, setCapacityMode] = useState(initialCapacityMode);
   const [audienceType, setAudienceType] = useState(initialAudienceType);
   const [goalEnabled, setGoalEnabled] = useState(Boolean(event.metaTipo));
@@ -6890,7 +7039,7 @@ function EditEventView({
   const [eventStartValue, setEventStartValue] = useState(() => getEventStartDateTimeValue(event));
   const [requiresControl, setRequiresControl] = useState(() => requiresAttendanceControl(event));
   const [selectedOperativeIds, setSelectedOperativeIds] = useState(() => event.operativosAsignadosIds ?? []);
-  const [checklistEvent, setChecklistEvent] = useState(() => eventWithMunicipalArea);
+  const [checklistEvent, setChecklistEvent] = useState(() => eventWithResources);
   const [hasFormChanges, setHasFormChanges] = useState(false);
   const checklist = getEventChecklist(checklistEvent, {
     observationAddressed: hasFormChanges,
@@ -6910,25 +7059,85 @@ function EditEventView({
     setEventStartValue(getNamedFormValue(formRef.current, 'eventStart'));
     setRequiresControl(isNamedChecked(formRef.current, 'requiresAttendanceControl'));
     setSelectedOperativeIds(getSelectedOperativeIdsFromForm(formRef.current));
-    setChecklistEvent(getChecklistEventFromForm(formRef.current, eventWithMunicipalArea, { categories, locations }));
+    setChecklistEvent(getChecklistEventFromForm(formRef.current, eventWithResources, { categories, locations }));
+  }
+
+  function requestEventAction(actionType, payloadActionType) {
+    const form = formRef.current;
+    onRequestAction(
+      actionType,
+      buildEventCreatePayload(form, payloadActionType, eventWithResources),
+      buildResourceUploadRequestsFromForm(form),
+    );
   }
 
   function requestReview() {
-    const missingFields = getMissingReviewFields(formRef.current, event);
+    const missingFields = getMissingReviewFields(formRef.current, eventWithResources);
 
     if (missingFields.length > 0) {
       onValidationIssue({ missingFields });
       return;
     }
 
-    onRequestAction('review-changes', buildEventCreatePayload(formRef.current, 'review', event));
+    requestEventAction('review-changes', 'review');
   }
 
-  useEffect(() =>{
+  const loadEventResources = useCallback(async () => {
+    if (!event.id) {
+      setEventResources([]);
+      return;
+    }
 
-    
+    try {
+      setIsLoadingResources(true);
+      setResourceLoadError('');
+      const resources = await getRecursosEvento(event.id);
+      setEventResources(Array.isArray(resources) ? resources : []);
+    } catch (error) {
+      setResourceLoadError(getApiErrorMessage(error, 'No se pudieron cargar los recursos del evento.'));
+    } finally {
+      setIsLoadingResources(false);
+    }
+  }, [event.id]);
 
-  }, []);
+  function requestDeleteEventResource(resource) {
+    setResourceToDelete(resource);
+  }
+
+  const confirmDeleteEventResource = useCallback(async () => {
+    if (!event.id || !resourceToDelete?.id) {
+      return;
+    }
+
+    try {
+      setDeletingResourceId(resourceToDelete.id);
+      setResourceLoadError('');
+      await eliminarRecursoEvento(event.id, resourceToDelete.id);
+      setEventResources((currentResources) =>
+        currentResources.filter((currentResource) => currentResource.id !== resourceToDelete.id),
+      );
+      setResourceToDelete(null);
+    } catch (error) {
+      setResourceLoadError(getApiErrorMessage(error, 'No se pudo eliminar el recurso del evento.'));
+    } finally {
+      setDeletingResourceId(null);
+    }
+  }, [event.id, resourceToDelete]);
+
+  useEffect(() => {
+    const loadTimer = window.setTimeout(loadEventResources, 0);
+
+    return () => window.clearTimeout(loadTimer);
+  }, [loadEventResources]);
+
+  useEffect(() => {
+    if (formRef.current) {
+      setChecklistEvent(getChecklistEventFromForm(formRef.current, eventWithResources, { categories, locations }));
+      return;
+    }
+
+    setChecklistEvent(eventWithResources);
+  }, [categories, eventWithResources, locations]);
 
   return (
     <section className="new-event-view" aria-labelledby="edit-event-title">
@@ -7137,6 +7346,14 @@ function EditEventView({
               <span className="section-kicker">Recursos</span>
               <h2>Material del evento</h2>
             </div>
+            <ExistingEventResources
+              deletingResourceId={deletingResourceId}
+              error={resourceLoadError}
+              isLoading={isLoadingResources}
+              resources={eventResources}
+              onDelete={requestDeleteEventResource}
+              onRetry={loadEventResources}
+            />
             <div className="resource-grid">
               <ResourceUploadCard
                 accept="image/*"
@@ -7146,13 +7363,13 @@ function EditEventView({
                 showPreview
               />
               <ResourceUploadCard
-                accept="image/*"
-                label="Actualizar afiche"
+                accept=".pdf,image/jpeg,image/png"
+                label="Actualizar afiche (PDF, JPG o PNG)"
                 name="poster"
                 resourceType="AFICHE"
                 showPreview
               />
-              <VideoResourceCard defaultValue={event.videoUrl ?? ''} />
+              <VideoResourceCard defaultValue={eventWithResources.videoUrl ?? ''} />
             </div>
           </article>
 
@@ -7216,7 +7433,7 @@ function EditEventView({
             <button
               className="admin-secondary-action event-draft-action"
               type="button"
-              onClick={() => onRequestAction('save-changes', buildEventCreatePayload(formRef.current, 'draft', event))}
+              onClick={() => requestEventAction('save-changes', 'draft')}
             >
               Guardar cambios
             </button>
@@ -7233,7 +7450,50 @@ function EditEventView({
           </div>
         </aside>
       </form>
+      {resourceToDelete && (
+        <ResourceDeleteModal
+          isDeleting={deletingResourceId === resourceToDelete.id}
+          resource={resourceToDelete}
+          onCancel={() => setResourceToDelete(null)}
+          onConfirm={confirmDeleteEventResource}
+        />
+      )}
     </section>
+  );
+}
+
+function ResourceDeleteModal({ isDeleting = false, onCancel, onConfirm, resource }) {
+  const resourceName = resource?.nombreOriginal || getResourceTypeLabel(resource?.tipoRecurso);
+  const resourceType = getResourceTypeLabel(resource?.tipoRecurso);
+
+  return (
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onMouseDown={isDeleting ? undefined : onCancel}
+    >
+      <section
+        aria-labelledby="delete-event-resource-title"
+        aria-modal="true"
+        className="confirm-modal event-delete-modal resource-delete-modal"
+        role="dialog"
+        onMouseDown={(mouseEvent) => mouseEvent.stopPropagation()}
+      >
+        <span className="section-kicker">Recurso del evento</span>
+        <h2 id="delete-event-resource-title">Eliminar recurso</h2>
+        <p>
+          ¿Deseas eliminar el {resourceType.toLowerCase()} "{resourceName}"? Esta acción quitará el archivo del bucket y del evento.
+        </p>
+        <div className="modal-actions">
+          <button className="back-button" disabled={isDeleting} type="button" onClick={onCancel}>
+            Cancelar
+          </button>
+          <LoadingButton className="primary-button danger-action" loading={isDeleting} loadingLabel="Eliminando..." onClick={onConfirm}>
+            Eliminar recurso
+          </LoadingButton>
+        </div>
+      </section>
+    </div>
   );
 }
 

@@ -34,7 +34,9 @@ public record EventoRegistroRequest(
 
     public record RecursoRequest(
             String tipoRecurso,
-            String urlRecurso,
-            String nombreArchivo
+            String objectPath,
+            String nombreOriginal,
+            String mimeType,
+            Long sizeBytes
     ) {}
 }

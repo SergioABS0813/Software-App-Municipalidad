@@ -40,5 +40,5 @@ public record EventoPanelAdministrativoDto(
     ) {}
     public record CategoriaEventoPanelAdministrativoDto(Integer id, String nombre) {}
     public record ItemOrdenadoEventoPanelAdministrativoDto(Integer orden, String descripcion) {}
-    public record RecursoEventoPanelAdministrativoDto(String tipoRecurso, String urlRecurso, String nombreArchivo) {}
+    public record RecursoEventoPanelAdministrativoDto(Integer id, String tipoRecurso, String objectPath, String nombreOriginal, String mimeType, Long sizeBytes, String signedUrl) {}
 }

@@ -101,6 +101,24 @@ export async function guardarEventoGestion(evento){
     return response.data
 }
 
+export async function subirRecursoEvento(eventoId, tipoRecurso, archivo){
+    const formData = new FormData();
+    formData.append("tipoRecurso", tipoRecurso);
+    formData.append("archivo", archivo);
+
+    const response = await api.post(`eventos/admin/operacion/${eventoId}/recursos`, formData);
+    return response.data;
+}
+export async function getRecursosEvento(eventoId){
+    const response = await api.get(`eventos/${eventoId}/recursos`);
+    return response.data;
+}
+
+export async function eliminarRecursoEvento(eventoId, recursoId){
+    const response = await api.delete(`eventos/admin/operacion/${eventoId}/recursos/${recursoId}`);
+    return response.data;
+}
+
 export async function actualizarEventoGestion(id, evento){
     const response = await api.put(`eventos/admin/operacion/${id}`, evento);
     return response.data

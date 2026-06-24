@@ -114,7 +114,7 @@ function mapDirectiveReviewSummaryFromApi(event) {
 function mapDirectiveReviewDetailFromApi(event) {
   const resources = (event.recursos ?? []).reduce((mappedResources, resource) => {
     if (resource?.tipoRecurso) {
-      mappedResources[resource.tipoRecurso] = resource.urlRecurso || resource.nombreArchivo || true;
+      mappedResources[resource.tipoRecurso] = resource.signedUrl || resource.nombreOriginal || true;
     }
     return mappedResources;
   }, {});
