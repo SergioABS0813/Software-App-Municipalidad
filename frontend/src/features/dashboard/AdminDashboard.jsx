@@ -93,8 +93,8 @@ const adminNotifications = [
   },
   {
     id: 4,
-    message: '"Voluntariado Local" fue aprobado.',
-    type: 'Evento aprobado',
+    message: '"Voluntariado Local" fue publicado.',
+    type: 'Evento publicado',
     unread: true,
   },
   {
@@ -218,6 +218,8 @@ function mapManagementEventFromApi(event) {
   const resourceItems = Array.isArray(event.recursos) ? event.recursos : [];
   const videoResource = resourceItems.find((resource) => resource?.tipoRecurso === 'VIDEO');
 
+  const directiveObservation = event.ultimaObservacionDirectiva ?? event.ultimaObservacion ?? null;
+
   return {
     id: event.id,
     title: event.titulo ?? 'Evento sin titulo',
@@ -240,6 +242,10 @@ function mapManagementEventFromApi(event) {
     edad_minima: event.edadMin ?? '',
     edad_maxima: event.edadMax ?? '',
     requiereControlAsistencia: event.requiereControlAsistencia ?? true,
+    directorObservation: directiveObservation?.observacion ?? '',
+    directorObservationStatus: directiveObservation?.estado ?? '',
+    directorObservationDateTime: directiveObservation?.fechaObservacion ?? '',
+    directorName: directiveObservation?.usuarioNombre ?? '',
     lastUpdatedAt: event.actualizadoEn ?? '',
     criteriosFicha: Array.isArray(event.criteriosFicha) ? event.criteriosFicha : [],
     agenda_evento: Array.isArray(event.agenda) ? event.agenda : [],
@@ -576,7 +582,6 @@ function getEventStateTone(state) {
     CERRADO: 'state-closed',
     FINALIZADO: 'state-finished',
     OBSERVADO: 'state-observed',
-    APROBADO: 'state-published',
     PUBLICADO: 'state-published',
   };
 
@@ -3286,13 +3291,8 @@ function getAdminEventActionConfig(event) {
     };
   }
 
-  if (['PARA_REVISION', 'APROBADO'].includes(event.state)) {
-    return {
-      icon: ClipboardCheckLineIcon,
-      label: `Ver estado de revision de ${event.title}`,
-      tooltip: 'Ver estado de revisión',
-      type: 'review',
-    };
+  if (event.state === 'PARA_REVISION') {
+    return null;
   }
 
   if (event.state === 'PUBLICADO') {
@@ -7396,12 +7396,19 @@ function EditEventView({
 
           {event.state === 'OBSERVADO' && event.directorObservation && (
             <section className="admin-panel director-observation-panel">
-              <span className="section-kicker">Observación del directivo</span>
+              <span className="section-kicker">Observacion del directivo</span>
+              <h2>Correccion solicitada</h2>
               <blockquote>{event.directorObservation}</blockquote>
-              {event.directorName && <small>Registrada por {event.directorName}</small>}
+              <div className="director-observation-meta">
+                {event.directorName && <span>{event.directorName}</span>}
+                {event.directorObservationDateTime && (
+                  <time dateTime={event.directorObservationDateTime}>
+                    {formatManagementDateTime(event.directorObservationDateTime)}
+                  </time>
+                )}
+              </div>
             </section>
           )}
-
           <section className="admin-panel validation-side-card">
             <span className="section-kicker">Revisión</span>
             <h2>Validación de ficha</h2>

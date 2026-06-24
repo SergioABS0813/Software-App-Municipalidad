@@ -136,7 +136,6 @@ const eventStateLabels = {
   PARA_REVISION: 'Para revisión',
   FINALIZADO: 'Finalizado',
   OBSERVADO: 'Observado',
-  APROBADO: 'Aprobado',
   PUBLICADO: 'Publicado',
 };
 

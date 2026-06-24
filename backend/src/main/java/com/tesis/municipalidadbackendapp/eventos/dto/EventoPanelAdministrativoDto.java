@@ -28,9 +28,11 @@ public record EventoPanelAdministrativoDto(
         List<ItemOrdenadoEventoPanelAdministrativoDto> agenda,
         List<ItemOrdenadoEventoPanelAdministrativoDto> requisitos,
         List<RecursoEventoPanelAdministrativoDto> recursos,
-        List<UsuarioOperativoDto> operativosAsignados
+        List<UsuarioOperativoDto> operativosAsignados,
+        ObservacionDirectivaPanelAdministrativoDto ultimaObservacionDirectiva
 ) {
     public record AlertaFichaEventoPanelAdministrativoDto(String tipo, String mensaje) {}
+    public record ObservacionDirectivaPanelAdministrativoDto(Integer id, String observacion, String estado, LocalDateTime fechaObservacion, String usuarioNombre) {}
     public record CriterioFichaEventoPanelAdministrativoDto(
             String codigo,
             String nombre,

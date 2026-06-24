@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 
 public interface EventoRepository extends JpaRepository<Evento, Integer> {
 
@@ -73,6 +74,16 @@ public interface EventoRepository extends JpaRepository<Evento, Integer> {
             @Param("fin") Instant fin
     );
 
+    @Query("""
+            select evento
+            from Evento evento
+            left join fetch evento.estadoEvento estado
+            left join fetch evento.categoria categoria
+            left join fetch evento.ubicacion ubicacion
+            left join fetch evento.areaMunicipal area
+            where estado.codigo in :codigos
+            """)
+    List<Evento> findAllReportesDirectivosFinalizados(@Param("codigos") Collection<String> codigos);
     Long countByUbicacionId(Integer ubicacionId);
 
     Long countByCategoriaId(Integer categoriaId);

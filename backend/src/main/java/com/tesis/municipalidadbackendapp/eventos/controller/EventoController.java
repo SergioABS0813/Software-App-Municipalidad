@@ -1,6 +1,8 @@
 package com.tesis.municipalidadbackendapp.eventos.controller;
 
+import com.tesis.municipalidadbackendapp.bitacora.dto.BitacoraEventoDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoPanelAdministrativoDto;
+import com.tesis.municipalidadbackendapp.eventos.dto.EventoReporteDirectivoDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoRegistroRequest;
 import com.tesis.municipalidadbackendapp.eventos.dto.ConteosRevisionDirectivaDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoRevisionDirectivaDetalleDto;
@@ -21,6 +23,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor //Crea el constructor para atributos final
@@ -107,6 +111,10 @@ public class EventoController {
         return eventoService.obtenerResumenCardsDirectivo();
     }
 
+    @GetMapping("directivo/reportes")
+    public List<EventoReporteDirectivoDto> obtenerReportesDirectivosFinalizados() {
+        return eventoService.obtenerReportesDirectivosFinalizados();
+    }
     @GetMapping("directivo/revision")
     public Page<EventoRevisionDirectivaResumenDto> obtenerEventosRevisionDirectiva(
             @RequestParam(defaultValue = "TODOS") String estado,
@@ -120,9 +128,34 @@ public class EventoController {
         return eventoService.obtenerConteosRevisionDirectiva();
     }
 
+    @GetMapping("{id}/historial")
+    public List<BitacoraEventoDto> obtenerHistorialEvento(@PathVariable Integer id) {
+        return eventoService.obtenerHistorialEvento(id);
+    }
     @GetMapping("directivo/revision/{id}")
     public EventoRevisionDirectivaDetalleDto obtenerDetalleRevisionDirectiva(@PathVariable Integer id) {
         return eventoService.obtenerDetalleRevisionDirectiva(id);
+    }
+
+    @PatchMapping("directivo/operacion/{id}/aprobar")
+    public EventoPanelAdministrativoDto aprobarEventoDirectivo(
+            @PathVariable Integer id,
+            HttpServletRequest httpServletRequest
+    ) {
+        return eventoService.aprobarEventoDirectivo(id, httpServletRequest);
+    }
+
+    @PatchMapping("directivo/operacion/{id}/observar")
+    public EventoPanelAdministrativoDto observarEventoDirectivo(
+            @PathVariable Integer id,
+            @RequestBody ObservarEventoRequest request,
+            HttpServletRequest httpServletRequest
+    ) {
+        return eventoService.observarEventoDirectivo(
+                id,
+                request != null ? request.observacion() : null,
+                httpServletRequest
+        );
     }
 
     @PatchMapping("directivo/operacion/{id}/cancelar")
@@ -137,6 +170,8 @@ public class EventoController {
                 httpServletRequest
         );
     }
+
+    public record ObservarEventoRequest(String observacion) {}
 
     public record CancelarEventoRequest(String motivo) {}
 

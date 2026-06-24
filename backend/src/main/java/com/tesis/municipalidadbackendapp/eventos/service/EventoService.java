@@ -1,11 +1,15 @@
 package com.tesis.municipalidadbackendapp.eventos.service;
 
+import com.tesis.municipalidadbackendapp.asistencias.entity.Asistencia;
+import com.tesis.municipalidadbackendapp.asistencias.repository.AsistenciaRepository;
 import com.tesis.municipalidadbackendapp.common.UsuarioAutenticadoService;
+import com.tesis.municipalidadbackendapp.bitacora.dto.BitacoraEventoDto;
 import com.tesis.municipalidadbackendapp.bitacora.entity.BitacoraAccion;
 import com.tesis.municipalidadbackendapp.bitacora.service.BitacoraAccionService;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoPanelAdministrativoDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoRegistroRequest;
 import com.tesis.municipalidadbackendapp.eventos.dto.ConteosRevisionDirectivaDto;
+import com.tesis.municipalidadbackendapp.eventos.dto.EventoReporteDirectivoDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoRevisionDirectivaDetalleDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoRevisionDirectivaResumenDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.ResumenCardsDirectivoDto;
@@ -17,12 +21,16 @@ import com.tesis.municipalidadbackendapp.eventos.entity.ObservacionEvento;
 import com.tesis.municipalidadbackendapp.eventos.entity.RequisitoEvento;
 import com.tesis.municipalidadbackendapp.eventos.entity.RecursoEvento;
 import com.tesis.municipalidadbackendapp.eventos.repository.*;
+import com.tesis.municipalidadbackendapp.inscripciones.entity.Inscripcion;
+import com.tesis.municipalidadbackendapp.inscripciones.repository.InscripcionRepository;
 import com.tesis.municipalidadbackendapp.notificaciones.service.NotificacionService;
 import com.tesis.municipalidadbackendapp.organizacion.entity.AreaMunicipal;
 import com.tesis.municipalidadbackendapp.organizacion.repository.AreaMunicipalRepository;
 import com.tesis.municipalidadbackendapp.ubicacion.entity.Ubicacion;
 import com.tesis.municipalidadbackendapp.ubicacion.repository.UbicacionRepository;
 import com.tesis.municipalidadbackendapp.usuariosinternos.entity.Usuario;
+import com.tesis.municipalidadbackendapp.valoraciones.entity.ValoracionEvento;
+import com.tesis.municipalidadbackendapp.valoraciones.repository.ValoracionEventoRepository;
 import com.tesis.municipalidadbackendapp.valoraciones.service.ValoracionEventoService;
 import com.tesis.municipalidadbackendapp.storage.CloudStorageService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -41,6 +49,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Locale;
 import java.util.List;
 
 @Service
@@ -60,6 +69,9 @@ public class EventoService {
     private final BitacoraAccionService bitacoraAccionService;
     private final NotificacionService notificacionService;
     private final ValoracionEventoService valoracionEventoService;
+    private final InscripcionRepository inscripcionRepository;
+    private final AsistenciaRepository asistenciaRepository;
+    private final ValoracionEventoRepository valoracionEventoRepository;
     private final EventoOperativoService eventoOperativoService;
     private final CloudStorageService cloudStorageService;
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
@@ -104,10 +116,92 @@ public class EventoService {
                 .map(this::toRevisionDirectivaResumenDto);
     }
 
+    @Transactional(readOnly = true)
+    public List<EventoReporteDirectivoDto> obtenerReportesDirectivosFinalizados() {
+        return eventoRepository.findAllReportesDirectivosFinalizados(List.of("FINALIZADO", "CERRADO")).stream()
+                .map(this::toReporteDirectivoDto)
+                .toList();
+    }
+
+    private EventoReporteDirectivoDto toReporteDirectivoDto(Evento evento) {
+        List<Inscripcion> inscripciones = inscripcionRepository.findByEventoId(evento.getId());
+        List<Integer> inscripcionIds = inscripciones.stream().map(Inscripcion::getId).toList();
+        List<Asistencia> asistencias = inscripcionIds.isEmpty()
+                ? List.of()
+                : asistenciaRepository.findByInscripcionIdIn(inscripcionIds);
+        List<Asistencia> asistenciasValidas = asistencias.stream()
+                .filter(this::esAsistenciaValidaParaReporte)
+                .toList();
+        int totalInscritos = inscripciones.size();
+        int totalAsistentes = asistenciasValidas.size();
+        int totalQr = (int) asistenciasValidas.stream()
+                .filter(asistencia -> "QR".equalsIgnoreCase(asistencia.getMetodoValidacion()))
+                .count();
+        int totalManual = totalAsistentes - totalQr;
+        boolean requiereControl = requiereControlAsistencia(evento);
+        Integer tasaAsistencia = requiereControl && totalInscritos > 0
+                ? Math.round((totalAsistentes * 100f) / totalInscritos)
+                : null;
+        Integer adopcionQr = requiereControl && totalAsistentes > 0
+                ? Math.round((totalQr * 100f) / totalAsistentes)
+                : null;
+        List<ValoracionEvento> valoracionesRespondidas = valoracionEventoRepository.findByEventoId(evento.getId()).stream()
+                .filter(valoracion -> "RESPONDIDO".equalsIgnoreCase(valoracion.getEstado()))
+                .filter(valoracion -> valoracion.getPuntuacion() != null)
+                .toList();
+        int totalValoraciones = valoracionesRespondidas.size();
+        Double promedioSatisfaccion = totalValoraciones > 0
+                ? valoracionesRespondidas.stream()
+                        .mapToInt(valoracion -> valoracion.getPuntuacion().intValue())
+                        .average()
+                        .orElse(0)
+                : null;
+
+        return new EventoReporteDirectivoDto(
+                evento.getId(),
+                evento.getTitulo(),
+                evento.getCategoria() != null ? evento.getCategoria().getNombre() : null,
+                evento.getUbicacion() != null ? evento.getUbicacion().getNombre() : null,
+                toLocalDateTime(evento.getFechaHoraInicio()),
+                toLocalDateTime(evento.getFechaHoraFin()),
+                toLocalDateTime(evento.getEventoActualizadoEn() != null ? evento.getEventoActualizadoEn() : evento.getTiempoActualizado()),
+                evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : null,
+                requiereControl,
+                evento.getEncuestaSatisfaccionHabilitado() != null && evento.getEncuestaSatisfaccionHabilitado() == 1,
+                totalInscritos,
+                totalAsistentes,
+                tasaAsistencia,
+                totalQr,
+                totalManual,
+                adopcionQr,
+                promedioSatisfaccion,
+                totalValoraciones,
+                evento.getCostoReferencial(),
+                evento.getAforoMaximo(),
+                evento.getMetaTipo(),
+                evento.getMetaValor()
+        );
+    }
+
+    private boolean esAsistenciaValidaParaReporte(Asistencia asistencia) {
+        if (asistencia == null || asistencia.getEstado() == null) {
+            return false;
+        }
+
+        String estado = asistencia.getEstado().trim().toUpperCase(Locale.ROOT);
+        return "VALIDADA".equals(estado) || "ASISTIO".equals(estado) || "CONFIRMADA".equals(estado);
+    }
     public ConteosRevisionDirectivaDto obtenerConteosRevisionDirectiva() {
         int pendientes = eventoRepository.countByEstadoEventoCodigo("PARA_REVISION");
         int observados = eventoRepository.countByEstadoEventoCodigo("OBSERVADO");
         return new ConteosRevisionDirectivaDto(pendientes + observados, pendientes, observados);
+    }
+
+    @Transactional(readOnly = true)
+    public List<BitacoraEventoDto> obtenerHistorialEvento(Integer id) {
+        eventoRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evento no encontrado"));
+        return bitacoraAccionService.listarHistorialEvento(id);
     }
 
     public EventoRevisionDirectivaDetalleDto obtenerDetalleRevisionDirectiva(Integer id) {
@@ -159,10 +253,26 @@ public class EventoService {
                 obtenerAgendaDto(evento),
                 obtenerRequisitosDto(evento),
                 obtenerRecursosDto(evento),
-                eventoOperativoService.listarOperativosAsignados(evento)
+                eventoOperativoService.listarOperativosAsignados(evento),
+                obtenerUltimaObservacionDirectivaDto(evento)
         );
     }
 
+    private EventoPanelAdministrativoDto.ObservacionDirectivaPanelAdministrativoDto obtenerUltimaObservacionDirectivaDto(Evento evento) {
+        if (evento == null || evento.getId() == null) {
+            return null;
+        }
+
+        return observacionEventoRepository.findTopByEventoIdOrderByFechaObservacionDesc(evento.getId())
+                .map(observacion -> new EventoPanelAdministrativoDto.ObservacionDirectivaPanelAdministrativoDto(
+                        observacion.getId(),
+                        observacion.getObservacion(),
+                        observacion.getEstado(),
+                        toLocalDateTime(observacion.getFechaObservacion()),
+                        observacion.getUsuario() != null ? observacion.getUsuario().getNombre() : null
+                ))
+                .orElse(null);
+    }
     private EventoRevisionDirectivaResumenDto toRevisionDirectivaResumenDto(Evento evento) {
         return new EventoRevisionDirectivaResumenDto(
                 evento.getId(),
@@ -255,7 +365,7 @@ public class EventoService {
                 obtenerNumeroEventosParaRevision(),
                 obtenerNumeroEventosObservados(),
                 toIntegerCount(eventoRepository.countByEstadoCodigoInAndFechaActualizacionBetween(
-                        List.of("PUBLICADO", "APROBADO"),
+                        List.of("PUBLICADO"),
                         rangoMesActual.inicio(),
                         rangoMesActual.fin()
                 )),
@@ -407,6 +517,9 @@ public class EventoService {
         requisitoEventoRepository.deleteAll(requisitoEventoRepository.findByEvento(evento));
 
         Evento eventoGuardado = eventoRepository.save(evento);
+        if ("OBSERVADO".equals(estadoAnterior) && esEstadoRevision(estadoCodigo)) {
+            atenderObservacionesPendientes(eventoGuardado);
+        }
         guardarAgenda(eventoGuardado, request.agenda());
         guardarRequisitos(eventoGuardado, request.requisitos());
         eventoOperativoService.sincronizarOperativos(
@@ -472,6 +585,88 @@ public class EventoService {
                 usuario,
                 httpServletRequest
         );
+
+        return toPanelAdministrativoDto(eventoGuardado);
+    }
+
+    @Transactional
+    public EventoPanelAdministrativoDto aprobarEventoDirectivo(Integer id, HttpServletRequest httpServletRequest) {
+        Usuario usuario = usuarioAutenticadoService.obtenerUsuarioAutenticado();
+        Evento evento = eventoRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evento no encontrado"));
+        String estadoAnterior = evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : "";
+
+        if ("PUBLICADO".equals(estadoAnterior)) {
+            return toPanelAdministrativoDto(evento);
+        }
+
+        validarEstadoDecisionDirectiva(estadoAnterior);
+
+        EstadoEvento estadoPublicado = obtenerEstadoEvento("PUBLICADO");
+        Instant ahora = Instant.now();
+        evento.setEstadoEvento(estadoPublicado);
+        evento.setTiempoActualizado(ahora);
+        evento.setEventoActualizadoEn(ahora);
+
+        Evento eventoGuardado = eventoRepository.save(evento);
+        BitacoraAccion bitacoraAccion = bitacoraAccionService.guardarAccion(
+                "PUBLICAR_EVENTO",
+                "EVENTO",
+                eventoGuardado.getId(),
+                "Publico el evento \"" + valorDetalle(eventoGuardado.getTitulo()) + "\"",
+                usuario,
+                httpServletRequest
+        );
+
+        notificacionService.notificarEventoPublicadoAdministradores(eventoGuardado, usuario, bitacoraAccion);
+        notificacionService.notificarEventoPublicadoDirectivos(eventoGuardado, usuario, bitacoraAccion);
+
+        return toPanelAdministrativoDto(eventoGuardado);
+    }
+
+    @Transactional
+    public EventoPanelAdministrativoDto observarEventoDirectivo(
+            Integer id,
+            String observacion,
+            HttpServletRequest httpServletRequest
+    ) {
+        String observacionNormalizada = normalizarTexto(observacion);
+        if (!hasText(observacionNormalizada)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La observacion es obligatoria");
+        }
+
+        Usuario usuario = usuarioAutenticadoService.obtenerUsuarioAutenticado();
+        Evento evento = eventoRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evento no encontrado"));
+        String estadoAnterior = evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : "";
+        validarEstadoDecisionDirectiva(estadoAnterior);
+
+        EstadoEvento estadoObservado = obtenerEstadoEvento("OBSERVADO");
+        Instant ahora = Instant.now();
+        evento.setEstadoEvento(estadoObservado);
+        evento.setTiempoActualizado(ahora);
+        evento.setEventoActualizadoEn(ahora);
+        Evento eventoGuardado = eventoRepository.save(evento);
+
+        ObservacionEvento observacionEvento = new ObservacionEvento();
+        observacionEvento.setEvento(eventoGuardado);
+        observacionEvento.setUsuario(usuario);
+        observacionEvento.setObservacion(observacionNormalizada);
+        observacionEvento.setFechaObservacion(ahora);
+        observacionEvento.setEstado("PENDIENTE");
+        observacionEventoRepository.save(observacionEvento);
+
+        BitacoraAccion bitacoraAccion = bitacoraAccionService.guardarAccion(
+                "OBSERVAR_EVENTO",
+                "EVENTO",
+                eventoGuardado.getId(),
+                "Observo el evento \"" + valorDetalle(eventoGuardado.getTitulo()) + "\". Observacion: " + observacionNormalizada,
+                usuario,
+                httpServletRequest
+        );
+
+        notificacionService.notificarEventoObservadoAdministradores(eventoGuardado, usuario, bitacoraAccion);
+        notificacionService.notificarEventoObservadoDirectivos(eventoGuardado, usuario, bitacoraAccion);
 
         return toPanelAdministrativoDto(eventoGuardado);
     }
@@ -792,6 +987,22 @@ public class EventoService {
         notificacionService.notificarEventoPendienteRevisionDirectivos(evento, usuario, bitacoraAccion);
     }
 
+    private void validarEstadoDecisionDirectiva(String estadoCodigo) {
+        if (!"PARA_REVISION".equals(estadoCodigo)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Solo se pueden revisar eventos en estado PARA_REVISION"
+            );
+        }
+    }
+    private void atenderObservacionesPendientes(Evento evento) {
+        observacionEventoRepository.findByEventoId(evento.getId()).stream()
+                .filter(this::esObservacionPendiente)
+                .forEach(observacion -> {
+                    observacion.setEstado("ATENDIDA");
+                    observacionEventoRepository.save(observacion);
+                });
+    }
     private boolean esEstadoRevision(String estadoCodigo) {
         return "PARA_REVISION".equals(estadoCodigo);
     }

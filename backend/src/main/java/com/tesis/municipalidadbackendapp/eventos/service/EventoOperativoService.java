@@ -232,10 +232,10 @@ public class EventoOperativoService {
     ) {
         bitacoraAccionService.guardarAccion(
                 accion,
-                "EVENTO_OPERATIVO",
+                "EVENTO",
                 evento.getId(),
-                ("ASIGNAR_OPERATIVO_EVENTO".equals(accion) ? "Se asigno" : "Se desactivo")
-                        + " el operativo " + (operativo != null ? operativo.getNombre() : "")
+                ("ASIGNAR_OPERATIVO_EVENTO".equals(accion) ? "Asigno personal operativo:" : "Removio personal operativo:")
+                        + " " + (operativo != null ? operativo.getNombre() : "")
                         + " al evento \"" + (evento.getTitulo() != null ? evento.getTitulo() : "Sin titulo") + "\"",
                 asignadoPor,
                 request

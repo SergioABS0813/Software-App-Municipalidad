@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import municipalLogo from '../../assets/images/municipalidad-logo.png';
 import eventReviewPlaceholder from '../../assets/images/event-review-placeholder.png';
-import { adminEvents, formatEventState } from './dashboardData';
+import { formatEventState } from './dashboardData';
 import NotificationMenu from './NotificationMenu';
 import { CardSkeleton, EmptyState, ErrorState, TableSkeleton } from '../../components/feedback/LoadingStates';
 import { getApiErrorMessage } from '../../services/api/api';
 import {
+  aprobarEventoDirectivo,
   cancelarEventoDirectivo,
   getConteosRevisionDirectiva,
   getDetalleRevisionDirectiva,
+  getHistorialEvento,
   getEventosRevisionDirectiva,
   getNotificacionesDirectivo,
+  getReportesDirectivosFinalizados,
   getResumenCardsDirectivo,
   marcarNotificacionComoLeida,
+  observarEventoDirectivo,
 } from '../../services/dashboardService';
 import './AdminDashboard.css';
 import './DirectivoDashboard.css';
@@ -112,7 +116,8 @@ function mapDirectiveReviewSummaryFromApi(event) {
 }
 
 function mapDirectiveReviewDetailFromApi(event) {
-  const resources = (event.recursos ?? []).reduce((mappedResources, resource) => {
+  const resourceItems = event.recursos ?? [];
+  const resources = resourceItems.reduce((mappedResources, resource) => {
     if (resource?.tipoRecurso) {
       mappedResources[resource.tipoRecurso] = resource.signedUrl || resource.nombreOriginal || true;
     }
@@ -153,6 +158,7 @@ function mapDirectiveReviewDetailFromApi(event) {
     } : null,
     referenceCost: event.costoReferencial,
     requirements: (event.requisitos ?? []).map((item) => item.descripcion).filter(Boolean),
+    resourceItems,
     resources,
     state: event.estadoCodigo,
     summary: event.descripcionBreve ?? '',
@@ -174,42 +180,62 @@ function hasAforoMaximo(event) {
   return Number(getAforoMaximo(event)) > 0;
 }
 
-const eventReports = adminEvents
-  .filter((event) => event.state === 'FINALIZADO')
-  .map((event, index) => {
-    const aforoMaximo = getAforoMaximo(event);
-    const registered = [118, 192][index] ?? Math.round(event.spots * 0.82);
-    const qrValidated = [86, 146][index] ?? Math.round(registered * 0.72);
-    const manualValidated = [12, 18][index] ?? Math.round(registered * 0.12);
-    const cancelled = [2, 4][index] ?? 1;
-    const cancelledRegistrations = [4, 7][index] ?? 2;
-    const totalAttendance = qrValidated + manualValidated;
+function mapDirectiveReportFromApi(report) {
+  const totalInscritos = Number(report.totalInscritos ?? 0);
+  const totalAsistentes = Number(report.totalAsistentes ?? 0);
+  const totalQr = Number(report.totalValidacionesQr ?? 0);
+  const totalManual = Number(report.totalValidacionesManual ?? 0);
+  const tasaAsistencia = report.tasaAsistencia ?? safePercent(totalAsistentes, totalInscritos) ?? null;
+  const adopcionQr = report.adopcionQr ?? safePercent(totalQr, totalQr + totalManual) ?? null;
+  const aforoMaximo = report.aforoMaximo ?? null;
 
-    return {
-      ...event,
-      approvedAt: ['2026-05-08T15:30:00', '2026-05-14T11:45:00'][index] ?? '2026-05-20T09:00:00',
-      aforoMaximo,
-      cancelled,
-      cancelledRegistrations,
-      completedAt: ['08/06/2026', '14/06/2026'][index] ?? event.date,
-      digitalValidationRate: totalAttendance > 0
-        ? Math.round((qrValidated / totalAttendance) * 100)
-        : 0,
-      generatedAt: ['Hoy, 10:20 a.m.', 'Lun, 9:15 a.m.'][index] ?? 'Pendiente',
-      generatedAtDate: ['2026-05-28T10:20:00', '2026-05-25T09:15:00'][index] ?? '2026-05-20T09:00:00',
-      manualValidated,
-      puntuacionPromedio: [4.7, 4.4][index] ?? null,
-      qrValidated,
-      registered,
-      totalValoraciones: [82, 136][index] ?? 0,
-      totalAttendance,
-      turnoutRate: Math.round((totalAttendance / registered) * 100),
-      usedCapacityRate: aforoMaximo && aforoMaximo > 0
-        ? Math.round((totalAttendance / aforoMaximo) * 100)
-        : null,
-    };
-  });
+  return {
+    id: report.id,
+    title: report.titulo ?? 'Evento sin titulo',
+    category: report.categoriaNombre ?? 'Sin categoria',
+    venue: report.ubicacionNombre ?? 'Ubicacion pendiente',
+    date: formatDirectiveEventDate(report.fechaHoraInicio),
+    time: formatDirectiveEventTime(report.fechaHoraInicio),
+    state: report.estadoCodigo ?? 'FINALIZADO',
+    completedAt: formatDirectiveReportDate(report.finalizadoEn ?? report.fechaHoraFin),
+    generatedAt: report.finalizadoEn ? formatDirectiveNotificationTime(report.finalizadoEn) : 'Pendiente',
+    generatedAtDate: report.finalizadoEn ?? report.fechaHoraFin ?? report.fechaHoraInicio,
+    eventStartAt: report.fechaHoraInicio,
+    requiereControlAsistencia: Boolean(report.requiereControlAsistencia),
+    encuestaSatisfaccionHabilitada: Boolean(report.encuestaSatisfaccionHabilitada),
+    registered: totalInscritos,
+    totalAttendance: totalAsistentes,
+    turnoutRate: tasaAsistencia,
+    qrValidated: totalQr,
+    manualValidated: totalManual,
+    digitalValidationRate: adopcionQr,
+    cancelled: 0,
+    cancelledRegistrations: 0,
+    puntuacionPromedio: report.promedioSatisfaccion ?? null,
+    totalValoraciones: Number(report.totalValoraciones ?? 0),
+    referenceCost: report.costoReferencial ?? 0,
+    aforoMaximo,
+    usedCapacityRate: aforoMaximo && aforoMaximo > 0 && totalAsistentes > 0
+      ? Math.round((totalAsistentes / aforoMaximo) * 100)
+      : null,
+    metaTipo: report.metaTipo,
+    metaValor: report.metaValor,
+  };
+}
 
+function formatDirectiveReportDate(value) {
+  const date = value ? new Date(value) : null;
+
+  if (!date || Number.isNaN(date.getTime())) {
+    return 'Sin fecha';
+  }
+
+  return new Intl.DateTimeFormat('es-PE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+}
 const reviewFilters = [
   {
     label: 'Todos',
@@ -253,7 +279,7 @@ function buildDirectiveStats(summary = emptyDirectiveStatsSummary) {
       icon: BadgeCheckIcon,
       label: 'Publicados del mes',
       tone: 'is-month-approved',
-      trend: 'aprobados en el mes actual',
+      trend: 'publicados en el mes actual',
       value: Number(summary.publicadosDelMes ?? 0),
     },
     {
@@ -362,24 +388,46 @@ function getReviewPendingTime(event) {
   return getReviewTimeMetric(event).value ?? 'Sin fecha';
 }
 
-function getResourceKind(type) {
-  if (type === 'VIDEO') {
-    return 'video';
-  }
-
-  if (type === 'DOCUMENTO') {
-    return 'document';
-  }
-
-  return 'image';
-}
-
 function getResourceValue(event, type) {
   if (type === 'VIDEO') {
     return event.resources?.[type] ?? event.videoUrl ?? null;
   }
 
   return event.resources?.[type];
+}
+
+function getDirectiveResourceItem(event, type) {
+  return Array.isArray(event.resourceItems)
+    ? event.resourceItems.find((resource) => resource?.tipoRecurso === type)
+    : null;
+}
+
+function getDirectiveResourceUrl(resource, fallbackValue) {
+  if (resource?.signedUrl) {
+    return resource.signedUrl;
+  }
+
+  return typeof fallbackValue === 'string' && /^https?:\/\//i.test(fallbackValue)
+    ? fallbackValue
+    : null;
+}
+
+function getDirectiveResourceName(resource, fallbackLabel) {
+  return resource?.nombreOriginal || fallbackLabel;
+}
+
+function getDirectiveReviewResourceKind(type, resource) {
+  const mimeType = resource?.mimeType ?? '';
+
+  if (type === 'VIDEO' || mimeType.startsWith('video/')) {
+    return 'video';
+  }
+
+  if (mimeType === 'application/pdf' || type === 'DOCUMENTO') {
+    return 'document';
+  }
+
+  return 'image';
 }
 
 function getResourcePreviewUrl(resourceValue, kind) {
@@ -476,11 +524,103 @@ function getReferenceCostLabel(event) {
     : 'No especificado';
 }
 
+function normalizeHistoryType(value) {
+  return String(value ?? '').trim().toUpperCase();
+}
+
+function getHistoryIconType(value) {
+  const type = normalizeHistoryType(value);
+  const iconTypeMap = {
+    CANCELAR: 'CANCELLED',
+    CREAR: 'CREATED',
+    EDITAR: 'UPDATED',
+    FECHA: 'DATE',
+    GENERAL: 'UPDATED',
+    OBSERVACION: 'OBSERVED',
+    OPERATIVO: 'OPERATIVE',
+    PUBLICAR: 'PUBLISHED',
+    RECURSO: 'RESOURCE',
+    REVISION: 'SENT_TO_REVIEW',
+    UBICACION: 'LOCATION',
+  };
+
+  return iconTypeMap[type] ?? iconTypeMap[normalizeHistoryType(value).replace('_EVENTO', '')] ?? 'UPDATED';
+}
+
+function getHistoryTone(value) {
+  const type = normalizeHistoryType(value);
+  if (type === 'CANCELAR') {
+    return 'danger';
+  }
+  if (type === 'OBSERVACION') {
+    return 'warning';
+  }
+  if (type === 'PUBLICAR' || type === 'CREAR') {
+    return 'success';
+  }
+  if (type === 'REVISION') {
+    return 'review';
+  }
+
+  return 'neutral';
+}
+
+function getHistoryTitle(item) {
+  const action = normalizeHistoryType(item?.accion);
+  const type = normalizeHistoryType(item?.tipoAccion);
+
+  if (action === 'CREAR_EVENTO' || type === 'CREAR') {
+    return 'Evento creado';
+  }
+  if (action.includes('ACTUALIZAR') || type === 'EDITAR') {
+    return 'Informacion actualizada';
+  }
+  if (action.includes('SUBIR_RECURSO') || action.includes('ELIMINAR_RECURSO') || type === 'RECURSO') {
+    return 'Recurso actualizado';
+  }
+  if (action.includes('OPERATIVO') || type === 'OPERATIVO') {
+    return 'Personal operativo';
+  }
+  if (action.includes('CANCEL') || type === 'CANCELAR') {
+    return 'Evento cancelado';
+  }
+  if (action.includes('PUBLIC') || type === 'PUBLICAR') {
+    return 'Evento publicado';
+  }
+  if (action.includes('OBSERV') || type === 'OBSERVACION') {
+    return 'Observacion registrada';
+  }
+  if (action.includes('REVISION') || type === 'REVISION') {
+    return 'Enviado a revision';
+  }
+  if (type === 'UBICACION') {
+    return 'Ubicacion actualizada';
+  }
+  if (type === 'FECHA') {
+    return 'Fecha y hora actualizadas';
+  }
+
+  return item?.detalle ? 'Movimiento registrado' : 'Gestion del evento';
+}
+
+function mapEventHistoryFromApi(item) {
+  const type = item?.tipoAccion ?? item?.accion;
+  return {
+    actorName: item?.usuarioNombre ?? 'Sistema',
+    actorRole: item?.usuarioRol ?? 'Sistema',
+    dateTime: item?.fechaHora,
+    id: item?.id ?? `${item?.accion ?? 'historial'}-${item?.fechaHora ?? Math.random()}`,
+    message: item?.detalle ?? '',
+    title: getHistoryTitle(item),
+    tone: getHistoryTone(type),
+    type: getHistoryIconType(type),
+    userComment: null,
+  };
+}
 function getDirectiveStateTone(state) {
   const stateToneMap = {
     PARA_REVISION: 'state-review',
     OBSERVADO: 'state-observed',
-    APROBADO: 'state-published',
     PUBLICADO: 'state-published',
   };
 
@@ -499,7 +639,13 @@ function DirectivoDashboard({ onLogout, user }) {
   const [reviewEventsError, setReviewEventsError] = useState('');
   const [isLoadingReviewDetail, setIsLoadingReviewDetail] = useState(false);
   const [selectedReviewEvent, setSelectedReviewEvent] = useState(null);
+  const [reviewHistoryItems, setReviewHistoryItems] = useState([]);
+  const [isLoadingReviewHistory, setIsLoadingReviewHistory] = useState(false);
+  const [reviewHistoryError, setReviewHistoryError] = useState('');
   const [selectedReportEvent, setSelectedReportEvent] = useState(null);
+  const [directiveReportItems, setDirectiveReportItems] = useState([]);
+  const [isLoadingReports, setIsLoadingReports] = useState(false);
+  const [reportsError, setReportsError] = useState('');
   const [pendingDecision, setPendingDecision] = useState(null);
   const [isSavingDecision, setIsSavingDecision] = useState(false);
   const [decisionError, setDecisionError] = useState('');
@@ -514,6 +660,7 @@ function DirectivoDashboard({ onLogout, user }) {
   const [notificationFilter, setNotificationFilter] = useState('all');
   const directiveUser = user ?? fallbackDirectiveUser;
   const directiveUserName = directiveUser.fullName || directiveUser.name || 'Sergio Bustamante';
+  const directiveReports = directiveReportItems;
 
   const loadReviewEvents = useCallback(async () => {
     setIsLoadingReviewEvents(true);
@@ -544,6 +691,22 @@ function DirectivoDashboard({ onLogout, user }) {
     }
   }, [reviewFilter, reviewPage.number]);
 
+  const loadDirectiveReports = useCallback(() => {
+    setIsLoadingReports(true);
+    setReportsError('');
+
+    return getReportesDirectivosFinalizados()
+      .then((data) => {
+        const reports = Array.isArray(data) ? data.map(mapDirectiveReportFromApi) : [];
+        setDirectiveReportItems(reports);
+      })
+      .catch((error) => {
+        console.error('No se pudieron cargar los reportes directivos.', error);
+        setDirectiveReportItems([]);
+        setReportsError(getApiErrorMessage(error, 'No se pudieron cargar los reportes directivos.'));
+      })
+      .finally(() => setIsLoadingReports(false));
+  }, []);
   const loadDirectiveNotifications = useCallback((nextFilter = notificationFilter) => {
     const soloNoLeidas = nextFilter === 'unread';
     setIsLoadingNotifications(true);
@@ -607,6 +770,13 @@ function DirectivoDashboard({ onLogout, user }) {
     };
   }, []);
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      loadDirectiveReports();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadDirectiveReports]);
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       loadDirectiveNotifications(notificationFilter);
@@ -688,12 +858,31 @@ function DirectivoDashboard({ onLogout, user }) {
     }
   }
 
+  async function loadEventHistory(eventId) {
+    setIsLoadingReviewHistory(true);
+    setReviewHistoryError('');
+
+    try {
+      const history = await getHistorialEvento(eventId);
+      setReviewHistoryItems(Array.isArray(history) ? history.map(mapEventHistoryFromApi) : []);
+    } catch (error) {
+      setReviewHistoryItems([]);
+      setReviewHistoryError(getApiErrorMessage(error, 'No se pudo cargar el historial de gestion.'));
+    } finally {
+      setIsLoadingReviewHistory(false);
+    }
+  }
   async function openDirectiveReviewEvent(eventId) {
     setIsLoadingReviewDetail(true);
     setReviewEventsError('');
+    setReviewHistoryItems([]);
+    setReviewHistoryError('');
 
     try {
-      const detail = await getDetalleRevisionDirectiva(eventId);
+      const [detail] = await Promise.all([
+        getDetalleRevisionDirectiva(eventId),
+        loadEventHistory(eventId),
+      ]);
       setSelectedReviewEvent(mapDirectiveReviewDetailFromApi(detail));
       setSelectedReportEvent(null);
       setCurrentDirectiveView('review');
@@ -707,7 +896,7 @@ function DirectivoDashboard({ onLogout, user }) {
   }
 
   function findDirectiveReportById(eventId) {
-    return eventReports.find((report) => String(report.id) === String(eventId)) ?? null;
+    return directiveReports.find((report) => String(report.id) === String(eventId)) ?? null;
   }
 
   async function handleNotificationOpen(notification) {
@@ -762,44 +951,62 @@ function DirectivoDashboard({ onLogout, user }) {
     return event ? { ...event, state: 'CANCELADO' } : event;
   }
 
+  function applyReviewDecisionState(event, eventId, nextState) {
+    return String(event?.id) === String(eventId)
+      ? { ...event, state: nextState }
+      : event;
+  }
+
   async function handleDirectiveDecisionConfirm(decisionResult) {
     if (!pendingDecision || isSavingDecision) {
       return;
     }
 
-    if (pendingDecision.type !== 'cancel') {
-      setPendingDecision(null);
-      setSelectedReviewEvent(null);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
+    const decisionType = pendingDecision.type;
+    const eventId = pendingDecision.eventId;
 
     try {
       setIsSavingDecision(true);
       setDecisionError('');
-      await cancelarEventoDirectivo(pendingDecision.eventId, {
-        motivo: decisionResult.comment,
-      });
-      setSelectedReviewEvent((currentEvent) =>
-        String(currentEvent?.id) === String(pendingDecision.eventId)
-          ? applyCancelledState(currentEvent)
-          : currentEvent,
-      );
-      setSelectedReportEvent((currentReport) =>
-        String(currentReport?.id) === String(pendingDecision.eventId)
-          ? applyCancelledState(currentReport)
-          : currentReport,
-      );
+
+      if (decisionType === 'approve') {
+        await aprobarEventoDirectivo(eventId);
+        setSelectedReviewEvent((currentEvent) => applyReviewDecisionState(currentEvent, eventId, 'PUBLICADO'));
+      } else if (decisionType === 'observe') {
+        await observarEventoDirectivo(eventId, {
+          observacion: decisionResult.comment,
+        });
+        setSelectedReviewEvent((currentEvent) => applyReviewDecisionState(currentEvent, eventId, 'OBSERVADO'));
+      } else if (decisionType === 'cancel') {
+        await cancelarEventoDirectivo(eventId, {
+          motivo: decisionResult.comment,
+        });
+        setSelectedReviewEvent((currentEvent) => applyCancelledState(currentEvent));
+        setSelectedReportEvent((currentReport) =>
+          String(currentReport?.id) === String(eventId)
+            ? applyCancelledState(currentReport)
+            : currentReport,
+        );
+      }
+
       setPendingDecision(null);
+      setSelectedReviewEvent(null);
+      setReviewHistoryItems([]);
+      setReviewHistoryError('');
       loadDirectiveNotifications(notificationFilter);
+      loadReviewEvents();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
-      setDecisionError(getApiErrorMessage(error, 'No se pudo cancelar el evento.'));
+      const fallbackMessage = decisionType === 'approve'
+        ? 'No se pudo aprobar el evento.'
+        : decisionType === 'observe'
+          ? 'No se pudo registrar la observacion.'
+          : 'No se pudo cancelar el evento.';
+      setDecisionError(getApiErrorMessage(error, fallbackMessage));
     } finally {
       setIsSavingDecision(false);
     }
   }
-
   return (
     <section
       className={[
@@ -980,9 +1187,14 @@ function DirectivoDashboard({ onLogout, user }) {
         {selectedReviewEvent ? (
           <DirectiveReviewView
             event={selectedReviewEvent}
+            historyError={reviewHistoryError}
+            historyItems={reviewHistoryItems}
+            isLoadingHistory={isLoadingReviewHistory}
             onActiveSectionChange={setActiveReviewSection}
             onBack={() => {
               setSelectedReviewEvent(null);
+              setReviewHistoryItems([]);
+              setReviewHistoryError('');
               setActiveReviewSection('ficha-directiva');
             }}
             onDecision={(decision) => {
@@ -1009,7 +1221,9 @@ function DirectivoDashboard({ onLogout, user }) {
             {currentDirectiveView === 'reports' ? (
               <ReportsDashboardView
                 notificationMenu={directiveNotificationMenu}
-                reports={eventReports}
+                error={reportsError}
+                isLoading={isLoadingReports}
+                reports={directiveReports}
                 onSelectReport={(report) => {
                   setSelectedReportEvent(report);
                   setActiveReviewSection('report-section');
@@ -1274,7 +1488,7 @@ function safePercent(numerator, denominator) {
   return Math.round((numerator / denominator) * 100);
 }
 
-function ReportsDashboardView({ notificationMenu, reports, onSelectReport }) {
+function ReportsDashboardView({ error = '', isLoading = false, notificationMenu, reports, onSelectReport }) {
   const availableReportYears = [
     ...new Set(
       reports
@@ -1284,15 +1498,22 @@ function ReportsDashboardView({ notificationMenu, reports, onSelectReport }) {
   ].sort((firstYear, secondYear) => secondYear - firstYear);
   const reportYearOptions = availableReportYears.length > 0
     ? availableReportYears
-    : [2026, 2025, 2024];
+    : [new Date().getFullYear()];
   const [reportSearch, setReportSearch] = useState('');
   const [reportCategory, setReportCategory] = useState('Todas');
   const [reportYear, setReportYear] = useState(String(reportYearOptions[0]));
   const [reportMonth, setReportMonth] = useState('all');
-  const [reportRanking, setReportRanking] = useState('top-5');
-  const [highlightTab, setHighlightTab] = useState('attendance');
   const [reportSort, setReportSort] = useState('recent');
-  const reportCategoryOptions = ['Todas', 'Cultura', 'Deporte', 'Salud', 'Educación'];
+
+  useEffect(() => {
+    const availableYears = reportYearOptions.map(String);
+
+    if (!availableYears.includes(reportYear)) {
+      setReportYear(availableYears[0]);
+    }
+  }, [reportYear, reportYearOptions]);
+
+  const reportCategoryOptions = ['Todas', ...new Set(reports.map((report) => report.category).filter(Boolean))];
   const reportMonthOptions = [
     ['all', 'Todos'],
     ['0', 'Enero'],
@@ -1308,205 +1529,241 @@ function ReportsDashboardView({ notificationMenu, reports, onSelectReport }) {
     ['10', 'Noviembre'],
     ['11', 'Diciembre'],
   ];
-  const reportRankingOptions = [
-    ['top-5', 'Top 5'],
-    ['top-10', 'Top 10'],
-    ['top-20', 'Top 20'],
-  ];
   const selectedMonthLabel = reportMonthOptions.find(([value]) => value === reportMonth)?.[1] ?? 'Todos';
   const highlightedPeriodLabel = reportMonth === 'all'
-    ? `del año ${reportYear}`
+    ? `del ano ${reportYear}`
     : `de ${selectedMonthLabel.toLowerCase()} ${reportYear}`;
-  const filteredReports = reports
-    .filter((report) => {
-      const normalizedSearch = reportSearch.trim().toLowerCase();
-      const reportDate = parseReportCompletedDate(report);
-      const matchesSearch =
-        normalizedSearch.length === 0 ||
-        [report.title, report.venue, report.category]
-          .join(' ')
-          .toLowerCase()
-          .includes(normalizedSearch);
-      const matchesCategory =
-        reportCategory === 'Todas' || report.category === reportCategory;
-      const matchesPeriod = (() => {
-        if (Number.isNaN(reportDate.getTime())) {
-          return false;
-        }
+  const globallyFilteredReports = reports.filter((report) => {
+    const reportDate = parseReportCompletedDate(report);
+    const matchesCategory = reportCategory === 'Todas' || report.category === reportCategory;
 
-        if (String(reportDate.getFullYear()) !== reportYear) {
-          return false;
-        }
+    if (!matchesCategory || Number.isNaN(reportDate.getTime())) {
+      return false;
+    }
 
-        if (reportMonth === 'all') {
-          return true;
-        }
+    if (String(reportDate.getFullYear()) !== reportYear) {
+      return false;
+    }
 
-        return reportDate.getMonth() === Number(reportMonth);
-      })();
+    return reportMonth === 'all' || reportDate.getMonth() === Number(reportMonth);
+  });
+  const filteredReportsBeforeSort = globallyFilteredReports.filter((report) => {
+    const normalizedSearch = reportSearch.trim().toLowerCase();
 
-      return matchesSearch && matchesCategory && matchesPeriod;
-    })
-    .sort((firstReport, secondReport) => {
-      if (reportSort === 'attendance') {
-        return secondReport.totalAttendance - firstReport.totalAttendance;
-      }
+    return normalizedSearch.length === 0 ||
+      [report.title, report.venue, report.category]
+        .join(' ')
+        .toLowerCase()
+        .includes(normalizedSearch);
+  });
 
-      if (reportSort === 'completed') {
-        return secondReport.completedAt.localeCompare(firstReport.completedAt);
-      }
+  function hasAttendanceData(report) {
+    return Boolean(report.requiereControlAsistencia) && Number(report.registered) > 0;
+  }
 
-      return firstReport.id - secondReport.id;
-    });
-  const totalFilteredAttendees = filteredReports.reduce(
+  function hasQrData(report) {
+    return Boolean(report.requiereControlAsistencia) && Number(report.qrValidated) > 0;
+  }
+
+  function hasSatisfactionData(report) {
+    return Boolean(report.encuestaSatisfaccionHabilitada)
+      && Number(report.totalValoraciones) > 0
+      && Number(report.puntuacionPromedio) > 0;
+  }
+
+  function getAttendanceRate(report) {
+    return Number.isFinite(Number(report.turnoutRate))
+      ? Number(report.turnoutRate)
+      : safePercent(report.totalAttendance, report.registered);
+  }
+
+  function getQrAdoption(report) {
+    return Number.isFinite(Number(report.digitalValidationRate))
+      ? Number(report.digitalValidationRate)
+      : safePercent(report.qrValidated, report.qrValidated + report.manualValidated);
+  }
+
+  const sortableReports = filteredReportsBeforeSort.filter((report) => {
+    if (['attendance', 'attendance-rate', 'low-participation'].includes(reportSort)) {
+      return hasAttendanceData(report);
+    }
+    if (reportSort === 'qr-adoption') {
+      return hasQrData(report);
+    }
+    if (reportSort === 'satisfaction') {
+      return hasSatisfactionData(report);
+    }
+    return true;
+  });
+  const filteredReports = [...sortableReports].sort((firstReport, secondReport) => {
+    if (reportSort === 'attendance') {
+      return secondReport.totalAttendance - firstReport.totalAttendance;
+    }
+    if (reportSort === 'attendance-rate') {
+      return (getAttendanceRate(secondReport) ?? 0) - (getAttendanceRate(firstReport) ?? 0);
+    }
+    if (reportSort === 'qr-adoption') {
+      return (getQrAdoption(secondReport) ?? 0) - (getQrAdoption(firstReport) ?? 0);
+    }
+    if (reportSort === 'satisfaction') {
+      return (secondReport.puntuacionPromedio ?? 0) - (firstReport.puntuacionPromedio ?? 0);
+    }
+    if (reportSort === 'low-participation') {
+      return (getAttendanceRate(firstReport) ?? 0) - (getAttendanceRate(secondReport) ?? 0);
+    }
+    return parseReportCompletedDate(secondReport).getTime() - parseReportCompletedDate(firstReport).getTime();
+  });
+  const reportsWithAttendance = globallyFilteredReports.filter(hasAttendanceData);
+  const reportsWithQr = globallyFilteredReports.filter(hasQrData);
+  const reportsWithSatisfaction = globallyFilteredReports.filter(hasSatisfactionData);
+  const totalFilteredAttendees = reportsWithAttendance.reduce(
     (total, report) => total + report.totalAttendance,
     0,
   );
-  const totalFilteredRegistered = filteredReports.reduce(
+  const totalFilteredRegistered = reportsWithAttendance.reduce(
     (total, report) => total + report.registered,
     0,
   );
-  const totalFilteredQr = filteredReports.reduce(
+  const totalFilteredQr = reportsWithQr.reduce(
     (total, report) => total + report.qrValidated,
     0,
   );
-  const totalFilteredManual = filteredReports.reduce(
+  const totalFilteredManual = reportsWithQr.reduce(
     (total, report) => total + report.manualValidated,
     0,
   );
   const averageAttendanceRate = safePercent(totalFilteredAttendees, totalFilteredRegistered);
-  const averageQrAdoption = safePercent(
-    totalFilteredQr,
-    totalFilteredQr + totalFilteredManual,
+  const averageQrAdoption = safePercent(totalFilteredQr, totalFilteredQr + totalFilteredManual);
+  const averageSatisfaction = reportsWithSatisfaction.length > 0
+    ? reportsWithSatisfaction.reduce((total, report) => total + Number(report.puntuacionPromedio), 0) / reportsWithSatisfaction.length
+    : null;
+  const totalSatisfactionRatings = reportsWithSatisfaction.reduce(
+    (total, report) => total + Number(report.totalValoraciones ?? 0),
+    0,
   );
   const globalReportStats = [
     {
       icon: FileSearchIcon,
       label: 'Eventos finalizados',
       tone: 'is-decision',
-      trend: 'según filtros activos',
-      value: filteredReports.length,
+      trend: 'segun filtros activos',
+      value: globallyFilteredReports.length,
     },
     {
       icon: BadgeCheckIcon,
       label: 'Asistentes totales',
       tone: 'is-month-approved',
-      trend: 'validaciones acumuladas',
+      trend: 'solo eventos con asistencia',
       value: totalFilteredAttendees,
     },
     {
       icon: ChartColumnIcon,
       label: 'Tasa promedio',
       tone: 'is-month-report',
-      trend: 'asistentes sobre inscritos',
+      trend: 'solo eventos con asistencia',
       value: averageAttendanceRate === null ? 'No disponible' : `${averageAttendanceRate}%`,
     },
     {
       icon: ChartColumnIcon,
-      label: 'Adopción QR promedio',
+      label: 'Adopcion QR promedio',
       tone: 'is-report-capacity',
-      trend: 'sobre validaciones efectivas',
+      trend: 'solo eventos con QR',
       value: averageQrAdoption === null ? 'No disponible' : `${averageQrAdoption}%`,
     },
+    {
+      icon: BadgeCheckIcon,
+      label: 'Satisfaccion promedio',
+      tone: 'is-month-approved',
+      trend: `${totalSatisfactionRatings} valoraciones`,
+      value: averageSatisfaction === null ? 'No disponible' : `${averageSatisfaction.toFixed(1)} / 5`,
+    },
   ];
-  const rankingLimit = Number(reportRanking.replace('top-', ''));
-  const hasSatisfactionData = filteredReports.some((report) =>
-    Number(report.puntuacionPromedio) > 0 && Number(report.totalValoraciones) > 0,
-  );
-  const activeHighlightTab =
-    highlightTab === 'satisfaction' && !hasSatisfactionData ? 'attendance' : highlightTab;
-  const highlightedTabs = [
-    ['attendance', 'Más asistidos'],
-    ['attendance-rate', 'Mayor tasa de asistencia'],
-    ['qr-adoption', 'Mejor adopción QR'],
-    ['low-participation', 'Menor participación'],
-  ];
-  const highlightedRankingTabs = [
-    ...highlightedTabs.slice(0, 3),
-    [
-      'satisfaction',
-      hasSatisfactionData ? 'Mayor satisfacción' : 'Mayor satisfacción · Próximamente',
-      !hasSatisfactionData,
-    ],
-    ...highlightedTabs.slice(3),
-  ];
-  const highlightedReports = [...filteredReports]
-    .sort((firstReport, secondReport) => {
-      const firstAttendanceRate = safePercent(firstReport.totalAttendance, firstReport.registered) ?? 0;
-      const secondAttendanceRate = safePercent(secondReport.totalAttendance, secondReport.registered) ?? 0;
-      const firstQrRate = safePercent(
-        firstReport.qrValidated,
-        firstReport.qrValidated + firstReport.manualValidated,
-      ) ?? 0;
-      const secondQrRate = safePercent(
-        secondReport.qrValidated,
-        secondReport.qrValidated + secondReport.manualValidated,
-      ) ?? 0;
 
-      if (activeHighlightTab === 'attendance-rate') {
-        return secondAttendanceRate - firstAttendanceRate;
+  function getTopReport(criteria) {
+    const candidates = globallyFilteredReports.filter((report) => {
+      if (criteria === 'satisfaction') {
+        return hasSatisfactionData(report);
       }
-
-      if (activeHighlightTab === 'qr-adoption') {
-        return secondQrRate - firstQrRate;
+      if (criteria === 'qr-adoption') {
+        return hasQrData(report);
       }
+      return hasAttendanceData(report);
+    });
 
-      if (activeHighlightTab === 'satisfaction') {
+    return candidates.sort((firstReport, secondReport) => {
+      if (criteria === 'attendance') {
+        return secondReport.totalAttendance - firstReport.totalAttendance;
+      }
+      if (criteria === 'attendance-rate') {
+        return (getAttendanceRate(secondReport) ?? 0) - (getAttendanceRate(firstReport) ?? 0);
+      }
+      if (criteria === 'qr-adoption') {
+        return (getQrAdoption(secondReport) ?? 0) - (getQrAdoption(firstReport) ?? 0);
+      }
+      if (criteria === 'satisfaction') {
         return (secondReport.puntuacionPromedio ?? 0) - (firstReport.puntuacionPromedio ?? 0);
       }
-
-      if (activeHighlightTab === 'low-participation') {
-        return firstAttendanceRate - secondAttendanceRate;
+      if (criteria === 'low-participation') {
+        return (getAttendanceRate(firstReport) ?? 0) - (getAttendanceRate(secondReport) ?? 0);
       }
-
-      return secondReport.totalAttendance - firstReport.totalAttendance;
-    })
-    .slice(0, rankingLimit);
-
-  function getHighlightMetric(report) {
-    const attendanceRate = safePercent(report.totalAttendance, report.registered) ?? 0;
-    const qrRate = safePercent(
-      report.qrValidated,
-      report.qrValidated + report.manualValidated,
-    );
-
-    if (activeHighlightTab === 'attendance-rate') {
-      return `${attendanceRate}% asistencia`;
-    }
-
-    if (activeHighlightTab === 'qr-adoption') {
-      return qrRate === null ? 'Sin validaciones' : `${qrRate}% QR`;
-    }
-
-    if (activeHighlightTab === 'satisfaction') {
-      return Number(report.puntuacionPromedio) > 0
-        ? `${report.puntuacionPromedio.toFixed(1)} / 5 · ${report.totalValoraciones} valoraciones`
-        : 'Sin valoraciones';
-    }
-
-    if (activeHighlightTab === 'low-participation') {
-      return `${attendanceRate}% asistencia`;
-    }
-
-    return `${report.totalAttendance} asistentes`;
+      return 0;
+    })[0] ?? null;
   }
+
+  function getHighlightValue(criteria, report) {
+    if (!report) {
+      return 'No hay datos suficientes';
+    }
+    if (criteria === 'attendance') {
+      return `${report.totalAttendance} asistentes`;
+    }
+    if (criteria === 'attendance-rate') {
+      return `${getAttendanceRate(report)}% asistencia`;
+    }
+    if (criteria === 'qr-adoption') {
+      return `${getQrAdoption(report)}% QR`;
+    }
+    if (criteria === 'satisfaction') {
+      return `${Number(report.puntuacionPromedio).toFixed(1)} / 5`;
+    }
+    return `${getAttendanceRate(report)}% asistencia`;
+  }
+
+  const highlightedCards = [
+    ['attendance', 'Mas asistido'],
+    ['attendance-rate', 'Mejor tasa asistencia'],
+    ['qr-adoption', 'Mejor adopcion QR'],
+    ['satisfaction', 'Mayor satisfaccion'],
+    ['low-participation', 'Menor participacion'],
+  ].map(([criteria, label]) => {
+    const report = getTopReport(criteria);
+    return {
+      criteria,
+      label,
+      report,
+      value: getHighlightValue(criteria, report),
+    };
+  });
 
   return (
     <section className="reports-dashboard-view" aria-labelledby="reports-title">
       <header className="admin-topbar">
         <div>
           <span className="section-kicker">Reportes directivos</span>
-          <h1 id="reports-title">Análisis de eventos finalizados</h1>
-          <p>Consulta métricas acumuladas, rankings y reportes individuales de los eventos municipales.</p>
+          <h1 id="reports-title">Analisis de eventos finalizados</h1>
+          <p>Consulta metricas acumuladas y reportes individuales de los eventos municipales finalizados.</p>
         </div>
         <div className="admin-topbar-actions">
           {notificationMenu}
         </div>
       </header>
 
-      <section className="reports-global-filters" aria-label="Filtros globales de análisis">
+      {error && <p className="settings-inline-notice" role="alert">{error}</p>}
+      {isLoading && <p className="settings-inline-notice">Cargando reportes directivos...</p>}
+
+      <section className="reports-global-filters" aria-label="Filtros globales de analisis">
         <label>
-          Año
+          Ano
           <select
             value={reportYear}
             onChange={(event) => setReportYear(event.target.value)}
@@ -1528,7 +1785,7 @@ function ReportsDashboardView({ notificationMenu, reports, onSelectReport }) {
           </select>
         </label>
         <label>
-          Categoría
+          Categoria
           <select
             value={reportCategory}
             onChange={(event) => setReportCategory(event.target.value)}
@@ -1538,20 +1795,9 @@ function ReportsDashboardView({ notificationMenu, reports, onSelectReport }) {
             ))}
           </select>
         </label>
-        <label>
-          Ranking
-          <select
-            value={reportRanking}
-            onChange={(event) => setReportRanking(event.target.value)}
-          >
-            {reportRankingOptions.map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </label>
       </section>
 
-      <section className="admin-stats reports-global-stats" aria-label="Métricas globales de eventos finalizados">
+      <section className="admin-stats reports-global-stats" aria-label="Metricas globales de eventos finalizados">
         {globalReportStats.map((stat) => (
           <article
             className={`admin-stat-card management-stat-card directive-stat-card ${stat.tone}`}
@@ -1572,47 +1818,38 @@ function ReportsDashboardView({ notificationMenu, reports, onSelectReport }) {
       <section className="admin-panel highlighted-events-panel" aria-labelledby="highlighted-events-title">
         <div className="admin-panel-heading">
           <div>
-            <span className="section-kicker">Rankings</span>
-            <h2 id="highlighted-events-title">Eventos destacados {highlightedPeriodLabel}</h2>
+            <span className="section-kicker">Eventos destacados</span>
+            <h2 id="highlighted-events-title">Resumen ejecutivo {highlightedPeriodLabel}</h2>
           </div>
         </div>
-        <div className="highlight-tabs" role="tablist" aria-label="Rankings de eventos finalizados">
-          {highlightedRankingTabs.map(([value, label, disabled]) => (
-            <button
-              aria-selected={activeHighlightTab === value}
-              className={activeHighlightTab === value ? 'active' : ''}
-              disabled={disabled}
-              key={value}
-              role="tab"
-              type="button"
-              onClick={() => setHighlightTab(value)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
         <div className="highlighted-events-grid">
-          {highlightedReports.map((report, index) => (
-            <article className="highlighted-event-card" key={report.id}>
-              <span className="highlight-rank">#{index + 1}</span>
-              <div>
-                <strong>{report.title}</strong>
-                <small>{report.category}</small>
-              </div>
-              <span className="highlight-metric">{getHighlightMetric(report)}</span>
-              <small>{report.totalAttendance} asistentes · {report.registered} inscritos</small>
-              <button
-                aria-label={`Ver reporte de ${report.title}`}
-                className="table-icon-action"
-                title="Ver reporte"
-                type="button"
-                onClick={() => {
-                  onSelectReport(report);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-              >
-                <AnalyticsIcon />
-              </button>
+          {highlightedCards.map((card) => (
+            <article className={card.report ? 'highlighted-event-card' : 'highlighted-event-card is-empty'} key={card.criteria}>
+              <span className="highlight-rank">{card.label}</span>
+              {card.report ? (
+                <>
+                  <div>
+                    <strong>{card.report.title}</strong>
+                    <small>{card.report.category}</small>
+                  </div>
+                  <span className="highlight-metric">{card.value}</span>
+                  <small>{card.report.totalAttendance} asistentes · {card.report.registered} inscritos</small>
+                  <button
+                    aria-label={`Ver reporte de ${card.report.title}`}
+                    className="table-icon-action"
+                    title="Ver reporte"
+                    type="button"
+                    onClick={() => {
+                      onSelectReport(card.report);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                  >
+                    <AnalyticsIcon />
+                  </button>
+                </>
+              ) : (
+                <span className="highlight-empty">No hay datos suficientes</span>
+              )}
             </article>
           ))}
         </div>
@@ -1629,7 +1866,7 @@ function ReportsDashboardView({ notificationMenu, reports, onSelectReport }) {
           <label>
             Buscar reporte
             <input
-              placeholder="Nombre, categoría o lugar"
+              placeholder="Nombre, categoria o lugar"
               type="search"
               value={reportSearch}
               onChange={(event) => setReportSearch(event.target.value)}
@@ -1641,9 +1878,12 @@ function ReportsDashboardView({ notificationMenu, reports, onSelectReport }) {
               value={reportSort}
               onChange={(event) => setReportSort(event.target.value)}
             >
-              <option value="recent">Más recientes</option>
-              <option value="completed">Fecha de culminación</option>
-              <option value="attendance">Mayor asistencia</option>
+              <option value="recent">Mas recientes</option>
+              <option value="attendance">Mas asistidos</option>
+              <option value="attendance-rate">Mayor tasa de asistencia</option>
+              <option value="qr-adoption">Mejor adopcion QR</option>
+              <option value="satisfaction">Mayor satisfaccion</option>
+              <option value="low-participation">Menor participacion</option>
             </select>
           </label>
         </div>
@@ -1662,10 +1902,10 @@ function ReportsDashboardView({ notificationMenu, reports, onSelectReport }) {
                 <strong>{report.title}</strong>
                 <small>{report.date} - {report.venue}</small>
               </span>
-              <span>{report.registered}</span>
+              <span>{report.requiereControlAsistencia ? report.registered : 'No aplica'}</span>
               <span className="report-attendance-cell">
-                <strong>{report.totalAttendance}</strong>
-                <small>{report.turnoutRate}%</small>
+                <strong>{report.requiereControlAsistencia ? report.totalAttendance : 'No aplica'}</strong>
+                <small>{report.requiereControlAsistencia && report.turnoutRate !== null ? `${report.turnoutRate}%` : 'Sin control'}</small>
               </span>
               <span>{report.completedAt}</span>
               <span>
@@ -1684,13 +1924,21 @@ function ReportsDashboardView({ notificationMenu, reports, onSelectReport }) {
               </span>
             </div>
           ))}
+          {filteredReports.length === 0 && (
+            <div className="admin-table-row">
+              <span>No hay eventos finalizados para los filtros seleccionados.</span>
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
+          )}
         </div>
       </section>
 
     </section>
   );
 }
-
 function downloadReportCsv(report) {
   const rows = [
     ['campo', 'valor'],
@@ -2208,6 +2456,28 @@ function EventHistoryIcon({ type }) {
         <path d="M14 2v6h6" />
       </>
     ),
+    DATE: (
+      <>
+        <path d="M8 2v4" />
+        <path d="M16 2v4" />
+        <rect height="18" rx="2" width="18" x="3" y="4" />
+        <path d="M3 10h18" />
+      </>
+    ),
+    LOCATION: (
+      <>
+        <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z" />
+        <circle cx="12" cy="10" r="3" />
+      </>
+    ),
+    OPERATIVE: (
+      <>
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M19 8v6" />
+        <path d="M22 11h-6" />
+      </>
+    ),
     OBSERVED: (
       <>
         <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v8Z" />
@@ -2218,6 +2488,14 @@ function EventHistoryIcon({ type }) {
     PUBLISHED: (
       <>
         <path d="M12 2 15 8l6 .9-4.5 4.3 1.1 6.1L12 16.4 6.4 19.3l1.1-6.1L3 8.9 9 8Z" />
+      </>
+    ),
+    RESOURCE: (
+      <>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+        <path d="M14 2v6h6" />
+        <path d="m10 15 2-2 4 4" />
+        <path d="M8 17h8" />
       </>
     ),
     SAVED_DRAFT: (
@@ -2354,7 +2632,7 @@ function ReviewInfoList({ items }) {
   );
 }
 
-function EventHistoryMenu({ historyItems }) {
+function EventHistoryMenu({ historyError = '', historyItems = [], isLoading = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -2392,10 +2670,23 @@ function EventHistoryMenu({ historyItems }) {
         <aside className="event-history-panel" aria-label="Historial de gestión">
           <div className="event-history-header">
             <strong>Historial de gestión</strong>
-            <small>{historyItems.length} movimientos del evento</small>
+            <small>{isLoading ? 'Cargando movimientos...' : `${historyItems.length} movimientos del evento`}</small>
           </div>
           <div className="event-history-list">
-            {historyItems.length > 0 ? (
+            {isLoading ? (
+              Array.from({ length: 3 }).map((_, index) => (
+                <article className="event-history-item is-neutral is-loading" key={`history-loading-${index}`}>
+                  <span className="event-history-icon event-history-skeleton-dot" />
+                  <div>
+                    <span className="event-history-skeleton-line is-title" />
+                    <span className="event-history-skeleton-line is-meta" />
+                    <span className="event-history-skeleton-line" />
+                  </div>
+                </article>
+              ))
+            ) : historyError ? (
+              <p className="event-history-empty is-error">{historyError}</p>
+            ) : historyItems.length > 0 ? (
               historyItems.map((item) => (
                 <article className={`event-history-item is-${item.tone}`} key={item.id}>
                   <span className="event-history-icon">
@@ -2426,7 +2717,7 @@ function EventHistoryMenu({ historyItems }) {
   );
 }
 
-function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision }) {
+function DirectiveReviewView({ event, historyError = '', historyItems = [], isLoadingHistory = false, onActiveSectionChange, onBack, onDecision }) {
   const fichaRef = useRef(null);
   const recursosRef = useRef(null);
   const decisionRef = useRef(null);
@@ -2436,17 +2727,6 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
   const canCancelEvent = event.state !== 'CANCELADO';
   const reviewTimeMetric = getReviewTimeMetric(event);
   const shouldShowPreviousObservation = Boolean(event.previousObservation);
-  const eventHistory = event.previousObservation ? [{
-    actorName: event.previousObservation.author,
-    actorRole: event.previousObservation.role,
-    dateTime: event.previousObservation.dateTime,
-    id: `observation-${event.id}`,
-    message: null,
-    title: 'Observación registrada',
-    tone: 'warning',
-    type: 'OBSERVED',
-    userComment: event.previousObservation.comment,
-  }] : [];
   const mainInfoItems = [
     {
       icon: 'clock',
@@ -2543,7 +2823,7 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
           <h1 id="review-event-title">{event.title}</h1>
         </div>
         <div className="directive-review-topbar-actions">
-          <EventHistoryMenu historyItems={eventHistory} />
+          <EventHistoryMenu historyError={historyError} historyItems={historyItems} isLoading={isLoadingHistory} />
           <button className="admin-new-event-action event-form-top-action" type="button" onClick={onBack}>
             Volver
           </button>
@@ -2551,15 +2831,14 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
       </header>
 
       <section className="directive-review-hero" id="ficha-directiva" ref={fichaRef}>
-        <div className={`directive-review-media media-${event.accent}`}>
-          <img alt="" src={event.imageUrl || eventReviewPlaceholder} />
-          <span>{event.category}</span>
-        </div>
         <article className="admin-panel directive-review-summary">
           <div className="directive-summary-heading">
             <div>
               <span className="section-kicker">Evaluación directiva</span>
               <h2>Resumen para decisión</h2>
+              <p className="directive-summary-intro">
+                Revisa la información principal, los datos operativos y los recursos antes de registrar una decisión.
+              </p>
             </div>
             <div className="directive-summary-status">
               <span className={`state-badge ${getDirectiveStateTone(event.state)}`}>
@@ -2570,10 +2849,11 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
                   Pendiente desde {reviewTimeMetric.value.toLowerCase()}
                 </span>
               )}
+              <span className="directive-category-pill">{event.category}</span>
             </div>
           </div>
           <div className={'directive-description-grid'}>
-            <section>
+            <section className="is-main-description">
               <span>Descripción</span>
               <p>{getDisplayValue(event.description, 'Descripción no especificada.')}</p>
             </section>
@@ -2583,9 +2863,11 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
             </section>
           </div>
           <ReviewInfoList items={metadataItems} />
-          <div className="directive-review-checks" aria-label="Indicadores de revisión">
-            <span>Corrección atendida</span>
-          </div>
+          {shouldShowPreviousObservation && (
+            <div className="directive-review-checks" aria-label="Indicadores de revisión">
+              <span>Corrección atendida</span>
+            </div>
+          )}
         </article>
       </section>
 
@@ -2624,26 +2906,58 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
         </div>
         <div className="directive-resource-grid">
           {reviewResourceLabels.map(([type, label]) => {
-            const kind = getResourceKind(type);
-            const resourceValue = getResourceValue(event, type);
-            const isAvailable = Boolean(resourceValue);
-            const previewUrl = getResourcePreviewUrl(resourceValue, kind);
-            const externalUrl = typeof resourceValue === 'string' && /^https?:\/\//i.test(resourceValue)
-              ? resourceValue
-              : null;
-            const resourceActionLabel = kind === 'video' ? 'Abrir video' : `Previsualizar ${label}`;
+            const resourceItem = getDirectiveResourceItem(event, type);
+            const fallbackValue = getResourceValue(event, type);
+            const kind = getDirectiveReviewResourceKind(type, resourceItem);
+            const resourceUrl = getDirectiveResourceUrl(resourceItem, fallbackValue);
+            const isAvailable = Boolean(resourceUrl);
+            const previewUrl = resourceUrl ?? getResourcePreviewUrl(fallbackValue, kind);
+            const resourceName = getDirectiveResourceName(resourceItem, label);
+            const externalUrl = resourceUrl;
+            const resourceActionLabel = kind === 'video'
+              ? 'Reproducir video'
+              : kind === 'document'
+                ? 'Abrir documento'
+                : `Previsualizar ${label}`;
 
             return (
               <article
-                className={isAvailable ? 'directive-resource-card' : 'directive-resource-card missing'}
+                className={`directive-resource-card ${isAvailable ? 'is-available' : 'missing'} is-${kind}`}
                 key={type}
               >
-                <div className={kind === 'video' ? 'directive-video-preview' : `directive-resource-preview media-${event.accent}`}>
-                  <span>{kind === 'video' ? 'Video' : event.category}</span>
+                <div className="directive-resource-preview-shell">
+                  {isAvailable && kind === 'image' && previewUrl ? (
+                    <img alt={label} src={previewUrl} />
+                  ) : isAvailable && kind === 'video' && previewUrl ? (
+                    <>
+                      <video
+                        aria-hidden="true"
+                        muted
+                        playsInline
+                        preload="metadata"
+                        src={previewUrl}
+                        onError={(videoEvent) => {
+                          videoEvent.currentTarget.style.display = 'none';
+                        }}
+                      />
+                      <span className="directive-video-playmark">
+                        <ResourceActionIcon type="video" />
+                      </span>
+                    </>
+                  ) : isAvailable && kind === 'document' ? (
+                    <span className="directive-document-mark">
+                      <ResourceActionIcon type="document" />
+                    </span>
+                  ) : (
+                    <span className="directive-resource-empty-mark">Sin recurso</span>
+                  )}
                 </div>
-                <strong>{label}</strong>
+                <div className="directive-resource-card-body">
+                  <span className="directive-resource-type">{type}</span>
+                  <strong>{label}</strong>
+                  <small>{isAvailable ? resourceName : 'Recurso pendiente de carga'}</small>
+                </div>
                 <div className="directive-resource-meta">
-                  <small>{isAvailable ? type : 'No cargado'}</small>
                   <button
                     aria-label={isAvailable ? resourceActionLabel : `${label} no disponible`}
                     className="directive-resource-action"
@@ -2658,7 +2972,7 @@ function DirectiveReviewView({ event, onActiveSectionChange, onBack, onDecision 
                       type,
                     })}
                   >
-                    {isAvailable ? <ResourceActionIcon type={kind} /> : <span>No disponible</span>}
+                    {isAvailable ? <><ResourceActionIcon type={kind} /><span>{resourceActionLabel}</span></> : <span>No disponible</span>}
                   </button>
                 </div>
               </article>
@@ -2761,26 +3075,13 @@ function DirectiveOperativeAssignments({ event }) {
       </div>
 
       {operatives.length > 0 ? (
-        <div className={'area-combobox operative-assignment-combobox directive-operative-readonly'}>
-          <div className={'area-combobox-input directive-operative-summary'}>{assignmentSummary}</div>
-          <div className={'operative-assignment-selected'}>
-            {operatives.map((operative) => (
-              <span key={operative.id}>{operative.fullName}</span>
-            ))}
-          </div>
-          <div className={'directive-operative-list'}>
-            {operatives.map((operative) => (
-              <article className={'directive-operative-card'} key={operative.id}>
-                <span className={'admin-user-avatar'} aria-hidden={true}>
-                  {getDirectiveUserInitials(operative.fullName)}
-                </span>
-                <span>
-                  <strong>{operative.fullName}</strong>
-                  <small>{operative.role}{operative.email ? ` · ${operative.email}` : ''}</small>
-                </span>
-              </article>
-            ))}
-          </div>
+        <div className={'directive-operative-compact-list'}>
+          {operatives.map((operative) => (
+            <article className={'directive-operative-card'} key={operative.id}>
+              <strong>{operative.fullName}</strong>
+              {operative.email && <small>{operative.email}</small>}
+            </article>
+          ))}
         </div>
       ) : (
         <p className={'settings-inline-notice'}>
@@ -2937,21 +3238,25 @@ function DirectiveDecisionModal({ decision, error = '', isSaving = false, onCanc
         </span>
         <h2 id="directive-decision-title">
           {isApproval
-            ? '¿Deseas aprobar este evento?'
-            : `Registrar observación para "${decision.eventTitle}"`}
+            ? 'Deseas aprobar este evento?'
+            : isCancellation
+              ? `Cancelar "${decision.eventTitle}"`
+              : `Registrar observacion para "${decision.eventTitle}"`}
         </h2>
         <p>
           {isApproval
-            ? 'Al aprobarlo, el evento quedará listo para publicación según el flujo definido.'
-            : 'Describe con claridad qué debe corregir el administrador antes de reenviar la ficha.'}
+            ? 'Al aprobarlo, el evento pasara directamente a publicado.'
+            : isCancellation
+              ? 'Indica el motivo de cancelacion para dejar trazabilidad de la decision.'
+              : 'Describe con claridad que debe corregir el administrador antes de reenviar la ficha.'}
         </p>
         
         {!isApproval && (
           <label className="directive-observation-field">
-            Comentario de observación
+            {isCancellation ? 'Motivo de cancelacion' : 'Comentario de observacion'}
             <textarea
               required
-              placeholder="Indica qué debe corregirse antes de publicar."
+              placeholder={isCancellation ? 'Explica brevemente por que se cancela.' : 'Indica que debe corregirse antes de publicar.'}
               value={observationComment}
               onChange={(event) => setObservationComment(event.target.value)}
             />

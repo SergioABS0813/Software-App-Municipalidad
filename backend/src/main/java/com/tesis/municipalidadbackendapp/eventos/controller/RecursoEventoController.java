@@ -1,8 +1,11 @@
 package com.tesis.municipalidadbackendapp.eventos.controller;
 
+import com.tesis.municipalidadbackendapp.common.UsuarioAutenticadoService;
 import com.tesis.municipalidadbackendapp.eventos.dto.RecursoEventoDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.RecursoUploadResponse;
 import com.tesis.municipalidadbackendapp.eventos.service.RecursoEventoService;
+import com.tesis.municipalidadbackendapp.usuariosinternos.entity.Usuario;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -22,14 +25,17 @@ import java.util.List;
 @RequestMapping("api/eventos")
 public class RecursoEventoController {
     private final RecursoEventoService recursoEventoService;
+    private final UsuarioAutenticadoService usuarioAutenticadoService;
 
     @PostMapping(value = "admin/operacion/{eventoId}/recursos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public RecursoUploadResponse subirRecurso(
             @PathVariable Integer eventoId,
             @RequestParam String tipoRecurso,
-            @RequestParam("archivo") MultipartFile archivo
+            @RequestParam("archivo") MultipartFile archivo,
+            HttpServletRequest request
     ) {
-        return recursoEventoService.subirRecurso(eventoId, tipoRecurso, archivo);
+        Usuario usuario = usuarioAutenticadoService.obtenerUsuarioAutenticado();
+        return recursoEventoService.subirRecurso(eventoId, tipoRecurso, archivo, usuario, request);
     }
 
     @GetMapping("{eventoId}/recursos")
@@ -40,9 +46,11 @@ public class RecursoEventoController {
     @DeleteMapping("admin/operacion/{eventoId}/recursos/{recursoId}")
     public ResponseEntity<Void> eliminarRecurso(
             @PathVariable Integer eventoId,
-            @PathVariable Integer recursoId
+            @PathVariable Integer recursoId,
+            HttpServletRequest request
     ) {
-        recursoEventoService.eliminarRecurso(eventoId, recursoId);
+        Usuario usuario = usuarioAutenticadoService.obtenerUsuarioAutenticado();
+        recursoEventoService.eliminarRecurso(eventoId, recursoId, usuario, request);
         return ResponseEntity.noContent().build();
     }
 }

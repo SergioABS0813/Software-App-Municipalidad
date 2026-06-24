@@ -45,6 +45,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/valoraciones/validar").permitAll()
                         .requestMatchers("/api/valoraciones/responder").permitAll()
                         .requestMatchers("/api/eventos/*/recursos").permitAll()
+                        .requestMatchers("/api/eventos/*/historial").hasAnyRole("ADMINISTRADOR", "DIRECTIVO")
                         .requestMatchers("/api/valoraciones/admin/**").hasAnyRole("ADMINISTRADOR", "DIRECTIVO")
                         .requestMatchers("/api/eventos/admin/operacion/*/finalizar").hasAnyRole("ADMINISTRADOR", "DIRECTIVO")
                         .requestMatchers("/api/eventos/directivo/**").hasRole("DIRECTIVO")

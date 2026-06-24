@@ -183,6 +183,10 @@ export async function getEventosOperativoHoy(){
     return response.data;
 }
 
+export async function getReportesDirectivosFinalizados(){
+    const response = await api.get("eventos/directivo/reportes");
+    return response.data;
+}
 export async function getResumenCardsDirectivo(){
     const response = await api.get("eventos/directivo/cards");
     return response.data;
@@ -202,6 +206,21 @@ export async function getConteosRevisionDirectiva(){
 
 export async function getDetalleRevisionDirectiva(id){
     const response = await api.get(`eventos/directivo/revision/${id}`);
+    return response.data;
+}
+
+export async function getHistorialEvento(eventoId){
+    const response = await api.get(`eventos/${eventoId}/historial`);
+    return response.data;
+}
+
+export async function aprobarEventoDirectivo(id){
+    const response = await api.patch(`eventos/directivo/operacion/${id}/aprobar`);
+    return response.data;
+}
+
+export async function observarEventoDirectivo(id, { observacion = '' } = {}){
+    const response = await api.patch(`eventos/directivo/operacion/${id}/observar`, { observacion });
     return response.data;
 }
 

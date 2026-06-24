@@ -6,7 +6,7 @@ import municipalLogo from "../assets/municipalidad-logo.png";
 type ErrorKcContext = Extract<KcContext, { pageId: "error.ftl" }>;
 
 function getBackToEventsUrl(kcContext: ErrorKcContext) {
-    if (kcContext.client.baseUrl) {
+    if (kcContext.client?.baseUrl) {
         return kcContext.client.baseUrl;
     }
 
