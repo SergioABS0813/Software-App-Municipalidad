@@ -10,11 +10,15 @@ import keycloak, {
   logoutFromKeycloak,
   registerWithKeycloak,
 } from '../auth/keycloak';
-import { eventCategories, events } from './data/events';
 import PublicEventDetail from './PublicEventDetail';
 import './PublicPortal.css';
-import { SESSION_EXPIRED_MESSAGE } from '../../services/api/api';
-import {recuperarContrasena} from '../../services/publicPortalService';
+import { getApiErrorMessage, SESSION_EXPIRED_MESSAGE } from '../../services/api/api';
+import {
+  obtenerCategoriasPublicas,
+  obtenerEventosPublicados,
+  inscribirEventoPublicado,
+  recuperarContrasena,
+} from '../../services/publicPortalService';
 import LoadingButton from '../../components/feedback/LoadingButton';
 
 const institutionalUsers = [
@@ -73,6 +77,8 @@ const emptyCitizenRegister = {
 const eventsListPath = '/eventos';
 const citizenAuthStorageKey = 'citizenAuthUser';
 const citizenAuthTokenKey = 'token';
+const allCategoriesLabel = 'Todos';
+const portalAccentOptions = ['coral', 'teal', 'indigo', 'lime', 'gold'];
 
 const eventMonthIndex = {
   abr: 3,
@@ -90,6 +96,13 @@ const eventMonthIndex = {
 };
 
 function parseEventDateTime(event) {
+  const rawDate = event.eventStartAt ?? event.fechaHoraInicio;
+  const parsedRawDate = rawDate ? new Date(rawDate) : null;
+
+  if (parsedRawDate && !Number.isNaN(parsedRawDate.getTime())) {
+    return parsedRawDate;
+  }
+
   const dateMatch = event.date?.match(/(\d{1,2})\s+([a-záéíóúñ]{3})/i);
 
   if (!dateMatch) {
@@ -151,7 +164,7 @@ function getClosestStartingEvent(eventList) {
 }
 
 function getResourceUrl(resource) {
-  return resource?.url_recurso ?? resource?.url ?? '';
+  return resource?.signedUrl ?? resource?.url_recurso ?? resource?.url ?? '';
 }
 
 function getEventCoverResource(event) {
@@ -177,6 +190,113 @@ function getEventShortDescription(event) {
   return event.descripcion_breve || event.descripcion || event.summary || event.description || '';
 }
 
+function formatPublicEventDate(value) {
+  const date = value ? new Date(value) : null;
+
+  if (!date || Number.isNaN(date.getTime())) {
+    return 'Fecha por confirmar';
+  }
+
+  return new Intl.DateTimeFormat('es-PE', {
+    day: '2-digit',
+    month: 'short',
+    weekday: 'short',
+  }).format(date);
+}
+
+function formatPublicEventTime(value) {
+  const date = value ? new Date(value) : null;
+
+  if (!date || Number.isNaN(date.getTime())) {
+    return 'Hora por confirmar';
+  }
+
+  return new Intl.DateTimeFormat('es-PE', {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function formatPublicEventDuration(startValue, endValue) {
+  const start = startValue ? new Date(startValue) : null;
+  const end = endValue ? new Date(endValue) : null;
+
+  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+    return 'Duracion por confirmar';
+  }
+
+  const totalMinutes = Math.round((end.getTime() - start.getTime()) / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return [hours > 0 ? `${hours} ${hours === 1 ? 'hora' : 'horas'}` : '', minutes > 0 ? `${minutes} min` : '']
+    .filter(Boolean)
+    .join(' ');
+}
+
+function mapPublicEventFromApi(event, index = 0) {
+  const aforoMaximo = event.aforoMaximo ?? null;
+  const venue = event.ubicacionNombre ?? 'Ubicacion por confirmar';
+  const address = [event.ubicacionDireccion, event.ubicacionReferencia].filter(Boolean).join(' - ');
+  const resources = Array.isArray(event.recursos)
+    ? event.recursos.map((resource) => ({
+        fecha_subida: resource.fechaSubida,
+        mime_type: resource.mimeType,
+        mimeType: resource.mimeType,
+        nombre_archivo: resource.nombreOriginal,
+        nombreOriginal: resource.nombreOriginal,
+        objectPath: resource.objectPath,
+        recurso_id: resource.id,
+        signedUrl: resource.signedUrl,
+        sizeBytes: resource.sizeBytes,
+        tipo_recurso: resource.tipoRecurso,
+        url_recurso: resource.signedUrl,
+      }))
+    : [];
+  const coverResource = resources.find((resource) => {
+    const resourceType = resource.tipo_recurso?.toUpperCase();
+    return resourceType === 'PORTADA' || resourceType === 'IMAGEN_PORTADA';
+  });
+
+  return {
+    id: event.id,
+    title: event.titulo ?? 'Evento municipal',
+    category: event.categoriaNombre ?? 'Sin categoria',
+    categoryId: event.categoriaId,
+    date: formatPublicEventDate(event.fechaHoraInicio),
+    time: formatPublicEventTime(event.fechaHoraInicio),
+    eventStartAt: event.fechaHoraInicio,
+    eventEndAt: event.fechaHoraFin,
+    venue,
+    district: 'San Miguel',
+    aforoMaximo,
+    spots: aforoMaximo ?? 0,
+    capacityLabel: aforoMaximo ? `${aforoMaximo} cupos disponibles` : 'Aforo por confirmar',
+    status: aforoMaximo ? 'Inscripcion abierta' : 'Entrada disponible',
+    descripcion_breve: event.descripcionBreve ?? '',
+    summary: event.descripcionBreve ?? event.descripcion ?? '',
+    accent: portalAccentOptions[index % portalAccentOptions.length],
+    imageUrl: coverResource?.signedUrl ?? coverResource?.url_recurso ?? '',
+    duration: formatPublicEventDuration(event.fechaHoraInicio, event.fechaHoraFin),
+    organizer: event.areaMunicipalNombre ?? 'Municipalidad de San Miguel',
+    address,
+    audience: event.edadMin !== null && event.edadMax !== null && event.edadMin !== undefined && event.edadMax !== undefined
+      ? `${event.edadMin}-${event.edadMax} anos`
+      : 'Publico general',
+    publico_tipo: event.edadMin !== null && event.edadMax !== null && event.edadMin !== undefined && event.edadMax !== undefined
+      ? 'OBJETIVO'
+      : 'GENERAL',
+    edad_minima: event.edadMin,
+    edad_maxima: event.edadMax,
+    description: event.descripcion ?? '',
+    requirements: event.requisitos ?? [],
+    agenda: event.agenda ?? [],
+    accessibility: event.ubicacionReferencia ?? '',
+    recursos: resources,
+    latitude: event.latitud,
+    longitude: event.longitud,
+  };
+}
 function getCurrentInternalPath() {
   return `${window.location.pathname}${window.location.search}` || eventsListPath;
 }
@@ -296,13 +416,7 @@ function getInitialPortalView() {
 }
 
 function getInitialSelectedEvent() {
-  const eventId = window.location.pathname.match(/^\/eventos\/([^/?#]+)$/)?.[1];
-
-  if (!eventId) {
-    return null;
-  }
-
-  return events.find((event) => String(event.id) === eventId) ?? null;
+  return null;
 }
 
 function PublicPortal() {
@@ -310,12 +424,18 @@ function PublicPortal() {
   const [authMode, setAuthMode] = useState('auth-check');
   const [authError, setAuthError] = useState('');
   const [currentView, setCurrentView] = useState(getInitialPortalView);
-  const [selectedCategory, setSelectedCategory] = useState('Todos');
+  const [selectedCategory, setSelectedCategory] = useState(allCategoriesLabel);
   const [searchTerm, setSearchTerm] = useState('');
+  const [portalEvents, setPortalEvents] = useState([]);
+  const [portalCategories, setPortalCategories] = useState([]);
+  const [isLoadingPortalEvents, setIsLoadingPortalEvents] = useState(true);
+  const [portalEventsError, setPortalEventsError] = useState('');
   const [selectedEvent, setSelectedEvent] = useState(getInitialSelectedEvent);
   const [registration, setRegistration] = useState(emptyRegistration);
   const [isRegistered, setIsRegistered] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isSubmittingRegistration, setIsSubmittingRegistration] = useState(false);
+  const [registrationError, setRegistrationError] = useState('');
   const [isLoginRequiredOpen, setIsLoginRequiredOpen] = useState(false);
   const [receiptCode, setReceiptCode] = useState('');
   const [authenticatedUser, setAuthenticatedUser] = useState(readStoredCitizenUser);
@@ -395,10 +515,103 @@ function PublicPortal() {
     };
   }, []);
 
+  const categoryOptions = useMemo(
+    () => [allCategoriesLabel, ...portalCategories.map((category) => category.nombre).filter(Boolean)],
+    [portalCategories],
+  );
+
+  const selectedCategoryId = useMemo(() => {
+    if (selectedCategory === allCategoriesLabel) {
+      return '';
+    }
+
+    return portalCategories.find((category) => category.nombre === selectedCategory)?.id ?? '';
+  }, [portalCategories, selectedCategory]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    obtenerCategoriasPublicas()
+      .then((categories) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setPortalCategories(Array.isArray(categories) ? categories : []);
+      })
+      .catch((error) => {
+        console.error('No se pudieron cargar las categorias publicas.', error);
+        if (isMounted) {
+          setPortalCategories([]);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (selectedCategory !== allCategoriesLabel && !categoryOptions.includes(selectedCategory)) {
+      setSelectedCategory(allCategoriesLabel);
+    }
+  }, [categoryOptions, selectedCategory]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const timeoutId = window.setTimeout(() => {
+      setIsLoadingPortalEvents(true);
+      setPortalEventsError('');
+
+      obtenerEventosPublicados({
+        categoriaId: selectedCategoryId,
+        texto: searchTerm.trim(),
+      })
+        .then((eventList) => {
+          if (!isMounted) {
+            return;
+          }
+
+          setPortalEvents(Array.isArray(eventList) ? eventList.map(mapPublicEventFromApi) : []);
+        })
+        .catch((error) => {
+          console.error('No se pudieron cargar los eventos publicados.', error);
+          if (isMounted) {
+            setPortalEvents([]);
+            setPortalEventsError('No se pudieron cargar los eventos publicados.');
+          }
+        })
+        .finally(() => {
+          if (isMounted) {
+            setIsLoadingPortalEvents(false);
+          }
+        });
+    }, 300);
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [searchTerm, selectedCategoryId]);
+
+  useEffect(() => {
+    const eventId = window.location.pathname.match(/^\/eventos\/([^/?#]+)$/)?.[1];
+
+    if (!eventId || selectedEvent) {
+      return;
+    }
+
+    const matchingEvent = portalEvents.find((event) => String(event.id) === eventId);
+
+    if (matchingEvent) {
+      setSelectedEvent(matchingEvent);
+      setDetailOriginPath(eventsListPath);
+    }
+  }, [portalEvents, selectedEvent]);
   const filteredEvents = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
-    return events.filter((event) => {
+    return portalEvents.filter((event) => {
       const matchesCategory =
         selectedCategory === 'Todos' || event.category === selectedCategory;
       const matchesSearch =
@@ -410,11 +623,11 @@ function PublicPortal() {
 
       return matchesCategory && matchesSearch;
     });
-  }, [searchTerm, selectedCategory]);
+  }, [portalEvents, searchTerm, selectedCategory]);
 
   const featuredEvent = useMemo(
-    () => getClosestStartingEvent(filteredEvents.length > 0 ? filteredEvents : events) ?? events[0],
-    [filteredEvents],
+    () => getClosestStartingEvent(filteredEvents.length > 0 ? filteredEvents : portalEvents) ?? portalEvents[0] ?? null,
+    [filteredEvents, portalEvents],
   );
 
   function openEventDetail(event) {
@@ -461,25 +674,37 @@ function PublicPortal() {
       return;
     }
 
+    setRegistrationError('');
     setIsConfirmOpen(true);
   }
 
-  function confirmRegistration() {
-    if (!selectedEvent) {
+  async function confirmRegistration() {
+    if (!selectedEvent || isSubmittingRegistration) {
       return;
     }
 
-    const documentSuffix = registration.documentNumber
-      ? registration.documentNumber.slice(-4).padStart(4, '0')
-      : 'PERFIL';
+    setIsSubmittingRegistration(true);
+    setRegistrationError('');
 
-    setReceiptCode(`EC-${selectedEvent?.id ?? '000'}-${documentSuffix}`);
-    setIsRegistered(true);
-    setIsConfirmOpen(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    try {
+      const response = await inscribirEventoPublicado(selectedEvent.id);
+      setReceiptCode(response.codigoInscripcion ?? `EC-${selectedEvent.id}`);
+      setIsRegistered(true);
+      setIsConfirmOpen(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      setRegistrationError(getApiErrorMessage(error, 'No se pudo registrar tu inscripcion.'));
+    } finally {
+      setIsSubmittingRegistration(false);
+    }
   }
 
   function cancelRegistrationConfirmation() {
+    if (isSubmittingRegistration) {
+      return;
+    }
+
+    setRegistrationError('');
     setIsConfirmOpen(false);
   }
 
@@ -589,7 +814,7 @@ function PublicPortal() {
         ? requestedRedirect
         : eventsListPath;
       const redirectEventId = redirectTo.match(/^\/eventos\/(.+)$/)?.[1];
-      const redirectEvent = events.find((event) => String(event.id) === redirectEventId);
+      const redirectEvent = portalEvents.find((event) => String(event.id) === redirectEventId);
 
       setAuthenticatedUser(citizenUser);
       setLoginNotice('');
@@ -703,7 +928,9 @@ function PublicPortal() {
 
           {isConfirmOpen && (
             <ConfirmRegistrationModal
+              error={registrationError}
               eventTitle={selectedEvent.title}
+              isSubmitting={isSubmittingRegistration}
               onCancel={cancelRegistrationConfirmation}
               onConfirm={confirmRegistration}
             />
@@ -719,13 +946,17 @@ function PublicPortal() {
         </>
       ) : (
         <PortalHome
+          categories={categoryOptions}
           featuredEvent={featuredEvent}
           filteredEvents={filteredEvents}
+          isLoading={isLoadingPortalEvents}
+          loadError={portalEventsError}
           searchTerm={searchTerm}
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
           onEventSelect={openEventDetail}
           onSearchChange={setSearchTerm}
+          upcomingEvents={portalEvents}
         />
       )}
 
@@ -1090,6 +1321,7 @@ function AccountSettingsPage({ user, onBack, onUserUpdate }) {
     </section>
   );
 }
+
 
 function LoginView({ notice, onBack, onLoginSuccess, onRecoverPassword, onRegister }) {
   const [credentials, setCredentials] = useState({
@@ -1801,15 +2033,20 @@ function UsersIcon() {
 }
 
 function PortalHome({
+  categories,
   featuredEvent,
   filteredEvents,
+  isLoading,
+  loadError,
   searchTerm,
   selectedCategory,
   onCategoryChange,
   onEventSelect,
   onSearchChange,
+  upcomingEvents,
 }) {
-  const featuredCoverUrl = getEventCoverUrl(featuredEvent);
+  const featuredCoverUrl = featuredEvent ? getEventCoverUrl(featuredEvent) : '';
+  const hasFeaturedEvent = Boolean(featuredEvent);
 
   return (
     <>
@@ -1827,7 +2064,7 @@ function PortalHome({
           </a>
         </div>
 
-        <article className={`featured-event media-${featuredEvent.accent}`}>
+        {hasFeaturedEvent && (<article className={`featured-event media-${featuredEvent.accent}`}>
           <div className="event-visual" aria-hidden="true">
             {featuredCoverUrl && <img alt="" src={featuredCoverUrl} />}
             <span>{featuredEvent.category}</span>
@@ -1846,7 +2083,7 @@ function PortalHome({
               </span>
               <span>
                 <UsersIcon />
-                {featuredEvent.spots} cupos disponibles
+                {featuredEvent.capacityLabel}
               </span>
             </div>
             <button
@@ -1857,7 +2094,7 @@ function PortalHome({
               Ver detalle
             </button>
           </div>
-        </article>
+        </article>)}
       </section>
 
       <span className="section-anchor" id="eventos" aria-hidden="true" />
@@ -1888,7 +2125,7 @@ function PortalHome({
           </form>
 
           <div className="category-tabs" aria-label="Filtrar por categoria">
-            {eventCategories.map((category) => (
+            {categories.map((category) => (
               <button
                 className={category === selectedCategory ? 'active' : ''}
                 key={category}
@@ -1900,7 +2137,16 @@ function PortalHome({
             ))}
           </div>
 
+          {loadError && <p className="portal-inline-message" role="alert">{loadError}</p>}
+          {isLoading && <p className="portal-inline-message">Cargando eventos publicados...</p>}
+
           <div className="events-list">
+            {!isLoading && filteredEvents.length === 0 && (
+              <article className="event-empty-state">
+                <strong>No hay eventos publicados para los filtros seleccionados.</strong>
+                <span>Prueba con otro nombre, lugar o categoria.</span>
+              </article>
+            )}
             {filteredEvents.map((event) => {
               const coverUrl = getEventCoverUrl(event);
               const shortDescription = getEventShortDescription(event);
@@ -1928,18 +2174,18 @@ function PortalHome({
           </div>
         </div>
 
-        <AgendaSidebar />
+        <AgendaSidebar events={upcomingEvents} />
       </section>
     </>
   );
 }
 
-function AgendaSidebar() {
+function AgendaSidebar({ events: upcomingEvents = [] }) {
   return (
     <aside className="sidebar" id="agenda" aria-label="Resumen de agenda">
       <section className="next-panel">
         <h2>Próximas fechas</h2>
-        {events.slice(0, 3).map((event) => (
+        {upcomingEvents.slice(0, 3).map((event) => (
           <div className="mini-event" key={event.id}>
             <time>{event.date}</time>
             <span>{event.title}</span>
@@ -1950,7 +2196,8 @@ function AgendaSidebar() {
   );
 }
 
-function ConfirmRegistrationModal({ eventTitle, onCancel, onConfirm }) {
+
+function ConfirmRegistrationModal({ error = '', eventTitle, isSubmitting = false, onCancel, onConfirm }) {
   return (
     <div className="modal-backdrop" role="presentation">
       <section
@@ -1959,27 +2206,33 @@ function ConfirmRegistrationModal({ eventTitle, onCancel, onConfirm }) {
         className="confirm-modal"
         role="dialog"
       >
-        <span className="section-kicker">Confirmar inscripción</span>
+        <span className="section-kicker">Confirmar inscripci&oacute;n</span>
         <h2 id="confirm-registration-title">
-          ¿Estás seguro de inscribirte al evento "{eventTitle}"?
+          &iquest;Est&aacute;s seguro de inscribirte al evento "{eventTitle}"?
         </h2>
         <p>
-          Al confirmar se generará tu constancia de inscripción usando los datos
+          Al confirmar se generar&aacute; tu constancia de inscripci&oacute;n usando los datos
           de tu perfil ciudadano.
         </p>
+        {error && <p className="modal-inline-error" role="alert">{error}</p>}
         <div className="modal-actions">
-          <button className="back-button" type="button" onClick={onCancel}>
+          <button className="back-button" disabled={isSubmitting} type="button" onClick={onCancel}>
             Volver al evento
           </button>
-          <button className="primary-button" type="button" onClick={onConfirm}>
-            Sí, inscribirme
-          </button>
+          <LoadingButton
+            className="primary-button"
+            loading={isSubmitting}
+            loadingLabel="Inscribiendo..."
+            type="button"
+            onClick={onConfirm}
+          >
+            S&iacute;, inscribirme
+          </LoadingButton>
         </div>
       </section>
     </div>
   );
 }
-
 function SessionExpiredModal({ message, onLogin }) {
   return (
     <div className="modal-backdrop" role="presentation">

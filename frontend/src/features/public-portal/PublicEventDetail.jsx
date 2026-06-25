@@ -128,6 +128,10 @@ function getEventShortDescription(event) {
   return event.descripcion_breve || event.descripcion || event.summary || event.description || '';
 }
 
+function getEventFullDescription(event) {
+  return event.descripcion || event.description || event.summary || event.descripcion_breve || '';
+}
+
 function getOrderedTextItems(items = []) {
   return items
     .map((item, index) => ({
@@ -288,7 +292,7 @@ function EventPosterPreview({ resource }) {
     return (
       <div className="event-poster-preview is-pdf">
         <div className="event-poster-pdf-card">
-          <strong>Afiche en PDF</strong>
+          <strong>Abrir afiche PDF</strong>
           <span>{posterName}</span>
         </div>
         <a href={posterUrl} rel="noopener noreferrer" target="_blank">
@@ -381,7 +385,7 @@ export default function PublicEventDetail({
             </button>
 
             <h1 id="event-detail-title">{event.title}</h1>
-            <p>{getEventShortDescription(event)}</p>
+            <p>{getEventFullDescription(event)}</p>
             <div className="detail-quick-meta" aria-label="Datos rápidos del evento">
               <span>
                 <CalendarClockIcon />

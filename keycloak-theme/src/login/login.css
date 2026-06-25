@@ -216,23 +216,6 @@ input {
     text-decoration: underline;
 }
 
-.kc-reference-toggle {
-    background: transparent;
-    border: 0;
-    color: var(--kc-brand-primary);
-    cursor: pointer;
-    font-size: 0.82rem;
-    font-weight: 850;
-    justify-self: start;
-    padding: 0;
-    text-decoration: none;
-}
-
-.kc-reference-toggle:hover {
-    color: var(--kc-brand-primary-dark);
-    text-decoration: underline;
-}
-
 .kc-login-submit {
     align-items: center;
     background: var(--kc-brand-soft);

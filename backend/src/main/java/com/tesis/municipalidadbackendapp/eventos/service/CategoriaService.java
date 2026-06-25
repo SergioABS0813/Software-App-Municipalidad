@@ -2,6 +2,7 @@ package com.tesis.municipalidadbackendapp.eventos.service;
 
 import com.tesis.municipalidadbackendapp.bitacora.service.BitacoraAccionService;
 import com.tesis.municipalidadbackendapp.eventos.dto.CategoriaConfiguracionDto;
+import com.tesis.municipalidadbackendapp.eventos.dto.CategoriaPublicaDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.CategoriaRequest;
 import com.tesis.municipalidadbackendapp.eventos.dto.CategoriaResponse;
 import com.tesis.municipalidadbackendapp.eventos.entity.Categoria;
@@ -29,6 +30,11 @@ public class CategoriaService {
     private final BitacoraAccionService bitacoraAccionService;
 
 
+    public List<CategoriaPublicaDto> obtenerCategoriasPublicas() {
+        return categoriaRepository.findAll(Sort.by("nombre").ascending()).stream()
+                .map(categoria -> new CategoriaPublicaDto(categoria.getId(), categoria.getNombre()))
+                .toList();
+    }
     public List<Categoria> obtenerCategorias(){
         return categoriaRepository.findAll();
     }

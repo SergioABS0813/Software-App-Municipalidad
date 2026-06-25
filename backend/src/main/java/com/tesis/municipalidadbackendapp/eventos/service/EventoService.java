@@ -7,6 +7,7 @@ import com.tesis.municipalidadbackendapp.bitacora.dto.BitacoraEventoDto;
 import com.tesis.municipalidadbackendapp.bitacora.entity.BitacoraAccion;
 import com.tesis.municipalidadbackendapp.bitacora.service.BitacoraAccionService;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoPanelAdministrativoDto;
+import com.tesis.municipalidadbackendapp.eventos.dto.EventoPortalPublicoDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoRegistroRequest;
 import com.tesis.municipalidadbackendapp.eventos.dto.ConteosRevisionDirectivaDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoReporteDirectivoDto;
@@ -100,6 +101,13 @@ public class EventoService {
         ).map(this::toPanelAdministrativoDto);
     }
 
+    @Transactional(readOnly = true)
+    public List<EventoPortalPublicoDto> obtenerEventosPortalPublico(String texto, Integer categoriaId) {
+        String textoNormalizado = normalizarTexto(texto);
+        return eventoRepository.findAllPortalPublico(textoNormalizado, categoriaId).stream()
+                .map(this::toPortalPublicoDto)
+                .toList();
+    }
     public Page<EventoRevisionDirectivaResumenDto> obtenerEventosRevisionDirectiva(
             String estado,
             int page
@@ -258,6 +266,35 @@ public class EventoService {
         );
     }
 
+    private EventoPortalPublicoDto toPortalPublicoDto(Evento evento) {
+        Ubicacion ubicacion = evento.getUbicacion();
+
+        return new EventoPortalPublicoDto(
+                evento.getId(),
+                evento.getTitulo(),
+                evento.getDescripcionBreve(),
+                evento.getDescripcion(),
+                toLocalDateTime(evento.getFechaHoraInicio()),
+                toLocalDateTime(evento.getFechaHoraFin()),
+                evento.getCategoria() != null ? evento.getCategoria().getId() : null,
+                evento.getCategoria() != null ? evento.getCategoria().getNombre() : null,
+                evento.getAreaMunicipal() != null ? evento.getAreaMunicipal().getNombre() : null,
+                ubicacion != null ? ubicacion.getId() : null,
+                ubicacion != null ? ubicacion.getNombre() : null,
+                ubicacion != null ? ubicacion.getDireccion() : null,
+                ubicacion != null ? ubicacion.getReferencia() : null,
+                ubicacion != null ? ubicacion.getLatitud() : null,
+                ubicacion != null ? ubicacion.getLongitud() : null,
+                evento.getCostoReferencial(),
+                evento.getAforoMaximo(),
+                evento.getEdadMin(),
+                evento.getEdadMax(),
+                requiereControlAsistencia(evento),
+                obtenerAgendaPublicaDto(evento),
+                obtenerRequisitosPublicosDto(evento),
+                obtenerRecursosPublicosDto(evento)
+        );
+    }
     private EventoPanelAdministrativoDto.ObservacionDirectivaPanelAdministrativoDto obtenerUltimaObservacionDirectivaDto(Evento evento) {
         if (evento == null || evento.getId() == null) {
             return null;
@@ -1175,6 +1212,39 @@ public class EventoService {
                 .toList();
     }
 
+    private List<EventoPortalPublicoDto.ItemOrdenadoPublicoDto> obtenerAgendaPublicaDto(Evento evento) {
+        return agendaEventoRepository.findByEvento(evento).stream()
+                .sorted(Comparator.comparing(AgendaEvento::getOrden, Comparator.nullsLast(Integer::compareTo)))
+                .map(item -> new EventoPortalPublicoDto.ItemOrdenadoPublicoDto(
+                        item.getOrden(),
+                        item.getDescripcion()
+                ))
+                .toList();
+    }
+
+    private List<EventoPortalPublicoDto.ItemOrdenadoPublicoDto> obtenerRequisitosPublicosDto(Evento evento) {
+        return requisitoEventoRepository.findByEvento(evento).stream()
+                .sorted(Comparator.comparing(RequisitoEvento::getOrden, Comparator.nullsLast(Integer::compareTo)))
+                .map(item -> new EventoPortalPublicoDto.ItemOrdenadoPublicoDto(
+                        item.getOrden(),
+                        item.getDescripcion()
+                ))
+                .toList();
+    }
+
+    private List<EventoPortalPublicoDto.RecursoPublicoDto> obtenerRecursosPublicosDto(Evento evento) {
+        return recursoEventoRepository.findByEvento(evento).stream()
+                .map(recurso -> new EventoPortalPublicoDto.RecursoPublicoDto(
+                        recurso.getId(),
+                        recurso.getTipoRecurso(),
+                        recurso.getObjectPath(),
+                        recurso.getNombreOriginal(),
+                        recurso.getMimeType(),
+                        recurso.getSizeBytes(),
+                        cloudStorageService.generarSignedUrl(recurso.getObjectPath())
+                ))
+                .toList();
+    }
     private List<EventoPanelAdministrativoDto.CriterioFichaEventoPanelAdministrativoDto> construirCriteriosFicha(Evento evento) {
         boolean requiereControl = requiereControlAsistencia(evento);
         boolean operativoCompleto = personalOperativoCompleto(evento);

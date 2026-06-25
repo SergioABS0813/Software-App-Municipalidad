@@ -2,30 +2,15 @@ import { type FormEvent, useState } from "react";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../KcContext";
 import municipalLogo from "../assets/municipalidad-logo.png";
+import {consultaDni} from "../services/api/crear-vecino-service";
 
 type RegisterKcContext = Extract<KcContext, { pageId: "register.ftl" }>;
 
 type Identity = {
-    apellidos: string;
     dni: string;
     nombreCompleto: string;
-    nombres: string;
 };
 
-const mockIdentities: Record<string, Identity> = {
-    "12345678": {
-        apellidos: "Bustamante Villanueva",
-        dni: "12345678",
-        nombreCompleto: "Sergio André Bustamante Villanueva",
-        nombres: "Sergio André"
-    },
-    "87654321": {
-        apellidos: "Rojas Mendoza",
-        dni: "87654321",
-        nombreCompleto: "María Fernanda Rojas Mendoza",
-        nombres: "María Fernanda"
-    }
-};
 
 export default function RegisterCitizen(props: {
     kcContext: RegisterKcContext;
@@ -55,7 +40,7 @@ export default function RegisterCitizen(props: {
         setFormError("");
     }
 
-    function searchIdentity() {
+    async function searchIdentity() {
         if (!/^\d{8}$/.test(dni)) {
             setFormError("Ingresa un DNI válido de 8 dígitos.");
             return;
@@ -63,15 +48,36 @@ export default function RegisterCitizen(props: {
 
         setFormError("");
         setIdentityMessage("");
+        setIdentityResult(null);
         setIsSearchingIdentity(true);
 
-        window.setTimeout(() => {
-            const identity = mockIdentities[dni] ?? null;
+        try {
+            const response = await consultaDni(dni);
 
+            if (!response.success || !response.data) {
+                setIdentityMessage("No se encontraron datos para el DNI ingresado.");
+                return;
+            }
+
+            const nombreCompleto = response.data ?? "";
+
+            if (!nombreCompleto) {
+                setIdentityResult(null);
+                setIdentityMessage("No se encontraron datos para el DNI ingresado.");
+                return;
+            }
+
+            setIdentityResult({
+                dni,
+                nombreCompleto: response.data
+            });
+            setIdentityMessage("");
+        } catch {
+            setIdentityResult(null);
+            setIdentityMessage("No se pudo consultar el DNI. Inténtalo nuevamente.");
+        } finally {
             setIsSearchingIdentity(false);
-            setIdentityResult(identity);
-            setIdentityMessage(identity === null ? "No se encontraron datos para el DNI ingresado." : "");
-        }, 650);
+        }
     }
 
     function validateRegisterForm() {
@@ -160,14 +166,6 @@ export default function RegisterCitizen(props: {
                         <h1 id="kc-register-title">Crear cuenta vecinal</h1>
                         <p>Regístrate para reservar tu lugar en las actividades municipales.</p>
                     </div>
-
-                    <button
-                        className="kc-reference-toggle"
-                        type="button"
-                        onClick={() => setIsReferenceVisible(currentValue => !currentValue)}
-                    >
-                        {isReferenceVisible ? "Ocultar referencia React" : "Ver referencia React"}
-                    </button>
 
                     <div className="kc-register-fields-grid">
                         <label className="kc-login-field kc-register-dni-field" htmlFor="dni">
@@ -325,9 +323,9 @@ export default function RegisterCitizen(props: {
                     </div>
 
                     <input name="username" type="hidden" value={correo.trim()} />
-                    <input name="firstName" type="hidden" value={identityResult?.nombres ?? ""} />
-                    <input name="lastName" type="hidden" value={identityResult?.apellidos ?? ""} />
+                    <input name="firstName" type="hidden" value={identityResult?.nombreCompleto ?? ""} />
                     <input name="user.attributes.rol" type="hidden" value="VECINO" />
+                    <input name="lastName" type="hidden" value="" />
 
                     <label className="kc-data-consent-control" htmlFor="acceptsDataUse">
                         <input
@@ -359,80 +357,10 @@ export default function RegisterCitizen(props: {
                     </p>
                 </form>
 
-                {isReferenceVisible && <ReactRegisterReference />}
             </section>
 
             <aside className="kc-login-art-side" aria-hidden="true" />
         </main>
-    );
-}
-
-function ReactRegisterReference() {
-    return (
-        <section className="kc-login-card kc-register-card kc-react-reference-card" aria-label="Referencia React de crear cuenta">
-            <div className="kc-login-title">
-                <span>Portal de eventos</span>
-                <h2>Crear cuenta vecinal</h2>
-                <p>Regístrate para reservar tu lugar en las actividades municipales.</p>
-            </div>
-
-            <div className="kc-register-fields-grid">
-                <label className="kc-login-field kc-register-dni-field">
-                    DNI
-                    <span className="kc-dni-search-control">
-                        <input maxLength={8} placeholder="Ingrese su DNI" type="text" />
-                        <button type="button">Buscar</button>
-                    </span>
-                    <span className="kc-identity-verified-message">
-                        Identidad verificada: Sergio André Bustamante Villanueva
-                    </span>
-                </label>
-                <label className="kc-login-field">
-                    Fecha de nacimiento
-                    <input type="date" />
-                </label>
-                <label className="kc-login-field">
-                    Correo electrónico
-                    <input placeholder="Ingrese su correo electrónico" type="email" />
-                </label>
-                <label className="kc-login-field">
-                    Celular
-                    <input placeholder="Ingrese su número de celular" type="tel" />
-                </label>
-                <label className="kc-login-field">
-                    Contraseña
-                    <span className="kc-password-control">
-                        <input placeholder="Cree una contraseña" type="password" />
-                        <span className="kc-password-toggle kc-password-toggle-static">
-                            <EyeIcon />
-                        </span>
-                    </span>
-                </label>
-                <label className="kc-login-field">
-                    Confirmar contraseña
-                    <span className="kc-password-control">
-                        <input placeholder="Repita su contraseña" type="password" />
-                        <span className="kc-password-toggle kc-password-toggle-static">
-                            <EyeIcon />
-                        </span>
-                    </span>
-                </label>
-            </div>
-
-            <label className="kc-data-consent-control">
-                <input type="checkbox" />
-                <span>Acepto el uso de mis datos para gestionar mi participación en eventos municipales.</span>
-            </label>
-
-            <button className="kc-login-submit kc-register-primary-button" type="button">
-                Crear cuenta
-            </button>
-
-            <p className="kc-register-login-link">
-                <span>¿Ya tienes cuenta?</span>
-                <a href="#kc-register-title">Inicia sesión</a>
-            </p>
-        </section>
     );
 }
 

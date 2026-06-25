@@ -41,6 +41,8 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/public/**").permitAll()
+                        .requestMatchers("/api/consulta_dni/**").permitAll()
+                        .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/api/auth/forgot-password").permitAll()
                         .requestMatchers("/api/valoraciones/validar").permitAll()
                         .requestMatchers("/api/valoraciones/responder").permitAll()
@@ -61,6 +63,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/categoria/admin/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/categoria/**").hasRole("OPERATIVO")
                         .requestMatchers("/api/ubicacion/admin/**").hasRole("ADMINISTRADOR")
+                        .requestMatchers("/api/inscripciones/**").hasRole("VECINO")
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2

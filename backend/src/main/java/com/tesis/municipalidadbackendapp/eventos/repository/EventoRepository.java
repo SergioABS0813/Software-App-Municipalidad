@@ -59,6 +59,26 @@ public interface EventoRepository extends JpaRepository<Evento, Integer> {
     );
 
     @Query("""
+            select evento
+            from Evento evento
+            left join fetch evento.estadoEvento estado
+            left join fetch evento.categoria categoria
+            left join fetch evento.ubicacion ubicacion
+            left join fetch evento.areaMunicipal area
+            where estado.codigo = 'PUBLICADO'
+              and (:categoriaId is null or categoria.id = :categoriaId)
+              and (:texto is null or :texto = ''
+                or lower(evento.titulo) like lower(concat('%', :texto, '%'))
+                or lower(ubicacion.nombre) like lower(concat('%', :texto, '%'))
+                or lower(ubicacion.direccion) like lower(concat('%', :texto, '%'))
+              )
+            order by evento.fechaHoraInicio asc, evento.id asc
+            """)
+    List<Evento> findAllPortalPublico(
+            @Param("texto") String texto,
+            @Param("categoriaId") Integer categoriaId
+    );
+    @Query("""
             select count(evento)
             from Evento evento
             left join evento.estadoEvento estado
