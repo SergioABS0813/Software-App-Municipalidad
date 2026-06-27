@@ -683,6 +683,7 @@
   font-size: 0.86rem;
   font-weight: 650;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .event-card h3 {
@@ -738,6 +739,39 @@
   border-color: rgba(10, 86, 194, 0.28);
 }
 
+.events-pagination {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 18px;
+}
+
+.events-pagination button {
+  background: #ffffff;
+  border: 1px solid rgba(10, 167, 216, 0.3);
+  border-radius: 8px;
+  color: var(--brand-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 800;
+  min-height: 40px;
+  padding: 0 16px;
+}
+
+.events-pagination button:disabled {
+  background: #edf3f8;
+  border-color: #d9e4ef;
+  color: #7a8ba0;
+  cursor: not-allowed;
+}
+
+.events-pagination span {
+  color: #526b85;
+  font-size: 0.9rem;
+  font-weight: 750;
+}
 .sidebar {
   display: grid;
   gap: 16px;
@@ -1339,6 +1373,25 @@
   width: 18px;
 }
 
+.reservation-status-message,
+.reservation-error-message {
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.45;
+  margin: 2px 0 0;
+  padding: 10px 12px;
+}
+
+.reservation-status-message {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.reservation-error-message {
+  background: #fff4ed;
+  color: #c2410c;
+}
 .reservation-action {
   margin: 2px 0 0;
 }
@@ -1363,6 +1416,97 @@
   color: var(--brand-primary);
 }
 
+.registration-summary-panel {
+  background: #f8fbfd;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+  padding: 14px;
+}
+
+.registration-summary-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.registration-summary-heading span {
+  color: #047857;
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.registration-summary-heading strong {
+  color: var(--color-text-strong);
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.registration-summary-details {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.registration-summary-details div {
+  display: grid;
+  gap: 3px;
+}
+
+.registration-summary-details dt {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.registration-summary-details dd {
+  color: #334f6b;
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.registration-summary-qr {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #dbe6ef;
+  border-radius: 8px;
+  display: flex;
+  justify-content: center;
+  min-height: 172px;
+  padding: 12px;
+}
+
+.registration-summary-qr img {
+  display: block;
+  height: 148px;
+  object-fit: contain;
+  width: 148px;
+}
+
+.registration-summary-qr span {
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
+  font-weight: 750;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.reservation-cancel-button {
+  background: #fff4ed;
+  border-color: #fed7aa;
+  color: #c2410c;
+}
+
+.reservation-cancel-button:hover {
+  background: #ffedd5;
+  border-color: #fdba74;
+  color: #9a3412;
+}
 .reservation-button:disabled,
 .reservation-button:disabled:hover {
   background: #edf3f8;
@@ -1535,9 +1679,28 @@
   background: #ffffff;
   border-radius: 10px;
   box-shadow: none;
+  box-sizing: border-box;
   display: block;
   height: 132px;
+  object-fit: contain;
   width: 132px;
+}
+
+.qr-placeholder {
+  align-items: center;
+  border: 1px dashed #cbd5e1;
+  color: #526b85;
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  text-align: center;
+}
+
+.qr-placeholder span {
+  font-size: 0.75rem;
+  font-weight: 750;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .receipt-code {
@@ -1730,36 +1893,6 @@
   line-height: 1.4;
 }
 
-.account-settings-panel .password-control {
-  display: block;
-}
-
-.account-settings-panel .password-control input {
-  padding-right: 46px;
-}
-
-.account-security-section {
-  border-top: 1px solid var(--color-border);
-  display: grid;
-  gap: 16px;
-  margin-top: 22px;
-  padding-top: 20px;
-}
-
-.account-security-section h2 {
-  color: var(--color-text-strong);
-  font-size: 1.15rem;
-  letter-spacing: 0;
-  line-height: 1.2;
-  margin: 0;
-}
-
-.account-security-section p {
-  color: #526b85;
-  font-size: 0.9rem;
-  line-height: 1.55;
-  margin: 8px 0 0;
-}
 
 .account-form-actions {
   display: grid;

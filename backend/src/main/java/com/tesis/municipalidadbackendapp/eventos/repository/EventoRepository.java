@@ -58,7 +58,8 @@ public interface EventoRepository extends JpaRepository<Evento, Integer> {
             Pageable pageable
     );
 
-    @Query("""
+    @Query(
+            value = """
             select evento
             from Evento evento
             left join fetch evento.estadoEvento estado
@@ -73,10 +74,42 @@ public interface EventoRepository extends JpaRepository<Evento, Integer> {
                 or lower(ubicacion.direccion) like lower(concat('%', :texto, '%'))
               )
             order by evento.fechaHoraInicio asc, evento.id asc
-            """)
-    List<Evento> findAllPortalPublico(
+            """,
+            countQuery = """
+            select count(evento)
+            from Evento evento
+            left join evento.estadoEvento estado
+            left join evento.categoria categoria
+            left join evento.ubicacion ubicacion
+            where estado.codigo = 'PUBLICADO'
+              and (:categoriaId is null or categoria.id = :categoriaId)
+              and (:texto is null or :texto = ''
+                or lower(evento.titulo) like lower(concat('%', :texto, '%'))
+                or lower(ubicacion.nombre) like lower(concat('%', :texto, '%'))
+                or lower(ubicacion.direccion) like lower(concat('%', :texto, '%'))
+              )
+            """
+    )
+    Page<Evento> findAllPortalPublico(
             @Param("texto") String texto,
-            @Param("categoriaId") Integer categoriaId
+            @Param("categoriaId") Integer categoriaId,
+            Pageable pageable
+    );
+
+    @Query("""
+            select evento
+            from Evento evento
+            left join fetch evento.estadoEvento estado
+            left join fetch evento.categoria categoria
+            left join fetch evento.ubicacion ubicacion
+            left join fetch evento.areaMunicipal area
+            where estado.codigo = 'PUBLICADO'
+              and evento.fechaHoraInicio >= :ahora
+            order by evento.fechaHoraInicio asc, evento.id asc
+            """)
+    List<Evento> findNextPortalPublico(
+            @Param("ahora") Instant ahora,
+            Pageable pageable
     );
     @Query("""
             select count(evento)

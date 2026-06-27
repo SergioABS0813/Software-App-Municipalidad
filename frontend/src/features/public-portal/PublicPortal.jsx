@@ -16,8 +16,15 @@ import { getApiErrorMessage, SESSION_EXPIRED_MESSAGE } from '../../services/api/
 import {
   obtenerCategoriasPublicas,
   obtenerEventosPublicados,
+  obtenerProximoEventoPublicado,
   inscribirEventoPublicado,
+  obtenerInscripcionActualEvento,
+  cancelarInscripcionEvento,
+  obtenerQrActivoInscripcion,
+  confirmarSesionActual,
   recuperarContrasena,
+  obtenerPerfilVecino,
+  actualizarPerfilVecino,
 } from '../../services/publicPortalService';
 import LoadingButton from '../../components/feedback/LoadingButton';
 
@@ -79,89 +86,7 @@ const citizenAuthStorageKey = 'citizenAuthUser';
 const citizenAuthTokenKey = 'token';
 const allCategoriesLabel = 'Todos';
 const portalAccentOptions = ['coral', 'teal', 'indigo', 'lime', 'gold'];
-
-const eventMonthIndex = {
-  abr: 3,
-  ago: 7,
-  dic: 11,
-  ene: 0,
-  feb: 1,
-  jul: 6,
-  jun: 5,
-  mar: 2,
-  may: 4,
-  nov: 10,
-  oct: 9,
-  sep: 8,
-};
-
-function parseEventDateTime(event) {
-  const rawDate = event.eventStartAt ?? event.fechaHoraInicio;
-  const parsedRawDate = rawDate ? new Date(rawDate) : null;
-
-  if (parsedRawDate && !Number.isNaN(parsedRawDate.getTime())) {
-    return parsedRawDate;
-  }
-
-  const dateMatch = event.date?.match(/(\d{1,2})\s+([a-záéíóúñ]{3})/i);
-
-  if (!dateMatch) {
-    return null;
-  }
-
-  const day = Number(dateMatch[1]);
-  const monthKey = dateMatch[2]
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
-  const month = eventMonthIndex[monthKey];
-
-  if (!Number.isFinite(day) || month === undefined) {
-    return null;
-  }
-
-  const timeMatch = event.time?.match(/(\d{1,2})(?::(\d{2}))?\s*(a\.m\.|p\.m\.)?/i);
-  let hours = timeMatch ? Number(timeMatch[1]) : 0;
-  const minutes = timeMatch?.[2] ? Number(timeMatch[2]) : 0;
-  const meridiem = timeMatch?.[3]?.toLowerCase();
-
-  if (meridiem === 'p.m.' && hours < 12) {
-    hours += 12;
-  }
-
-  if (meridiem === 'a.m.' && hours === 12) {
-    hours = 0;
-  }
-
-  const currentYear = new Date().getFullYear();
-  const eventDate = new Date(currentYear, month, day, hours, minutes);
-
-  if (Number.isNaN(eventDate.getTime())) {
-    return null;
-  }
-
-  return eventDate;
-}
-
-function getClosestStartingEvent(eventList) {
-  const now = new Date();
-  const sortedEvents = [...eventList].sort((firstEvent, secondEvent) => {
-    const firstDate = parseEventDateTime(firstEvent);
-    const secondDate = parseEventDateTime(secondEvent);
-    const firstTime = firstDate?.getTime() ?? Number.MAX_SAFE_INTEGER;
-    const secondTime = secondDate?.getTime() ?? Number.MAX_SAFE_INTEGER;
-    const firstIsPast = firstTime < now.getTime();
-    const secondIsPast = secondTime < now.getTime();
-
-    if (firstIsPast !== secondIsPast) {
-      return firstIsPast ? 1 : -1;
-    }
-
-    return firstTime - secondTime;
-  });
-
-  return sortedEvents[0] ?? null;
-}
+const publicEventsPageSize = 6;
 
 function getResourceUrl(resource) {
   return resource?.signedUrl ?? resource?.url_recurso ?? resource?.url ?? '';
@@ -232,6 +157,24 @@ function formatPublicEventDuration(startValue, endValue) {
   return [hours > 0 ? `${hours} ${hours === 1 ? 'hora' : 'horas'}` : '', minutes > 0 ? `${minutes} min` : '']
     .filter(Boolean)
     .join(' ');
+}
+
+function normalizePublicEventsPage(response) {
+  if (Array.isArray(response)) {
+    return {
+      content: response,
+      number: 0,
+      totalElements: response.length,
+      totalPages: response.length > 0 ? 1 : 0,
+    };
+  }
+
+  return {
+    content: Array.isArray(response?.content) ? response.content : [],
+    number: response?.number ?? 0,
+    totalElements: response?.totalElements ?? 0,
+    totalPages: response?.totalPages ?? 0,
+  };
 }
 
 function mapPublicEventFromApi(event, index = 0) {
@@ -335,6 +278,30 @@ function saveCitizenSession(user) {
   return citizenUser;
 }
 
+function mapNeighborProfileToSession(profile) {
+  return saveCitizenSession({
+    acceptsDataUse: profile.aceptaTratamientoDatos ?? true,
+    celular: profile.celular ?? '',
+    correo: profile.correo ?? '',
+    dni: profile.dni ?? '',
+    email: profile.correo ?? '',
+    fechaNacimiento: profile.fechaNacimiento ?? '',
+    fullName: profile.nombreCompleto ?? '',
+    nombreCompleto: profile.nombreCompleto ?? '',
+    rol: 'VECINO',
+    role: 'VECINO',
+  });
+}
+
+function getAccountFormData(source = {}) {
+  return {
+    acceptsDataUse: source.aceptaTratamientoDatos ?? source.acceptsDataUse ?? true,
+    celular: source.celular ?? '',
+    correo: source.correo ?? source.email ?? '',
+    fechaNacimiento: source.fechaNacimiento ?? '',
+  };
+}
+
 function clearCitizenSession() {
   try {
     localStorage.removeItem(citizenAuthTokenKey);
@@ -427,6 +394,9 @@ function PublicPortal() {
   const [selectedCategory, setSelectedCategory] = useState(allCategoriesLabel);
   const [searchTerm, setSearchTerm] = useState('');
   const [portalEvents, setPortalEvents] = useState([]);
+  const [portalEventsPage, setPortalEventsPage] = useState({ number: 0, totalElements: 0, totalPages: 0 });
+  const [portalEventsPageNumber, setPortalEventsPageNumber] = useState(0);
+  const [featuredEvent, setFeaturedEvent] = useState(null);
   const [portalCategories, setPortalCategories] = useState([]);
   const [isLoadingPortalEvents, setIsLoadingPortalEvents] = useState(true);
   const [portalEventsError, setPortalEventsError] = useState('');
@@ -438,6 +408,15 @@ function PublicPortal() {
   const [registrationError, setRegistrationError] = useState('');
   const [isLoginRequiredOpen, setIsLoginRequiredOpen] = useState(false);
   const [receiptCode, setReceiptCode] = useState('');
+  const [receiptQrDataUrl, setReceiptQrDataUrl] = useState('');
+  const [receiptQrError, setReceiptQrError] = useState('');
+  const [selectedEventRegistration, setSelectedEventRegistration] = useState(null);
+  const [registrationQrDataUrl, setRegistrationQrDataUrl] = useState('');
+  const [registrationQrError, setRegistrationQrError] = useState('');
+  const [isLoadingRegistrationQr, setIsLoadingRegistrationQr] = useState(false);
+  const [isLoadingRegistrationStatus, setIsLoadingRegistrationStatus] = useState(false);
+  const [isCancellingRegistration, setIsCancellingRegistration] = useState(false);
+  const [registrationActionError, setRegistrationActionError] = useState('');
   const [authenticatedUser, setAuthenticatedUser] = useState(readStoredCitizenUser);
   const [detailOriginPath, setDetailOriginPath] = useState(eventsListPath);
   const [loginNotice, setLoginNotice] = useState('');
@@ -456,7 +435,7 @@ function PublicPortal() {
           const user = getKeycloakUser();
 
           if (user) {
-            openInstitutionalDashboard(user);
+            await openInstitutionalDashboard(user);
             setAuthState('ready');
           } else {
             setAuthError('Tu cuenta no tiene un rol habilitado para ingresar al sistema.');
@@ -552,6 +531,28 @@ function PublicPortal() {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+
+    obtenerProximoEventoPublicado()
+      .then((event) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setFeaturedEvent(event ? mapPublicEventFromApi(event) : null);
+      })
+      .catch((error) => {
+        console.error('No se pudo cargar el proximo evento publicado.', error);
+        if (isMounted) {
+          setFeaturedEvent(null);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+  useEffect(() => {
     if (selectedCategory !== allCategoriesLabel && !categoryOptions.includes(selectedCategory)) {
       setSelectedCategory(allCategoriesLabel);
     }
@@ -566,18 +567,27 @@ function PublicPortal() {
       obtenerEventosPublicados({
         categoriaId: selectedCategoryId,
         texto: searchTerm.trim(),
+        page: portalEventsPageNumber,
+        size: publicEventsPageSize,
       })
-        .then((eventList) => {
+        .then((response) => {
           if (!isMounted) {
             return;
           }
 
-          setPortalEvents(Array.isArray(eventList) ? eventList.map(mapPublicEventFromApi) : []);
+          const pageData = normalizePublicEventsPage(response);
+          setPortalEvents(pageData.content.map(mapPublicEventFromApi));
+          setPortalEventsPage({
+            number: pageData.number,
+            totalElements: pageData.totalElements,
+            totalPages: pageData.totalPages,
+          });
         })
         .catch((error) => {
           console.error('No se pudieron cargar los eventos publicados.', error);
           if (isMounted) {
             setPortalEvents([]);
+            setPortalEventsPage({ number: 0, totalElements: 0, totalPages: 0 });
             setPortalEventsError('No se pudieron cargar los eventos publicados.');
           }
         })
@@ -592,7 +602,7 @@ function PublicPortal() {
       isMounted = false;
       window.clearTimeout(timeoutId);
     };
-  }, [searchTerm, selectedCategoryId]);
+  }, [searchTerm, selectedCategoryId, portalEventsPageNumber]);
 
   useEffect(() => {
     const eventId = window.location.pathname.match(/^\/eventos\/([^/?#]+)$/)?.[1];
@@ -608,28 +618,112 @@ function PublicPortal() {
       setDetailOriginPath(eventsListPath);
     }
   }, [portalEvents, selectedEvent]);
-  const filteredEvents = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
+  useEffect(() => {
+    if (!selectedEvent) {
+      setSelectedEventRegistration(null);
+      setIsLoadingRegistrationStatus(false);
+      setRegistrationActionError('');
+      return;
+    }
 
-    return portalEvents.filter((event) => {
-      const matchesCategory =
-        selectedCategory === 'Todos' || event.category === selectedCategory;
-      const matchesSearch =
-        normalizedSearch.length === 0 ||
-        [event.title, event.venue, event.district, event.category]
-          .join(' ')
-          .toLowerCase()
-          .includes(normalizedSearch);
+    if (!hasActiveCitizenSession(authenticatedUser)) {
+      setSelectedEventRegistration(null);
+      setIsLoadingRegistrationStatus(false);
+      setRegistrationActionError('');
+      return;
+    }
 
-      return matchesCategory && matchesSearch;
-    });
-  }, [portalEvents, searchTerm, selectedCategory]);
+    let isMounted = true;
 
-  const featuredEvent = useMemo(
-    () => getClosestStartingEvent(filteredEvents.length > 0 ? filteredEvents : portalEvents) ?? portalEvents[0] ?? null,
-    [filteredEvents, portalEvents],
-  );
+    setIsLoadingRegistrationStatus(true);
+    setRegistrationActionError('');
 
+    obtenerInscripcionActualEvento(selectedEvent.id)
+      .then((response) => {
+        if (isMounted) {
+          setSelectedEventRegistration(response);
+        }
+      })
+      .catch((error) => {
+        console.error('No se pudo consultar la inscripcion actual del evento.', error);
+        if (isMounted) {
+          setSelectedEventRegistration(null);
+          setRegistrationActionError(getApiErrorMessage(error, 'No se pudo verificar tu inscripcion actual.'));
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingRegistrationStatus(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [authenticatedUser, selectedEvent]);
+  useEffect(() => {
+    const inscriptionId = selectedEventRegistration?.id;
+    const isConfirmed = selectedEventRegistration?.estado === 'CONFIRMADA';
+
+    if (!inscriptionId || !isConfirmed) {
+      setRegistrationQrDataUrl('');
+      setRegistrationQrError('');
+      setIsLoadingRegistrationQr(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    setIsLoadingRegistrationQr(true);
+    setRegistrationQrError('');
+
+    obtenerQrActivoInscripcion(inscriptionId)
+      .then((response) => {
+        if (!isMounted) {
+          return;
+        }
+
+        const qrDataUrl = response?.qrDataUrl ?? '';
+        setRegistrationQrDataUrl(qrDataUrl);
+        setRegistrationQrError(qrDataUrl ? '' : 'No se recibio la imagen del codigo QR.');
+      })
+      .catch((error) => {
+        console.error('No se pudo cargar el QR activo de la inscripcion.', error);
+        if (isMounted) {
+          setRegistrationQrDataUrl('');
+          setRegistrationQrError(getApiErrorMessage(error, 'No se pudo cargar el codigo QR.'));
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingRegistrationQr(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedEventRegistration?.estado, selectedEventRegistration?.id]);
+
+  const filteredEvents = portalEvents;
+
+  function changeCategory(category) {
+    setSelectedCategory(category);
+    setPortalEventsPageNumber(0);
+  }
+
+  function changeSearchTerm(value) {
+    setSearchTerm(value);
+    setPortalEventsPageNumber(0);
+  }
+
+  function changePortalEventsPage(nextPage) {
+    if (nextPage < 0 || nextPage >= portalEventsPage.totalPages || nextPage === portalEventsPageNumber) {
+      return;
+    }
+
+    setPortalEventsPageNumber(nextPage);
+  }
   function openEventDetail(event) {
     const from = getSafeEventsOriginPath();
 
@@ -640,6 +734,11 @@ function PublicPortal() {
     setIsConfirmOpen(false);
     setIsLoginRequiredOpen(false);
     setReceiptCode('');
+    setReceiptQrDataUrl('');
+    setReceiptQrError('');
+    setSelectedEventRegistration(null);
+    setIsLoadingRegistrationStatus(false);
+    setRegistrationActionError('');
     setLoginNotice('');
     setDetailOriginPath(from);
     window.history.pushState(
@@ -661,6 +760,11 @@ function PublicPortal() {
     setIsConfirmOpen(false);
     setIsLoginRequiredOpen(false);
     setReceiptCode('');
+    setReceiptQrDataUrl('');
+    setReceiptQrError('');
+    setSelectedEventRegistration(null);
+    setIsLoadingRegistrationStatus(false);
+    setRegistrationActionError('');
     setLoginNotice('');
     window.history.pushState(null, '', fallbackPath);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -688,7 +792,29 @@ function PublicPortal() {
 
     try {
       const response = await inscribirEventoPublicado(selectedEvent.id);
+      const inscriptionId = response?.id;
+      let qrDataUrl = '';
+      let qrError = '';
+
       setReceiptCode(response.codigoInscripcion ?? `EC-${selectedEvent.id}`);
+      setReceiptQrDataUrl('');
+      setReceiptQrError('');
+
+      if (inscriptionId) {
+        try {
+          const qrResponse = await obtenerQrActivoInscripcion(inscriptionId);
+          qrDataUrl = qrResponse?.qrDataUrl ?? '';
+          qrError = qrDataUrl ? '' : 'No se recibio la imagen del codigo QR.';
+        } catch (qrRequestError) {
+          console.error('No se pudo cargar el QR de la inscripcion.', qrRequestError);
+          qrError = getApiErrorMessage(qrRequestError, 'No se pudo cargar el codigo QR.');
+        }
+      } else {
+        qrError = 'No se recibio el identificador de la inscripcion para cargar el QR.';
+      }
+
+      setReceiptQrDataUrl(qrDataUrl);
+      setReceiptQrError(qrError);
       setIsRegistered(true);
       setIsConfirmOpen(false);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -699,6 +825,27 @@ function PublicPortal() {
     }
   }
 
+  async function cancelEventRegistration() {
+    if (!selectedEvent || isCancellingRegistration) {
+      return;
+    }
+
+    setIsCancellingRegistration(true);
+    setRegistrationActionError('');
+
+    try {
+      const response = await cancelarInscripcionEvento(selectedEvent.id);
+      setSelectedEventRegistration(response);
+      setIsRegistered(false);
+      setReceiptCode('');
+      setReceiptQrDataUrl('');
+      setReceiptQrError('');
+    } catch (error) {
+      setRegistrationActionError(getApiErrorMessage(error, 'No se pudo cancelar tu inscripcion.'));
+    } finally {
+      setIsCancellingRegistration(false);
+    }
+  }
   function cancelRegistrationConfirmation() {
     if (isSubmittingRegistration) {
       return;
@@ -806,9 +953,18 @@ function PublicPortal() {
     }
   }
 
-  function openInstitutionalDashboard(user) {
+  async function openInstitutionalDashboard(user) {
     if (user.role === 'VECINO') {
-      const citizenUser = saveCitizenSession(user);
+      let citizenUser = saveCitizenSession(user);
+
+      try {
+        await confirmarSesionActual();
+        const profile = await obtenerPerfilVecino();
+        citizenUser = mapNeighborProfileToSession(profile);
+      } catch (error) {
+        console.error('No se pudo cargar la cuenta vecinal autenticada desde base de datos.', error);
+      }
+
       const requestedRedirect = sessionStorage.getItem('postLoginRedirect') ?? eventsListPath;
       const redirectTo = requestedRedirect === eventsListPath || requestedRedirect.startsWith('/eventos/')
         ? requestedRedirect
@@ -849,7 +1005,6 @@ function PublicPortal() {
     window.history.replaceState(null, '', pathByRole[user.role] ?? '/admin');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
-
   if (authState !== 'ready') {
     return (
       <AuthTransition
@@ -913,6 +1068,8 @@ function PublicPortal() {
             <RegistrationReceipt
               event={selectedEvent}
               receiptCode={receiptCode}
+              qrDataUrl={receiptQrDataUrl}
+              qrError={receiptQrError}
               registration={registration}
               user={authenticatedUser}
               onBack={closeEventDetail}
@@ -921,7 +1078,16 @@ function PublicPortal() {
           ) : (
             <PublicEventDetail
               event={selectedEvent}
+              currentRegistration={selectedEventRegistration}
+              isCancellingRegistration={isCancellingRegistration}
+              isLoadingRegistrationStatus={isLoadingRegistrationStatus}
+              registrationActionError={registrationActionError}
+              registrationQrDataUrl={registrationQrDataUrl}
+              registrationQrError={registrationQrError}
+              registrationStatus={selectedEventRegistration?.estado ?? 'NO_INSCRITO'}
+              isLoadingRegistrationQr={isLoadingRegistrationQr}
               onBack={closeEventDetail}
+              onCancelRegistration={cancelEventRegistration}
               onSubmit={submitRegistration}
             />
           )}
@@ -953,9 +1119,11 @@ function PublicPortal() {
           loadError={portalEventsError}
           searchTerm={searchTerm}
           selectedCategory={selectedCategory}
-          onCategoryChange={setSelectedCategory}
+          eventsPage={portalEventsPage}
+          onCategoryChange={changeCategory}
           onEventSelect={openEventDetail}
-          onSearchChange={setSearchTerm}
+          onPageChange={changePortalEventsPage}
+          onSearchChange={changeSearchTerm}
           upcomingEvents={portalEvents}
         />
       )}
@@ -1002,7 +1170,7 @@ function PortalHeader({ user, onAccount, onHome, onLogin, onLogout }) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const isNeighbor = user?.role === 'VECINO' || user?.rol === 'VECINO';
-  const userDisplayName = [user?.nombres, user?.apellidos].filter(Boolean).join(' ');
+  const userDisplayName = user?.nombreCompleto || user?.fullName || [user?.nombres, user?.apellidos].filter(Boolean).join(' ') || user?.correo || user?.email || 'Mi cuenta';
 
   useEffect(() => {
     function closeMenuOnOutsideClick(event) {
@@ -1081,21 +1249,45 @@ function PortalHeader({ user, onAccount, onHome, onLogin, onLogout }) {
 }
 
 function AccountSettingsPage({ user, onBack, onUserUpdate }) {
-  const initialFormData = {
-    acceptsDataUse: user?.acceptsDataUse ?? true,
-    celular: user?.celular ?? '',
-    confirmNewPassword: '',
-    correo: user?.correo ?? '',
-    fechaNacimiento: user?.fechaNacimiento ?? '',
-    newPassword: '',
-  };
-  const displayName =
-    user?.nombreCompleto || [user?.nombres, user?.apellidos].filter(Boolean).join(' ');
-  const [formData, setFormData] = useState(initialFormData);
+  const [profile, setProfile] = useState(null);
+  const [formData, setFormData] = useState(() => getAccountFormData(user));
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
-  const [isNewPasswordVisible, setIsNewPasswordVisible] = useState(false);
-  const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const currentProfile = profile ?? user ?? {};
+  const displayName =
+    currentProfile.nombreCompleto || [currentProfile.nombres, currentProfile.apellidos].filter(Boolean).join(' ');
+
+  useEffect(() => {
+    let isMounted = true;
+
+    obtenerPerfilVecino()
+      .then((loadedProfile) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setProfile(loadedProfile);
+        setFormData(getAccountFormData(loadedProfile));
+        onUserUpdate(mapNeighborProfileToSession(loadedProfile));
+      })
+      .catch((error) => {
+        console.error('No se pudo cargar la configuracion de cuenta vecinal.', error);
+        if (isMounted) {
+          setFormError(getApiErrorMessage(error, 'No se pudieron cargar tus datos de cuenta.'));
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingProfile(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [onUserUpdate]);
 
   function updateField(field, value) {
     setFormData((currentData) => ({
@@ -1106,65 +1298,54 @@ function AccountSettingsPage({ user, onBack, onUserUpdate }) {
     setFormSuccess('');
   }
 
-  function submitAccountSettings(event) {
+  async function submitAccountSettings(event) {
     event.preventDefault();
+
+    if (!profile) {
+      setFormError('Espera a que se carguen tus datos de cuenta.');
+      return;
+    }
 
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!emailPattern.test(formData.correo.trim())) {
-      setFormError('Ingresa un correo electrónico válido.');
+      setFormError('Ingresa un correo electronico valido.');
       return;
     }
 
     if (!formData.celular.trim()) {
-      setFormError('Ingresa tu número de celular.');
+      setFormError('Ingresa tu numero de celular.');
       return;
     }
 
-    if (
-      (formData.newPassword || formData.confirmNewPassword) &&
-      formData.newPassword !== formData.confirmNewPassword
-    ) {
-      setFormError('Las contraseñas deben coincidir.');
-      return;
-    }
-
-    const payload = {
-      fechaNacimiento: formData.fechaNacimiento,
-      correo: formData.correo.trim(),
-      celular: formData.celular.trim(),
-      acceptsDataUse: formData.acceptsDataUse,
-      nuevaPassword: formData.newPassword || null,
-    };
-
-    // TODO: conectar este payload con el endpoint de actualizacion de cuenta en Spring Boot.
-    void payload;
-
-    const updatedUser = {
-      ...user,
-      acceptsDataUse: formData.acceptsDataUse,
-      celular: formData.celular.trim(),
-      correo: formData.correo.trim(),
-      fechaNacimiento: formData.fechaNacimiento,
-    };
+    setIsSavingProfile(true);
+    setFormError('');
+    setFormSuccess('');
 
     try {
-      localStorage.setItem(citizenAuthStorageKey, JSON.stringify(updatedUser));
-    } catch {
-      // La persistencia local es temporal mientras no exista backend.
-    }
+      const updatedProfile = await actualizarPerfilVecino({
+        dni: profile.dni,
+        nombreCompleto: profile.nombreCompleto,
+        fechaNacimiento: formData.fechaNacimiento,
+        correo: formData.correo.trim(),
+        celular: formData.celular.trim(),
+        aceptaTratamientoDatos: formData.acceptsDataUse,
+      });
 
-    onUserUpdate(updatedUser);
-    setFormData((currentData) => ({
-      ...currentData,
-      confirmNewPassword: '',
-      newPassword: '',
-    }));
-    setFormSuccess('Datos actualizados correctamente.');
+      setProfile(updatedProfile);
+      setFormData(getAccountFormData(updatedProfile));
+      onUserUpdate(mapNeighborProfileToSession(updatedProfile));
+      setFormSuccess('Datos actualizados correctamente.');
+    } catch (error) {
+      console.error('No se pudo actualizar la configuracion de cuenta vecinal.', error);
+      setFormError(getApiErrorMessage(error, 'No se pudieron actualizar tus datos.'));
+    } finally {
+      setIsSavingProfile(false);
+    }
   }
 
   function cancelAccountSettings() {
-    setFormData(initialFormData);
+    setFormData(getAccountFormData(currentProfile));
     setFormError('');
     setFormSuccess('');
     onBack();
@@ -1184,13 +1365,15 @@ function AccountSettingsPage({ user, onBack, onUserUpdate }) {
           <p>Revisa y actualiza los datos asociados a tu cuenta vecinal.</p>
         </div>
 
+        {isLoadingProfile && <p className="portal-inline-message">Cargando datos de cuenta...</p>}
+
         <div className="register-fields-grid account-fields-grid">
           <label>
             DNI
             <input
               disabled
               type="text"
-              value={user?.dni ?? ''}
+              value={currentProfile.dni ?? ''}
               readOnly
             />
             <span className="account-field-help">
@@ -1213,6 +1396,7 @@ function AccountSettingsPage({ user, onBack, onUserUpdate }) {
             Fecha de nacimiento
             <input
               autoComplete="bday"
+              disabled={isLoadingProfile || isSavingProfile}
               type="date"
               value={formData.fechaNacimiento}
               onChange={(event) => updateField('fechaNacimiento', event.target.value)}
@@ -1222,6 +1406,7 @@ function AccountSettingsPage({ user, onBack, onUserUpdate }) {
             Correo electrónico
             <input
               autoComplete="email"
+              disabled={isLoadingProfile || isSavingProfile}
               type="email"
               value={formData.correo}
               onChange={(event) => updateField('correo', event.target.value)}
@@ -1231,6 +1416,7 @@ function AccountSettingsPage({ user, onBack, onUserUpdate }) {
             Celular
             <input
               autoComplete="tel"
+              disabled={isLoadingProfile || isSavingProfile}
               inputMode="tel"
               type="tel"
               value={formData.celular}
@@ -1241,6 +1427,7 @@ function AccountSettingsPage({ user, onBack, onUserUpdate }) {
 
         <label className="data-consent-control account-consent-control">
           <input
+            disabled={isLoadingProfile || isSavingProfile}
             type="checkbox"
             checked={formData.acceptsDataUse}
             onChange={(event) => updateField('acceptsDataUse', event.target.checked)}
@@ -1251,77 +1438,27 @@ function AccountSettingsPage({ user, onBack, onUserUpdate }) {
           </span>
         </label>
 
-        <section className="account-security-section" aria-labelledby="account-security-title">
-          <div>
-            <h2 id="account-security-title">Seguridad</h2>
-            <p>Puedes actualizar tu contraseña cuando lo necesites.</p>
-          </div>
-          <div className="register-fields-grid account-fields-grid">
-            <label>
-              Nueva contraseña
-              <span className="password-control">
-                <input
-                  autoComplete="new-password"
-                  type={isNewPasswordVisible ? 'text' : 'password'}
-                  value={formData.newPassword}
-                  onChange={(event) => updateField('newPassword', event.target.value)}
-                />
-                <button
-                  aria-label={
-                    isNewPasswordVisible ? 'Ocultar nueva contraseña' : 'Mostrar nueva contraseña'
-                  }
-                  className="password-toggle"
-                  type="button"
-                  onClick={() => setIsNewPasswordVisible((currentValue) => !currentValue)}
-                >
-                  {isNewPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
-                </button>
-              </span>
-            </label>
-            <label>
-              Confirmar nueva contraseña
-              <span className="password-control">
-                <input
-                  autoComplete="new-password"
-                  type={isConfirmPasswordVisible ? 'text' : 'password'}
-                  value={formData.confirmNewPassword}
-                  onChange={(event) => updateField('confirmNewPassword', event.target.value)}
-                />
-                <button
-                  aria-label={
-                    isConfirmPasswordVisible
-                      ? 'Ocultar confirmación de contraseña'
-                      : 'Mostrar confirmación de contraseña'
-                  }
-                  className="password-toggle"
-                  type="button"
-                  onClick={() =>
-                    setIsConfirmPasswordVisible((currentValue) => !currentValue)
-                  }
-                >
-                  {isConfirmPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
-                </button>
-              </span>
-            </label>
-          </div>
-        </section>
-
         {formError && <p className="login-error">{formError}</p>}
         {formSuccess && <p className="login-success">{formSuccess}</p>}
 
         <div className="account-form-actions">
-          <button className="back-button" type="button" onClick={cancelAccountSettings}>
+          <button className="back-button" disabled={isSavingProfile} type="button" onClick={cancelAccountSettings}>
             Cancelar
           </button>
-          <button className="primary-button register-primary-button" type="submit">
+          <LoadingButton
+            className="primary-button register-primary-button"
+            disabled={isLoadingProfile || !profile}
+            loading={isSavingProfile}
+            loadingLabel="Guardando..."
+            type="submit"
+          >
             Guardar cambios
-          </button>
+          </LoadingButton>
         </div>
       </form>
     </section>
   );
 }
-
 
 function LoginView({ notice, onBack, onLoginSuccess, onRecoverPassword, onRegister }) {
   const [credentials, setCredentials] = useState({
@@ -2036,17 +2173,24 @@ function PortalHome({
   categories,
   featuredEvent,
   filteredEvents,
+  eventsPage,
   isLoading,
   loadError,
   searchTerm,
   selectedCategory,
   onCategoryChange,
   onEventSelect,
+  onPageChange,
   onSearchChange,
   upcomingEvents,
 }) {
   const featuredCoverUrl = featuredEvent ? getEventCoverUrl(featuredEvent) : '';
   const hasFeaturedEvent = Boolean(featuredEvent);
+  const currentPage = eventsPage?.number ?? 0;
+  const totalPages = eventsPage?.totalPages ?? 0;
+  const totalEvents = eventsPage?.totalElements ?? filteredEvents.length;
+  const canGoPrevious = currentPage > 0;
+  const canGoNext = totalPages > 0 && currentPage < totalPages - 1;
 
   return (
     <>
@@ -2105,7 +2249,7 @@ function PortalHome({
               <span className="section-kicker">Eventos disponibles</span>
               <h2>Agenda para ciudadanos</h2>
             </div>
-            <p>{filteredEvents.length} actividades encontradas</p>
+            <p>{totalEvents} actividades encontradas</p>
           </div>
 
           <form className="search-panel agenda-search-panel" role="search">
@@ -2172,6 +2316,26 @@ function PortalHome({
               );
             })}
           </div>
+
+          {totalPages > 1 && (
+            <nav className="events-pagination" aria-label="Paginacion de eventos">
+              <button
+                disabled={!canGoPrevious || isLoading}
+                type="button"
+                onClick={() => onPageChange(currentPage - 1)}
+              >
+                Anterior
+              </button>
+              <span>Página {currentPage + 1} de {totalPages}</span>
+              <button
+                disabled={!canGoNext || isLoading}
+                type="button"
+                onClick={() => onPageChange(currentPage + 1)}
+              >
+                Siguiente
+              </button>
+            </nav>
+          )}
         </div>
 
         <AgendaSidebar events={upcomingEvents} />
@@ -2304,7 +2468,7 @@ function LoginRequiredModal({ onCancel, onLogin, onRegister }) {
   );
 }
 
-function RegistrationReceipt({ event, receiptCode, registration, user, onBack, onPrint }) {
+function RegistrationReceipt({ event, receiptCode, qrDataUrl, qrError, registration, user, onBack, onPrint }) {
   const participantName =
     registration.fullName ||
     user?.nombreCompleto ||
@@ -2329,7 +2493,17 @@ function RegistrationReceipt({ event, receiptCode, registration, user, onBack, o
               día del evento.
             </p>
           </div>
-          <HardcodedQrCode value={receiptCode} />
+          {qrDataUrl ? (
+            <img
+              alt={`Codigo QR de la inscripcion ${receiptCode}`}
+              className="qr-preview"
+              src={qrDataUrl}
+            />
+          ) : (
+            <div className="qr-preview qr-placeholder" role="status">
+              <span>{qrError || 'QR no disponible'}</span>
+            </div>
+          )}
         </header>
 
         <div className="receipt-code">
@@ -2395,23 +2569,6 @@ function DownloadIcon() {
       <path d="M12 3v11" />
       <path d="m7 10 5 5 5-5" />
       <path d="M5 20h14" />
-    </svg>
-  );
-}
-
-function HardcodedQrCode({ value }) {
-  return (
-    <svg
-      aria-label={`Codigo QR ${value}`}
-      className="qr-preview"
-      role="img"
-      viewBox="0 0 116 116"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <rect width="116" height="116" fill="#ffffff" />
-      <path d="M8 8h28v28H8zM16 16v12h12V16zM80 8h28v28H80zM88 16v12h12V16zM8 80h28v28H8zM16 88v12h12V88z" fill="#0a56c2" />
-      <path d="M44 8h8v8h-8zM60 8h8v8h-8zM44 24h16v8H44zM68 24h8v8h-8zM44 40h8v8h-8zM60 40h24v8H60zM92 44h16v8H92zM8 44h8v8H8zM24 44h12v8H24zM48 56h8v8h-8zM64 56h8v8h-8zM80 56h28v8H80zM40 64h24v8H40zM72 68h8v8h-8zM92 72h16v8H92zM44 80h8v8h-8zM60 80h20v8H60zM88 88h8v8h-8zM104 88h4v20h-8V96h-8v-8h12zM44 96h8v12h-8zM60 100h28v8H60zM72 16h4v8h-8V12h4zM52 72h8v8h-8zM20 60h16v8H20zM8 64h8v8H8zM88 64h8v8h-8z" fill="#101828" />
-      <path d="M56 20h8v8h-8zM32 56h8v8h-8zM72 40h8v8h-8zM56 88h8v8h-8zM96 56h8v8h-8z" fill="#18c7f3" />
     </svg>
   );
 }

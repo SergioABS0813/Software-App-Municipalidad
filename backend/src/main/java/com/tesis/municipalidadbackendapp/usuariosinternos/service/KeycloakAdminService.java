@@ -15,15 +15,18 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.List;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class KeycloakAdminService {
     private static final List<String> ACTIVACION_USUARIO_INTERNO_ACTIONS = List.of("UPDATE_PASSWORD");
+    private static final String ROL_VECINO = "VECINO";
 
     private final KeycloakAdminProperties properties;
     private final RestClient.Builder restClientBuilder;
@@ -54,6 +57,7 @@ public class KeycloakAdminService {
 
             String keycloakId = obtenerIdDesdeLocation(location);
             asignarRolRealm(restClient, token, keycloakId, rolKeycloak);
+            sanearRolesVecinoParaUsuarioInterno(restClient, token, keycloakId);
             enviarCorreoAccionesRequeridas(restClient, token, keycloakId, email);
             log.info("Usuario creado en Keycloak. email={}, keycloakId={}, rol={}", email, keycloakId, rolKeycloak);
             return keycloakId;
@@ -68,6 +72,97 @@ public class KeycloakAdminService {
         }
     }
 
+    public String crearVecino(String nombre, String email, String dni, String celular, String fechaNacimiento) {
+        String token = obtenerAccessToken();
+        RestClient restClient = restClientBuilder.baseUrl(normalizedServerUrl()).build();
+
+        Map<String, Object> atributos = new HashMap<>();
+        atributos.put("dni", List.of(dni));
+        atributos.put("celular", List.of(celular));
+        atributos.put("fechaNacimiento", List.of(fechaNacimiento));
+        atributos.put("rol", List.of(ROL_VECINO));
+
+        Map<String, Object> request = new HashMap<>();
+        request.put("username", email);
+        request.put("email", email);
+        request.put("firstName", nombre);
+        request.put("enabled", true);
+        request.put("emailVerified", false);
+        request.put("requiredActions", ACTIVACION_USUARIO_INTERNO_ACTIONS);
+        request.put("attributes", atributos);
+
+        try {
+            String location = restClient.post()
+                    .uri("/admin/realms/{realm}/users", properties.getRealm())
+                    .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .toBodilessEntity()
+                    .getHeaders()
+                    .getFirst(HttpHeaders.LOCATION);
+
+            String keycloakId = obtenerIdDesdeLocation(location);
+            asignarRolRealm(restClient, token, keycloakId, ROL_VECINO);
+            enviarCorreoAccionesRequeridas(restClient, token, keycloakId, email);
+            log.info("Vecino creado en Keycloak. email={}, keycloakId={}, rol={}", email, keycloakId, ROL_VECINO);
+            return keycloakId;
+        } catch (RestClientResponseException exception) {
+            log.warn("Error al crear vecino en Keycloak. email={}, status={}, body={}",
+                    email, exception.getStatusCode(), exception.getResponseBodyAsString());
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "No se pudo crear la cuenta en Keycloak",
+                    exception
+            );
+        }
+    }
+
+    public boolean existeUsuarioPorEmail(String email) {
+        if (!StringUtils.hasText(email)) {
+            return false;
+        }
+
+        String token = obtenerAccessToken();
+        RestClient restClient = restClientBuilder.baseUrl(normalizedServerUrl()).build();
+
+        try {
+            List<Map<String, Object>> usuarios = restClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/admin/realms/{realm}/users")
+                            .queryParam("username", email)
+                            .queryParam("exact", true)
+                            .build(properties.getRealm()))
+                    .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                    .retrieve()
+                    .body(List.class);
+
+            if (usuarios != null && usuarios.stream().anyMatch(usuario -> email.equalsIgnoreCase(String.valueOf(usuario.get("username"))))) {
+                return true;
+            }
+
+            usuarios = restClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/admin/realms/{realm}/users")
+                            .queryParam("email", email)
+                            .queryParam("exact", true)
+                            .build(properties.getRealm()))
+                    .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                    .retrieve()
+                    .body(List.class);
+
+            return usuarios != null && !usuarios.isEmpty();
+        } catch (RestClientResponseException exception) {
+            log.warn("Error al consultar usuario en Keycloak por email. email={}, status={}, body={}",
+                    email, exception.getStatusCode(), exception.getResponseBodyAsString());
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "No se pudo validar el correo en Keycloak",
+                    exception
+            );
+        }
+    }
+
     public void eliminarUsuario(String keycloakId) {
         try {
             String token = obtenerAccessToken();
@@ -77,9 +172,9 @@ public class KeycloakAdminService {
                     .header(HttpHeaders.AUTHORIZATION, bearer(token))
                     .retrieve()
                     .toBodilessEntity();
-            log.info("Usuario eliminado de Keycloak por compensación. keycloakId={}", keycloakId);
+            log.info("Usuario eliminado de Keycloak por compensacion. keycloakId={}", keycloakId);
         } catch (RestClientResponseException exception) {
-            log.error("No se pudo eliminar usuario de Keycloak durante compensación. keycloakId={}, status={}, body={}",
+            log.error("No se pudo eliminar usuario de Keycloak durante compensacion. keycloakId={}, status={}, body={}",
                     keycloakId, exception.getStatusCode(), exception.getResponseBodyAsString());
         }
     }
@@ -164,6 +259,7 @@ public class KeycloakAdminService {
             }
 
             asignarRolRealm(restClient, token, keycloakId, rolNuevo);
+            sanearRolesVecinoParaUsuarioInterno(restClient, token, keycloakId);
             cerrarSesionesUsuario(restClient, token, keycloakId);
             log.info("Rol actualizado en Keycloak. keycloakId={}, rolAnterior={}, rolNuevo={}",
                     keycloakId, rolAnterior, rolNuevo);
@@ -192,12 +288,10 @@ public class KeycloakAdminService {
                         if (StringUtils.hasText(properties.getActivationRedirectUri())) {
                             builder.queryParam("redirect_uri", properties.getActivationRedirectUri());
                         }
-                        builder.queryParam("lifespan", 300); // El enlace de actualización de contraseña será válido por 5 minutos (300 segundos)
+                        builder.queryParam("lifespan", 300);
                         return builder.build(properties.getRealm(), keycloakId);
                     })
                     .header(HttpHeaders.AUTHORIZATION, bearer(token))
-                    //.contentType(MediaType.APPLICATION_JSON)
-                    //.body(List.of("UPDATE_PASSWORD")) CORREGIR CORREO
                     .retrieve()
                     .toBodilessEntity();
 
@@ -229,6 +323,74 @@ public class KeycloakAdminService {
                     exception
             );
         }
+    }
+
+    private void sanearRolesVecinoParaUsuarioInterno(RestClient restClient, String token, String keycloakId) {
+        List<Map<String, Object>> rolesDirectos = obtenerRolesRealmDirectos(restClient, token, keycloakId);
+        if (rolesDirectos.isEmpty()) {
+            return;
+        }
+
+        String defaultRoleName = "default-roles-" + properties.getRealm();
+        List<Map<String, Object>> rolesARemover = new ArrayList<>();
+
+        rolesDirectos.stream()
+                .filter(rol -> ROL_VECINO.equalsIgnoreCase(String.valueOf(rol.get("name"))))
+                .findFirst()
+                .ifPresent(rolesARemover::add);
+
+        if (tieneRolEfectivo(restClient, token, keycloakId, ROL_VECINO)) {
+            Optional<Map<String, Object>> defaultRole = rolesDirectos.stream()
+                    .filter(rol -> defaultRoleName.equalsIgnoreCase(String.valueOf(rol.get("name"))))
+                    .findFirst();
+            defaultRole.ifPresent(rolesARemover::add);
+        }
+
+        if (rolesARemover.isEmpty()) {
+            return;
+        }
+
+        try {
+            restClient.method(HttpMethod.DELETE)
+                    .uri("/admin/realms/{realm}/users/{userId}/role-mappings/realm", properties.getRealm(), keycloakId)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(rolesARemover)
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Rol VECINO/default role removido para usuario interno. keycloakId={}, rolesRemovidos={}",
+                    keycloakId, rolesARemover.stream().map(rol -> rol.get("name")).toList());
+        } catch (RestClientResponseException exception) {
+            log.warn("Error al remover rol VECINO de usuario interno. keycloakId={}, status={}, body={}",
+                    keycloakId, exception.getStatusCode(), exception.getResponseBodyAsString());
+            eliminarUsuario(keycloakId);
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "No se pudo sanear los roles del usuario en Keycloak",
+                    exception
+            );
+        }
+    }
+
+    private List<Map<String, Object>> obtenerRolesRealmDirectos(RestClient restClient, String token, String keycloakId) {
+        List<Map<String, Object>> roles = restClient.get()
+                .uri("/admin/realms/{realm}/users/{userId}/role-mappings/realm", properties.getRealm(), keycloakId)
+                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                .retrieve()
+                .body(List.class);
+
+        return roles == null ? List.of() : roles;
+    }
+
+    private boolean tieneRolEfectivo(RestClient restClient, String token, String keycloakId, String rolBuscado) {
+        List<Map<String, Object>> roles = restClient.get()
+                .uri("/admin/realms/{realm}/users/{userId}/role-mappings/realm/composite", properties.getRealm(), keycloakId)
+                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                .retrieve()
+                .body(List.class);
+
+        return roles != null && roles.stream()
+                .anyMatch(rol -> rolBuscado.equalsIgnoreCase(String.valueOf(rol.get("name"))));
     }
 
     private Map<String, Object> obtenerRolRealm(RestClient restClient, String token, String rolKeycloak) {
@@ -288,15 +450,14 @@ public class KeycloakAdminService {
                     .retrieve()
                     .toBodilessEntity();
 
-            // TODO personalizar visualmente este correo mediante theme de Keycloak/email templates.
-            log.info("Correo de activación solicitado a Keycloak. keycloakId={}, email={}", keycloakId, email);
+            log.info("Correo UPDATE_PASSWORD solicitado a Keycloak. keycloakId={}, email={}", keycloakId, email);
         } catch (RestClientResponseException exception) {
-            log.warn("Error al solicitar correo de activación en Keycloak. keycloakId={}, email={}, status={}, body={}",
+            log.warn("Error al solicitar correo de activacion en Keycloak. keycloakId={}, email={}, status={}, body={}",
                     keycloakId, email, exception.getStatusCode(), exception.getResponseBodyAsString());
             eliminarUsuario(keycloakId);
             throw new ResponseStatusException(
                     HttpStatus.BAD_GATEWAY,
-                    "No se pudo enviar el correo de activación desde Keycloak",
+                    "No se pudo enviar el correo de activacion desde Keycloak",
                     exception
             );
         }
@@ -319,7 +480,7 @@ public class KeycloakAdminService {
 
             Object accessToken = response == null ? null : response.get("access_token");
             if (!(accessToken instanceof String token) || token.isBlank()) {
-                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Keycloak no devolvió access_token");
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Keycloak no devolvio access_token");
             }
             return token;
         } catch (RestClientResponseException exception) {
@@ -335,7 +496,7 @@ public class KeycloakAdminService {
 
     private String obtenerIdDesdeLocation(String location) {
         if (location == null || location.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Keycloak no devolvió la ubicación del usuario creado");
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Keycloak no devolvio la ubicacion del usuario creado");
         }
         int lastSlash = location.lastIndexOf('/');
         if (lastSlash < 0 || lastSlash == location.length() - 1) {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const eventMonthIndex = {
   abr: 3,
@@ -124,6 +124,21 @@ function getAvailabilityState(spots) {
   };
 }
 
+function formatRegistrationDate(value) {
+  const date = value ? new Date(value) : null;
+
+  if (!date || Number.isNaN(date.getTime())) {
+    return 'Por confirmar';
+  }
+
+  return new Intl.DateTimeFormat('es-PE', {
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
+}
 function getEventShortDescription(event) {
   return event.descripcion_breve || event.descripcion || event.summary || event.description || '';
 }
@@ -355,15 +370,31 @@ function EventVideoPreview({ resource }) {
 export default function PublicEventDetail({
   backLabel = 'Volver a eventos',
   event,
+  currentRegistration = null,
+  isCancellingRegistration = false,
+  isLoadingRegistrationStatus = false,
+  registrationActionError = '',
+  registrationQrDataUrl = '',
+  registrationQrError = '',
+  registrationStatus = 'NO_INSCRITO',
+  isLoadingRegistrationQr = false,
   onBack,
+  onCancelRegistration,
   onSubmit,
 }) {
   const mapsUrl = getEventMapsUrl(event);
   const scheduleLabel = getEventScheduleLabel(event);
   const availabilityState = getAvailabilityState(event.spots);
+  const isRegistrationConfirmed = registrationStatus === 'CONFIRMADA';
+  const [isRegistrationDetailOpen, setIsRegistrationDetailOpen] = useState(false);
+  const isReservationActionDisabled = isLoadingRegistrationStatus || isCancellingRegistration || (!isRegistrationConfirmed && !availabilityState.isAvailable);
   const requirementItems = getOrderedTextItems(event.requisitos_evento ?? event.requirements);
   const agendaItems = getOrderedTextItems(event.agenda_evento ?? event.agenda);
   const audienceLabel = getEventAudienceLabel(event);
+
+  useEffect(() => {
+    setIsRegistrationDetailOpen(false);
+  }, [event.id, registrationStatus]);
 
   return (
     <section className="detail-shell" aria-labelledby="event-detail-title">
@@ -507,15 +538,65 @@ export default function PublicEventDetail({
             </div>
           </div>
 
+          {registrationActionError && (
+            <p className="reservation-error-message" role="alert">{registrationActionError}</p>
+          )}
+
           <form className="reservation-action" onSubmit={onSubmit}>
-            <button
-              className="primary-button reservation-button"
-              disabled={!availabilityState.isAvailable}
-              type="submit"
-            >
-              Reservar un lugar
-            </button>
+            {isRegistrationConfirmed ? (
+              <button
+                className="primary-button reservation-button"
+                disabled={isReservationActionDisabled}
+                type="button"
+                onClick={() => setIsRegistrationDetailOpen((currentValue) => !currentValue)}
+              >
+                {isRegistrationDetailOpen ? 'Ocultar inscripcion' : 'Ver inscripcion'}
+              </button>
+            ) : (
+              <button
+                className="primary-button reservation-button"
+                disabled={isReservationActionDisabled}
+                type="submit"
+              >
+                {isLoadingRegistrationStatus ? 'Verificando...' : 'Reservar un lugar'}
+              </button>
+            )}
           </form>
+
+          {isRegistrationConfirmed && isRegistrationDetailOpen && (
+            <section className="registration-summary-panel" aria-label="Datos de tu inscripcion">
+              <div className="registration-summary-heading">
+                <span>Inscripcion CONFIRMADA</span>
+                <strong>{currentRegistration?.codigoInscripcion ?? 'Codigo por confirmar'}</strong>
+              </div>
+              <dl className="registration-summary-details">
+                <div>
+                  <dt>Fecha de inscripcion</dt>
+                  <dd>{formatRegistrationDate(currentRegistration?.fechaInscripcion)}</dd>
+                </div>
+              </dl>
+              <div className="registration-summary-qr" aria-live="polite">
+                {isLoadingRegistrationQr ? (
+                  <span>Cargando QR...</span>
+                ) : registrationQrDataUrl ? (
+                  <img
+                    alt={`Codigo QR de la inscripcion ${currentRegistration?.codigoInscripcion ?? ''}`.trim()}
+                    src={registrationQrDataUrl}
+                  />
+                ) : (
+                  <span>{registrationQrError || 'QR no disponible'}</span>
+                )}
+              </div>
+              <button
+                className="primary-button reservation-button reservation-cancel-button"
+                disabled={isCancellingRegistration}
+                type="button"
+                onClick={onCancelRegistration}
+              >
+                {isCancellingRegistration ? 'Cancelando...' : 'Cancelar inscripcion'}
+              </button>
+            </section>
+          )}
         </aside>
       </div>
     </section>

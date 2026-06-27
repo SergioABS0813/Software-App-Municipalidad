@@ -102,11 +102,22 @@ public class EventoService {
     }
 
     @Transactional(readOnly = true)
-    public List<EventoPortalPublicoDto> obtenerEventosPortalPublico(String texto, Integer categoriaId) {
+    public Page<EventoPortalPublicoDto> obtenerEventosPortalPublico(String texto, Integer categoriaId, int page, int size) {
         String textoNormalizado = normalizarTexto(texto);
-        return eventoRepository.findAllPortalPublico(textoNormalizado, categoriaId).stream()
+        int pageSize = Math.max(1, Math.min(size, 50));
+        PageRequest pageable = PageRequest.of(Math.max(page, 0), pageSize);
+
+        return eventoRepository.findAllPortalPublico(textoNormalizado, categoriaId, pageable)
+                .map(this::toPortalPublicoDto);
+    }
+
+    @Transactional(readOnly = true)
+    public EventoPortalPublicoDto obtenerProximoEventoPortalPublico() {
+        return eventoRepository.findNextPortalPublico(Instant.now(), PageRequest.of(0, 1))
+                .stream()
+                .findFirst()
                 .map(this::toPortalPublicoDto)
-                .toList();
+                .orElse(null);
     }
     public Page<EventoRevisionDirectivaResumenDto> obtenerEventosRevisionDirectiva(
             String estado,

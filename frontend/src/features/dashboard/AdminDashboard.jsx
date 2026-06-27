@@ -32,6 +32,7 @@ import {
   guardarUbicacionConfiguracion,
   marcarNotificacionComoLeida,
   subirRecursoEvento,
+  consultaDni,
 } from '../../services/dashboardService';
 import { getApiErrorMessage } from '../../services/api/api';
 import { CardSkeleton, EmptyState, ErrorState, EventFormSkeleton, TableSkeleton } from '../../components/feedback/LoadingStates';
@@ -4736,21 +4737,32 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
             setUserFormData((current) => ({ ...current, [field]: value }));
             setUserFormErrors((current) => ({ ...current, [field]: undefined }));
           }}
-          onLookupDni={() => {
-            const identity = identityLookupMock[userFormData.dni];
+          onLookupDni={async () => {
+            
+            const response = await consultaDni(userFormData.dni);
 
-            if (identity) {
-              setUserFormData((current) => ({
-                ...current,
-                identityVerified: true,
-                nombre: identity.nombreCompleto,
-              }));
-              setUserFormErrors((current) => ({ ...current, identityVerified: undefined }));
-              setIdentityLookupNotice(`Nombre encontrado: ${identity.nombreCompleto}`);
-            } else {
+            if(!response.data || !response.success){
               setUserFormData((current) => ({ ...current, identityVerified: false, nombre: '' }));
               setIdentityLookupNotice('No se encontraron datos para el DNI ingresado.');
             }
+
+            if(response.status===404){
+              setUserFormData((current) => ({ ...current, identityVerified: false, nombre: '' }));
+              setIdentityLookupNotice('No se encontraron datos para el DNI ingresado.');
+            }
+
+            if(response.status===429){
+              setUserFormData((current) => ({ ...current, identityVerified: false, nombre: '' }));
+              setIdentityLookupNotice('El proveedor de consulta de DNI no está disponible en este momento');
+            }
+
+            setUserFormData((current) => ({
+                ...current,
+                identityVerified: true,
+                nombre: response.data,
+              }));
+              setUserFormErrors((current) => ({ ...current, identityVerified: undefined }));
+              setIdentityLookupNotice(`Nombre encontrado: ${response.data}`);
           }}
           onSendResetPassword={() => {
             if (!selectedUser) {

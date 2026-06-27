@@ -4,9 +4,13 @@ import com.tesis.municipalidadbackendapp.eventos.entity.Evento;
 import com.tesis.municipalidadbackendapp.eventos.repository.EventoRepository;
 import com.tesis.municipalidadbackendapp.inscripciones.dto.InscripcionEventoResponse;
 import com.tesis.municipalidadbackendapp.inscripciones.entity.Inscripcion;
+import com.tesis.municipalidadbackendapp.inscripciones.enums.EstadoInscripcion;
 import com.tesis.municipalidadbackendapp.inscripciones.repository.InscripcionRepository;
+import com.tesis.municipalidadbackendapp.qr.dto.CodigoQrResponseDto;
+import com.tesis.municipalidadbackendapp.qr.service.CodigoQrService;
 import com.tesis.municipalidadbackendapp.vecinos.entity.Vecino;
 import com.tesis.municipalidadbackendapp.vecinos.repository.VecinoRepository;
+import com.tesis.municipalidadbackendapp.vecinos.service.VecinoNotificacionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -17,6 +21,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -25,10 +31,104 @@ public class InscripcionEventoService {
     private final InscripcionRepository inscripcionRepository;
     private final EventoRepository eventoRepository;
     private final VecinoRepository vecinoRepository;
+    private final VecinoNotificacionService vecinoNotificacionService;
+    private final CodigoQrService codigoQrService;
+    private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
 
     @Transactional
     public InscripcionEventoResponse inscribirEvento(Integer eventoId) {
         Vecino vecino = obtenerVecinoAutenticado();
+        Evento evento = obtenerEventoPublicado(eventoId);
+
+        return inscripcionRepository.findByEventoIdAndVecinoId(eventoId, vecino.getId())
+                .map(inscripcion -> resolverInscripcionExistente(inscripcion, evento, vecino))
+                .orElseGet(() -> registrarNuevaInscripcion(evento, vecino));
+    }
+
+    @Transactional(readOnly = true)
+    public InscripcionEventoResponse obtenerInscripcionActual(Integer eventoId) {
+        Vecino vecino = obtenerVecinoAutenticado();
+
+        return inscripcionRepository.findByEventoIdAndVecinoId(eventoId, vecino.getId())
+                .map(this::toResponse)
+                .orElseGet(() -> new InscripcionEventoResponse(
+                        null,
+                        eventoId,
+                        null,
+                        vecino.getId(),
+                        vecino.getNombre(),
+                        null,
+                        null,
+                        "NO_INSCRITO"
+                ));
+    }
+
+    @Transactional
+    public InscripcionEventoResponse cancelarInscripcion(Integer eventoId) {
+        Vecino vecino = obtenerVecinoAutenticado();
+        Inscripcion inscripcion = inscripcionRepository
+                .findByEventoIdAndVecinoId(eventoId, vecino.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No tienes una inscripcion confirmada para este evento"));
+
+        if (inscripcion.getEstadoInscripcion() == EstadoInscripcion.CANCELADA) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "La inscripcion ya se encuentra cancelada");
+        }
+
+        inscripcion.setEstadoInscripcion(EstadoInscripcion.CANCELADA);
+        codigoQrService.revocarQrsActivosPorInscripcion(inscripcion.getId());
+
+        return toResponse(inscripcion);
+    }
+
+    private InscripcionEventoResponse resolverInscripcionExistente(Inscripcion inscripcion, Evento evento, Vecino vecino) {
+        if (inscripcion.getEstadoInscripcion() == EstadoInscripcion.CONFIRMADA) {
+            return toResponse(inscripcion);
+        }
+
+        if (inscripcion.getEstadoInscripcion() == EstadoInscripcion.CANCELADA) {
+            return reactivarInscripcion(inscripcion, evento, vecino);
+        }
+
+        inscripcion.setEstadoInscripcion(EstadoInscripcion.CONFIRMADA);
+        return toResponse(inscripcion);
+    }
+
+    private InscripcionEventoResponse registrarNuevaInscripcion(Evento evento, Vecino vecino) {
+        validarCuposDisponibles(evento);
+
+        ZonedDateTime ahora = ZonedDateTime.now(ZONA_LIMA).withZoneSameInstant(ZoneId.of("UTC"));
+        Inscripcion inscripcion = new Inscripcion();
+        inscripcion.setEvento(evento);
+        inscripcion.setVecino(vecino);
+        inscripcion.setFechaInscripcion(ahora.toInstant());
+        inscripcion.setOrigenInscripcion("PORTAL_PUBLICO");
+        inscripcion.setCodigoInscripcion(generarCodigoInscripcion(evento, vecino, ahora.toInstant()));
+        inscripcion.setEstadoInscripcion(EstadoInscripcion.CONFIRMADA);
+        System.out.println(EstadoInscripcion.CONFIRMADA);
+
+        return guardarConfirmadaYNotificar(inscripcion);
+    }
+
+    private InscripcionEventoResponse reactivarInscripcion(Inscripcion inscripcion, Evento evento, Vecino vecino) {
+        validarCuposDisponibles(evento);
+
+        Instant ahora = Instant.now();
+        inscripcion.setFechaInscripcion(ahora);
+        inscripcion.setOrigenInscripcion("PORTAL_PUBLICO");
+        inscripcion.setCodigoInscripcion(generarCodigoInscripcion(evento, vecino, ahora));
+        inscripcion.setEstadoInscripcion(EstadoInscripcion.CONFIRMADA);
+
+        return guardarConfirmadaYNotificar(inscripcion);
+    }
+
+    private InscripcionEventoResponse guardarConfirmadaYNotificar(Inscripcion inscripcion) {
+        Inscripcion guardada = inscripcionRepository.save(inscripcion);
+        CodigoQrResponseDto qr = codigoQrService.generarQrParaInscripcion(guardada.getId());
+        vecinoNotificacionService.enviarConstanciaInscripcion(guardada, qr.qrDataUrl());
+        return toResponse(guardada);
+    }
+
+    private Evento obtenerEventoPublicado(Integer eventoId) {
         Evento evento = eventoRepository.findById(eventoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evento no encontrado"));
 
@@ -37,29 +137,17 @@ public class InscripcionEventoService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "El evento no esta disponible para inscripcion");
         }
 
-        return inscripcionRepository.findByEventoIdAndVecinoId(eventoId, vecino.getId())
-                .map(inscripcion -> toResponse(inscripcion, "YA_INSCRITO"))
-                .orElseGet(() -> registrarNuevaInscripcion(evento, vecino));
+        return evento;
     }
 
-    private InscripcionEventoResponse registrarNuevaInscripcion(Evento evento, Vecino vecino) {
+    private void validarCuposDisponibles(Evento evento) {
         Integer aforoMaximo = evento.getAforoMaximo();
         if (aforoMaximo != null && aforoMaximo > 0) {
-            long totalInscritos = inscripcionRepository.countByEventoId(evento.getId());
+            long totalInscritos = inscripcionRepository.countActivasByEventoId(evento.getId());
             if (totalInscritos >= aforoMaximo) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "El evento ya no tiene cupos disponibles");
             }
         }
-
-        Instant ahora = Instant.now();
-        Inscripcion inscripcion = new Inscripcion();
-        inscripcion.setEvento(evento);
-        inscripcion.setVecino(vecino);
-        inscripcion.setFechaInscripcion(ahora);
-        inscripcion.setOrigenInscripcion("PORTAL_PUBLICO");
-        inscripcion.setCodigoInscripcion(generarCodigoInscripcion(evento, vecino, ahora));
-
-        return toResponse(inscripcionRepository.save(inscripcion), "INSCRITO");
     }
 
     private Vecino obtenerVecinoAutenticado() {
@@ -82,7 +170,11 @@ public class InscripcionEventoService {
         return "EC-" + evento.getId() + "-" + sufijoDni + "-" + Math.abs(fecha.toEpochMilli() % 100000);
     }
 
-    private InscripcionEventoResponse toResponse(Inscripcion inscripcion, String estado) {
+    private InscripcionEventoResponse toResponse(Inscripcion inscripcion) {
+        String estado = inscripcion.getEstadoInscripcion() != null
+                ? inscripcion.getEstadoInscripcion().name()
+                : EstadoInscripcion.CONFIRMADA.name();
+
         return new InscripcionEventoResponse(
                 inscripcion.getId(),
                 inscripcion.getEvento().getId(),

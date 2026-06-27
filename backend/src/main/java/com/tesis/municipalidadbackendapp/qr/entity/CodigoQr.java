@@ -1,6 +1,7 @@
 package com.tesis.municipalidadbackendapp.qr.entity;
 
 import com.tesis.municipalidadbackendapp.inscripciones.entity.Inscripcion;
+import com.tesis.municipalidadbackendapp.qr.enums.EstadoQr;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -19,8 +20,7 @@ public class CodigoQr {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Size(max = 45)
-    @Column(name = "token_hash", length = 45)
+    @Column(name = "token_hash")
     private String tokenHash;
 
     @Column(name = "generado_en")
@@ -32,9 +32,9 @@ public class CodigoQr {
     @Column(name = "fecha_expiracion")
     private Instant fechaExpiracion;
 
-    @Size(max = 45)
+    @Enumerated(EnumType.STRING)
     @Column(name = "estado_qr", length = 45)
-    private String estadoQr;
+    private EstadoQr estadoQr;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

@@ -1,6 +1,7 @@
 package com.tesis.municipalidadbackendapp.inscripciones.entity;
 
 import com.tesis.municipalidadbackendapp.eventos.entity.Evento;
+import com.tesis.municipalidadbackendapp.inscripciones.enums.EstadoInscripcion;
 import com.tesis.municipalidadbackendapp.usuariosinternos.entity.Usuario;
 import com.tesis.municipalidadbackendapp.vecinos.entity.Vecino;
 import jakarta.persistence.*;
@@ -45,6 +46,10 @@ public class Inscripcion {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "vecino_id", nullable = false)
     private Vecino vecino;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name="estado_inscripcion", length = 45)
+    private EstadoInscripcion estadoInscripcion;
 
 
 }

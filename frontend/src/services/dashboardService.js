@@ -228,3 +228,8 @@ export async function cancelarEventoDirectivo(id, { motivo = '' } = {}){
     const response = await api.patch(`eventos/directivo/operacion/${id}/cancelar`, { motivo });
     return response.data;
 }
+
+export async function consultaDni(dni){
+    const response = await api.get(`consulta_dni/${dni}`);
+    return response.data;
+}

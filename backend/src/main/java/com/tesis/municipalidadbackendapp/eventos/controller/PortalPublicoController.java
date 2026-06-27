@@ -5,6 +5,7 @@ import com.tesis.municipalidadbackendapp.eventos.dto.EventoPortalPublicoDto;
 import com.tesis.municipalidadbackendapp.eventos.service.CategoriaService;
 import com.tesis.municipalidadbackendapp.eventos.service.EventoService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -21,11 +22,18 @@ public class PortalPublicoController {
     private final CategoriaService categoriaService;
 
     @GetMapping("eventos")
-    public List<EventoPortalPublicoDto> obtenerEventosPublicados(
+    public Page<EventoPortalPublicoDto> obtenerEventosPublicados(
             @RequestParam(required = false) String texto,
-            @RequestParam(required = false) Integer categoriaId
+            @RequestParam(required = false) Integer categoriaId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "6") int size
     ) {
-        return eventoService.obtenerEventosPortalPublico(texto, categoriaId);
+        return eventoService.obtenerEventosPortalPublico(texto, categoriaId, page, size);
+    }
+
+    @GetMapping("eventos/proximo")
+    public EventoPortalPublicoDto obtenerProximoEventoPublicado() {
+        return eventoService.obtenerProximoEventoPortalPublico();
     }
 
     @GetMapping("categorias")
