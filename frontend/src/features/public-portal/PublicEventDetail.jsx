@@ -378,6 +378,11 @@ export default function PublicEventDetail({
   registrationQrError = '',
   registrationStatus = 'NO_INSCRITO',
   isLoadingRegistrationQr = false,
+  reservationActionDisabled = null,
+  reservationActionLabel = 'Reservar un lugar',
+  reservationActionLoadingLabel = 'Verificando...',
+  reservationCardKicker = 'PREINSCRIPCIÓN',
+  reservationCardTitle = 'Reserva tu participación',
   onBack,
   onCancelRegistration,
   onSubmit,
@@ -387,7 +392,8 @@ export default function PublicEventDetail({
   const availabilityState = getAvailabilityState(event.spots);
   const isRegistrationConfirmed = registrationStatus === 'CONFIRMADA';
   const [isRegistrationDetailOpen, setIsRegistrationDetailOpen] = useState(false);
-  const isReservationActionDisabled = isLoadingRegistrationStatus || isCancellingRegistration || (!isRegistrationConfirmed && !availabilityState.isAvailable);
+  const defaultReservationActionDisabled = isLoadingRegistrationStatus || isCancellingRegistration || (!isRegistrationConfirmed && !availabilityState.isAvailable);
+  const isReservationActionDisabled = reservationActionDisabled ?? defaultReservationActionDisabled;
   const requirementItems = getOrderedTextItems(event.requisitos_evento ?? event.requirements);
   const agendaItems = getOrderedTextItems(event.agenda_evento ?? event.agenda);
   const audienceLabel = getEventAudienceLabel(event);
@@ -464,8 +470,8 @@ export default function PublicEventDetail({
 
         <aside className="reservation-card" aria-label="Reserva al evento">
           <div className="reservation-card-header">
-            <span className="section-kicker">PREINSCRIPCIÓN</span>
-            <h2>Reserva tu participación</h2>
+            <span className="section-kicker">{reservationCardKicker}</span>
+            <h2>{reservationCardTitle}</h2>
           </div>
 
           <div className={`reservation-availability ${availabilityState.tone}`}>
@@ -558,7 +564,7 @@ export default function PublicEventDetail({
                 disabled={isReservationActionDisabled}
                 type="submit"
               >
-                {isLoadingRegistrationStatus ? 'Verificando...' : 'Reservar un lugar'}
+                {isLoadingRegistrationStatus ? reservationActionLoadingLabel : reservationActionLabel}
               </button>
             )}
           </form>

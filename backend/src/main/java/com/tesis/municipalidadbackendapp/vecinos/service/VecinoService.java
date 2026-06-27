@@ -7,6 +7,7 @@ import com.tesis.municipalidadbackendapp.inscripciones.repository.InscripcionRep
 import com.tesis.municipalidadbackendapp.auth.dto.AuthenticatedUserResponse;
 import com.tesis.municipalidadbackendapp.usuariosinternos.repository.UsuarioRepository;
 import com.tesis.municipalidadbackendapp.usuariosinternos.service.KeycloakAdminService;
+import com.tesis.municipalidadbackendapp.usuariosinternos.service.UsuarioNotificacionService;
 import com.tesis.municipalidadbackendapp.vecinos.dto.EstadoVecinoDirectorioDto;
 import com.tesis.municipalidadbackendapp.vecinos.dto.VecinoContactoUpdateRequest;
 import com.tesis.municipalidadbackendapp.vecinos.dto.VecinoCuentaVecinalDto;
@@ -66,6 +67,7 @@ public class VecinoService {
     private final AsistenciaRepository asistenciaRepository;
     private final KeycloakAdminService keycloakAdminService;
     private final VecinoNotificacionService vecinoNotificacionService;
+    private final UsuarioNotificacionService usuarioNotificacionService;
 
     public Optional<Vecino> obtenerVecinoPorCorreoDni(String email, String dni){
         return vecinoRepository.findByEmailAndDni(email, dni);
@@ -91,11 +93,17 @@ public class VecinoService {
         validarIdentidadNoEditable(vecino, request);
 
         String correoAnterior = nullToEmpty(vecino.getEmail());
+        String celularAnterior = nullToEmpty(vecino.getCelular());
+        Instant fechaNacimientoAnterior = vecino.getFechaNacimiento();
+        boolean aceptaTratamientoDatosAnterior = Byte.valueOf((byte) 1).equals(vecino.getAceptaTratamientoDatos());
         String correoNuevo = validarCorreo(request.correo(), vecino.getId());
         String celularNuevo = validarCelular(request.celular());
         Instant fechaNacimientoNueva = parseFechaNacimiento(normalizarFechaNacimiento(request.fechaNacimiento()));
         boolean aceptaTratamientoDatos = Boolean.TRUE.equals(request.aceptaTratamientoDatos());
         boolean cambioCorreo = !correoAnterior.equalsIgnoreCase(correoNuevo);
+        boolean cambioCelular = !celularAnterior.equals(celularNuevo);
+        boolean cambioFechaNacimiento = !Objects.equals(fechaNacimientoAnterior, fechaNacimientoNueva);
+        boolean cambioAceptacionDatos = aceptaTratamientoDatosAnterior != aceptaTratamientoDatos;
 
         if (cambioCorreo && StringUtils.hasText(vecino.getKeycloakId())) {
             keycloakAdminService.actualizarCorreoUsuario(vecino.getKeycloakId(), vecino.getNombre(), correoNuevo);
@@ -111,6 +119,20 @@ public class VecinoService {
         }
 
         Vecino guardado = vecinoRepository.save(vecino);
+
+        if (cambioCorreo) {
+            usuarioNotificacionService.notificarCorreoAccesoSeleccionado(correoNuevo, guardado.getNombre());
+            usuarioNotificacionService.notificarCorreoAnteriorReemplazado(correoAnterior, correoNuevo, guardado.getNombre());
+        } else if (cambioCelular || cambioFechaNacimiento || cambioAceptacionDatos) {
+            vecinoNotificacionService.notificarCambiosCuenta(
+                    correoNuevo,
+                    guardado.getNombre(),
+                    cambioCelular,
+                    cambioFechaNacimiento,
+                    cambioAceptacionDatos
+            );
+        }
+
         return mapToPerfilDto(guardado);
     }
 

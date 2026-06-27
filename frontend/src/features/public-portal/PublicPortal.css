@@ -1483,9 +1483,9 @@
 
 .registration-summary-qr img {
   display: block;
-  height: 148px;
+  height: 160px;
   object-fit: contain;
-  width: 148px;
+  width: 160px;
 }
 
 .registration-summary-qr span {

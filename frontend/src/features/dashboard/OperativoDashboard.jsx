@@ -424,6 +424,13 @@ function OperativoDashboard({ onLogout, user }) {
     setIsSidebarDrawerOpen(false);
   }
 
+  function handleOperativeBrandClick() {
+    closeSidebarDrawer();
+    window.history.pushState(null, '', '/operativo');
+    setActiveOperativeSection('control-acceso');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   function simulateQrScan() {
     if (!hasAuthorizedEvent) {
       setValidationFeedback(buildValidationFeedback('CLOSED', { source: 'scanner' }));
@@ -591,7 +598,7 @@ function OperativoDashboard({ onLogout, user }) {
           <span aria-hidden="true" />
         </button>
 
-        <button className="admin-brand" type="button" onClick={onLogout}>
+        <button className="admin-brand" type="button" onClick={handleOperativeBrandClick}>
           <img
             alt="Logo Municipalidad de San Miguel"
             className="municipality-logo brand-logo"

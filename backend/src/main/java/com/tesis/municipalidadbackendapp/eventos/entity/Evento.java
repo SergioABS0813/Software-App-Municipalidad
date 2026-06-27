@@ -94,5 +94,15 @@ public class Evento {
     @Column(name = "requiere_control_asistencia", nullable = false)
     private Byte requiereControlAsistencia = 1;
 
+    @Column(name = "motivo_cancelacion", columnDefinition = "TEXT")
+    private String motivoCancelacion;
+
+    @Column(name = "fecha_cancelacion")
+    private Instant fechaCancelacion;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "usuario_cancelacion_id")
+    private Usuario usuarioCancelacion;
+
 
 }

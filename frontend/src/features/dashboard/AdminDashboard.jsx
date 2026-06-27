@@ -10,6 +10,7 @@ import {
   actualizarContactoCuentaVecinal,
   actualizarEventoGestion,
   actualizarUsuarioInterno,
+  cancelarEventoGestion,
   eliminarCategoriaConfiguracion,
   eliminarEventoGestion,
   eliminarRecursoEvento,
@@ -211,13 +212,56 @@ function formatManagementDuration(startValue, endValue) {
   return hours > 0 ? `${hours} h` : `${minutes} min`;
 }
 
+function mapPublicPreviewResource(resource) {
+  const tipoRecurso = resource?.tipoRecurso ?? resource?.tipo_recurso ?? '';
+  const signedUrl = resource?.signedUrl ?? resource?.url_recurso ?? resource?.url ?? '';
+
+  return {
+    ...resource,
+    fecha_subida: resource?.fechaSubida ?? resource?.fecha_subida,
+    mime_type: resource?.mimeType ?? resource?.mime_type,
+    mimeType: resource?.mimeType ?? resource?.mime_type,
+    nombre_archivo: resource?.nombreOriginal ?? resource?.nombre_archivo,
+    nombreOriginal: resource?.nombreOriginal ?? resource?.nombre_archivo,
+    recurso_id: resource?.id ?? resource?.recurso_id,
+    signedUrl,
+    tipo_recurso: tipoRecurso,
+    tipoRecurso,
+    url_recurso: signedUrl,
+  };
+}
+
+function getPublicPreviewResources(event) {
+  const resources = Array.isArray(event?.recursos)
+    ? event.recursos
+    : Array.isArray(event?.resourceItems)
+      ? event.resourceItems
+      : Array.isArray(event?.resources)
+        ? event.resources
+        : [];
+
+  return resources.map(mapPublicPreviewResource);
+}
+
+function getPublicPreviewCoverUrl(resources, fallbackUrl = '') {
+  const coverResource = resources.find((resource) => {
+    const resourceType = resource.tipo_recurso?.toUpperCase();
+    return resourceType === 'PORTADA' || resourceType === 'IMAGEN_PORTADA';
+  });
+
+  return coverResource?.signedUrl || coverResource?.url_recurso || fallbackUrl;
+}
+
 function mapManagementEventFromApi(event) {
   const pendingItems = Array.isArray(event.alertas)
     ? event.alertas.map((alerta) => alerta?.mensaje).filter(Boolean)
     : [];
   const categoryName = event.categoria?.nombre ?? '';
-  const resourceItems = Array.isArray(event.recursos) ? event.recursos : [];
+  const resourceItems = Array.isArray(event.recursos)
+    ? event.recursos.map(mapPublicPreviewResource)
+    : [];
   const videoResource = resourceItems.find((resource) => resource?.tipoRecurso === 'VIDEO');
+  const coverUrl = getPublicPreviewCoverUrl(resourceItems);
 
   const directiveObservation = event.ultimaObservacionDirectiva ?? event.ultimaObservacion ?? null;
 
@@ -240,9 +284,14 @@ function mapManagementEventFromApi(event) {
     ubicacion_id: event.ubicacionId ?? '',
     referenceCost: event.costoReferencial ?? '',
     aforoMaximo: event.aforoMaximo ?? '',
+    cuposDisponibles: event.cuposDisponibles ?? event.aforoMaximo ?? 0,
+    spots: event.cuposDisponibles ?? event.aforoMaximo ?? 0,
     edad_minima: event.edadMin ?? '',
     edad_maxima: event.edadMax ?? '',
     requiereControlAsistencia: event.requiereControlAsistencia ?? true,
+    motivoCancelacion: event.motivoCancelacion ?? '',
+    fechaCancelacion: event.fechaCancelacion ?? '',
+    usuarioCancelacionId: event.usuarioCancelacionId ?? null,
     directorObservation: directiveObservation?.observacion ?? '',
     directorObservationStatus: directiveObservation?.estado ?? '',
     directorObservationDateTime: directiveObservation?.fechaObservacion ?? '',
@@ -257,6 +306,8 @@ function mapManagementEventFromApi(event) {
       : [],
     pendingItems,
     completeness: Number(event.completitud ?? 0),
+    imageUrl: coverUrl,
+    recursos: resourceItems,
     resourceItems,
     resources: {
       AFICHE: resourceItems.some((resource) => resource?.tipoRecurso === 'AFICHE'),
@@ -1416,6 +1467,10 @@ function AdminDashboard({ onLogout, user }) {
   const [isSavingEventAction, setIsSavingEventAction] = useState(false);
   const [eventToDelete, setEventToDelete] = useState(null);
   const [isDeletingEventAction, setIsDeletingEventAction] = useState(false);
+  const [eventToCancel, setEventToCancel] = useState(null);
+  const [cancelEventReason, setCancelEventReason] = useState('');
+  const [cancelEventError, setCancelEventError] = useState('');
+  const [isCancellingEventAction, setIsCancellingEventAction] = useState(false);
   const [eventDeleteNotice, setEventDeleteNotice] = useState('');
   const [eventsReloadKey, setEventsReloadKey] = useState(0);
   const [validationIssue, setValidationIssue] = useState(null);
@@ -1743,6 +1798,14 @@ function AdminDashboard({ onLogout, user }) {
     setIsSidebarDrawerOpen(false);
   }
 
+  function handleAdminBrandClick() {
+    closeSidebarDrawer();
+    window.history.pushState(null, '', '/admin');
+    setSelectedAdminEvent(null);
+    setCurrentAdminView('dashboard');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   function resetEventsPage() {
     setEventsPage((currentPage) => ({ ...currentPage, number: 0 }));
   }
@@ -1778,8 +1841,32 @@ function AdminDashboard({ onLogout, user }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function openPublishedEventPreview(event) {
-    setSelectedAdminEvent(event);
+  async function openPublishedEventPreview(event) {
+    let previewEvent = event;
+
+    try {
+      const resources = await getRecursosEvento(event.id);
+      const previewResources = Array.isArray(resources)
+        ? resources.map(mapPublicPreviewResource)
+        : getPublicPreviewResources(event);
+
+      previewEvent = {
+        ...event,
+        imageUrl: getPublicPreviewCoverUrl(previewResources, event.imageUrl),
+        recursos: previewResources,
+        resourceItems: previewResources,
+      };
+    } catch (error) {
+      const previewResources = getPublicPreviewResources(event);
+      previewEvent = {
+        ...event,
+        imageUrl: getPublicPreviewCoverUrl(previewResources, event.imageUrl),
+        recursos: previewResources,
+        resourceItems: previewResources,
+      };
+    }
+
+    setSelectedAdminEvent(previewEvent);
     setCurrentAdminView('public-preview');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -1999,6 +2086,59 @@ function AdminDashboard({ onLogout, user }) {
     }
   }
 
+  function requestCancelPublishedEvent(event) {
+    if (!event || ['FINALIZADO', 'CANCELADO'].includes(event.state)) {
+      return;
+    }
+
+    setCancelEventReason('');
+    setCancelEventError('');
+    setEventToCancel(event);
+  }
+
+  function cancelCancelPublishedEvent() {
+    if (isCancellingEventAction) {
+      return;
+    }
+
+    setEventToCancel(null);
+    setCancelEventReason('');
+    setCancelEventError('');
+  }
+
+  async function confirmCancelPublishedEvent() {
+    if (!eventToCancel || isCancellingEventAction) {
+      return;
+    }
+
+    const motivo = cancelEventReason.trim();
+    if (!motivo) {
+      setCancelEventError('Ingresa el motivo de cancelacion.');
+      return;
+    }
+
+    try {
+      setIsCancellingEventAction(true);
+      setCancelEventError('');
+      const updatedEvent = await cancelarEventoGestion(eventToCancel.id, { motivo });
+      const mappedEvent = mapManagementEventFromApi(updatedEvent);
+      setEventToCancel(null);
+      setCancelEventReason('');
+      setSelectedAdminEvent(null);
+      setCurrentAdminView('dashboard');
+      setEventItems((currentItems) =>
+        currentItems.map((event) => (String(event.id) === String(mappedEvent.id) ? mappedEvent : event)),
+      );
+      setEventDeleteNotice('Evento cancelado correctamente.');
+      setEventsReloadKey((currentKey) => currentKey + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      setCancelEventError(getApiErrorMessage(error, 'No se pudo cancelar el evento.'));
+    } finally {
+      setIsCancellingEventAction(false);
+    }
+  }
+
   return (
     <section
       className={[
@@ -2041,7 +2181,7 @@ function AdminDashboard({ onLogout, user }) {
           <span aria-hidden="true" />
         </button>
 
-        <button className="admin-brand" type="button" onClick={onLogout}>
+        <button className="admin-brand" type="button" onClick={handleAdminBrandClick}>
           <img
             alt="Logo Municipalidad de San Miguel"
             className="municipality-logo brand-logo"
@@ -2227,6 +2367,7 @@ function AdminDashboard({ onLogout, user }) {
         ) : currentAdminView === 'public-preview' && selectedAdminEvent ? (
           <AdminPublicEventPreview
             event={selectedAdminEvent}
+            onRequestCancel={requestCancelPublishedEvent}
             onBack={() => {
               setSelectedAdminEvent(null);
               setCurrentAdminView('dashboard');
@@ -2458,6 +2599,23 @@ function AdminDashboard({ onLogout, user }) {
             isDeleting={isDeletingEventAction}
             onCancel={cancelDeleteDraftEvent}
             onConfirm={confirmDeleteDraftEvent}
+          />
+        )}
+
+        {eventToCancel && (
+          <CancelPublishedEventModal
+            error={cancelEventError}
+            event={eventToCancel}
+            isCancelling={isCancellingEventAction}
+            motivo={cancelEventReason}
+            onCancel={cancelCancelPublishedEvent}
+            onConfirm={confirmCancelPublishedEvent}
+            onMotivoChange={(value) => {
+              setCancelEventReason(value);
+              if (cancelEventError) {
+                setCancelEventError('');
+              }
+            }}
           />
         )}
       </main>
@@ -2696,40 +2854,91 @@ function AttendanceControlSection({ requiresControl = true }) {
   );
 }
 
-function AdminPublicEventPreview({ event, onBack }) {
-  function preventPreviewSubmit(submitEvent) {
+function AdminPublicEventPreview({ event, onBack, onRequestCancel }) {
+  const [isOperativesOpen, setIsOperativesOpen] = useState(false);
+  const operativesPopoverRef = useRef(null);
+  const previewResources = getPublicPreviewResources(event);
+  const previewEvent = {
+    ...event,
+    imageUrl: getPublicPreviewCoverUrl(previewResources, event.imageUrl),
+    recursos: previewResources,
+    resourceItems: previewResources,
+    spots: event.cuposDisponibles ?? event.spots ?? event.aforoMaximo ?? 0,
+  };
+  const assignedOperatives = Array.isArray(event.operativosAsignados)
+    ? event.operativosAsignados
+    : [];
+
+  const canCancelEvent = !['FINALIZADO', 'CANCELADO'].includes(previewEvent.state);
+
+  useEffect(() => {
+    if (!isOperativesOpen) {
+      return undefined;
+    }
+
+    function handlePointerDown(pointerEvent) {
+      if (!operativesPopoverRef.current?.contains(pointerEvent.target)) {
+        setIsOperativesOpen(false);
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [isOperativesOpen]);
+
+  function handlePreviewSubmit(submitEvent) {
     submitEvent.preventDefault();
+    if (canCancelEvent) {
+      onRequestCancel?.(previewEvent);
+    }
   }
 
   return (
     <section className="admin-public-preview-view" aria-labelledby="admin-public-preview-title">
       <header className="admin-public-preview-notice">
-        <span className="section-kicker">Vista previa</span>
-        <h1 id="admin-public-preview-title">Vista previa pública del evento</h1>
-        <p>Así se visualizará este evento en el portal ciudadano.</p>
+        <div>
+          <span className="section-kicker">Vista previa</span>
+          <h1 id="admin-public-preview-title">Vista previa publica del evento</h1>
+          <p>Asi se visualizara este evento en el portal ciudadano.</p>
+        </div>
+        <div className="admin-public-preview-operatives" ref={operativesPopoverRef}>
+          <button
+            aria-expanded={isOperativesOpen}
+            className="admin-public-preview-operatives-button"
+            type="button"
+            onClick={() => setIsOperativesOpen((currentValue) => !currentValue)}
+          >
+            <OperativeUsersIcon />
+            <span>Ver operativos asignados</span>
+          </button>
+          {isOperativesOpen && (
+            <div className="admin-public-preview-operatives-popover" role="dialog">
+              {assignedOperatives.length ? (
+                <ul>
+                  {assignedOperatives.map((operative) => (
+                    <li key={operative.usuarioId ?? operative.email}>
+                      {[operative.nombres, operative.apellidos].filter(Boolean).join(' ') || operative.email}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>Este evento no tiene personal operativo asignado.</p>
+              )}
+            </div>
+          )}
+        </div>
       </header>
 
       <PublicEventDetail
         backLabel="Volver al panel de eventos"
-        event={event}
+        event={previewEvent}
         onBack={onBack}
-        onSubmit={preventPreviewSubmit}
+        reservationActionDisabled={!canCancelEvent}
+        reservationActionLabel="Cancelar evento"
+        reservationCardKicker="ADMINISTRACION"
+        reservationCardTitle="Gestion del evento publicado"
+        onSubmit={handlePreviewSubmit}
       />
-      <section className="admin-panel operative-detail-panel">
-        <span className="section-kicker">Personal operativo</span>
-        <h2>Personal operativo asignado</h2>
-        {event.operativosAsignados?.length ? (
-          <ul>
-            {event.operativosAsignados.map((operative) => (
-              <li key={operative.usuarioId}>
-                {[operative.nombres, operative.apellidos].filter(Boolean).join(' ') || operative.email}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>Este evento no tiene personal operativo asignado.</p>
-        )}
-      </section>
     </section>
   );
 }
@@ -3308,6 +3517,16 @@ function getAdminEventActionConfig(event) {
   return null;
 }
 
+function OperativeUsersIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M16 11a4 4 0 1 0-8 0" />
+      <path d="M5 21a7 7 0 0 1 14 0" />
+      <path d="M19 8a3 3 0 0 1 2 2.8" />
+      <path d="M3 10.8A3 3 0 0 1 5 8" />
+    </svg>
+  );
+}
 function ViewIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -7577,6 +7796,60 @@ function DeleteDraftEventModal({ event, isDeleting = false, onCancel, onConfirm 
             Eliminar evento
           </LoadingButton>
         </div>
+      </section>
+    </div>
+  );
+}
+
+function CancelPublishedEventModal({
+  error = '',
+  event,
+  isCancelling = false,
+  motivo = '',
+  onCancel,
+  onConfirm,
+  onMotivoChange,
+}) {
+  function handleSubmit(submitEvent) {
+    submitEvent.preventDefault();
+    onConfirm();
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="confirm-modal event-delete-modal" aria-labelledby="cancel-event-title" role="dialog" aria-modal="true">
+        <span className="section-kicker">Cancelar evento publicado</span>
+        <h2 id="cancel-event-title">Cancelar {event?.title ?? 'evento'}</h2>
+        <p>
+          Al cancelar el evento, se cancelaran las inscripciones confirmadas y se revocaran los codigos QR activos asociados.
+        </p>
+        <form className="event-cancel-form" onSubmit={handleSubmit}>
+          <label>
+            Motivo de cancelacion
+            <textarea
+              autoFocus
+              required
+              rows={4}
+              value={motivo}
+              onChange={(changeEvent) => onMotivoChange(changeEvent.target.value)}
+              placeholder="Indica el motivo para dejar trazabilidad de la cancelacion."
+            />
+          </label>
+          {error && <p className="settings-inline-error" role="alert">{error}</p>}
+          <div className="modal-actions">
+            <button className="back-button" disabled={isCancelling} type="button" onClick={onCancel}>
+              Volver
+            </button>
+            <LoadingButton
+              className="primary-button danger-action"
+              loading={isCancelling}
+              loadingLabel="Cancelando..."
+              type="submit"
+            >
+              Cancelar evento
+            </LoadingButton>
+          </div>
+        </form>
       </section>
     </div>
   );

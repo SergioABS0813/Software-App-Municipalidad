@@ -6,6 +6,7 @@ import com.tesis.municipalidadbackendapp.common.UsuarioAutenticadoService;
 import com.tesis.municipalidadbackendapp.bitacora.dto.BitacoraEventoDto;
 import com.tesis.municipalidadbackendapp.bitacora.entity.BitacoraAccion;
 import com.tesis.municipalidadbackendapp.bitacora.service.BitacoraAccionService;
+import com.tesis.municipalidadbackendapp.eventos.dto.CancelarEventoRequestDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoPanelAdministrativoDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoPortalPublicoDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoRegistroRequest;
@@ -23,8 +24,10 @@ import com.tesis.municipalidadbackendapp.eventos.entity.RequisitoEvento;
 import com.tesis.municipalidadbackendapp.eventos.entity.RecursoEvento;
 import com.tesis.municipalidadbackendapp.eventos.repository.*;
 import com.tesis.municipalidadbackendapp.inscripciones.entity.Inscripcion;
+import com.tesis.municipalidadbackendapp.inscripciones.enums.EstadoInscripcion;
 import com.tesis.municipalidadbackendapp.inscripciones.repository.InscripcionRepository;
 import com.tesis.municipalidadbackendapp.notificaciones.service.NotificacionService;
+import com.tesis.municipalidadbackendapp.qr.repository.CodigoQrRepository;
 import com.tesis.municipalidadbackendapp.organizacion.entity.AreaMunicipal;
 import com.tesis.municipalidadbackendapp.organizacion.repository.AreaMunicipalRepository;
 import com.tesis.municipalidadbackendapp.ubicacion.entity.Ubicacion;
@@ -33,6 +36,7 @@ import com.tesis.municipalidadbackendapp.usuariosinternos.entity.Usuario;
 import com.tesis.municipalidadbackendapp.valoraciones.entity.ValoracionEvento;
 import com.tesis.municipalidadbackendapp.valoraciones.repository.ValoracionEventoRepository;
 import com.tesis.municipalidadbackendapp.valoraciones.service.ValoracionEventoService;
+import com.tesis.municipalidadbackendapp.vecinos.service.VecinoNotificacionService;
 import com.tesis.municipalidadbackendapp.storage.CloudStorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -69,12 +73,14 @@ public class EventoService {
     private final UsuarioAutenticadoService usuarioAutenticadoService;
     private final BitacoraAccionService bitacoraAccionService;
     private final NotificacionService notificacionService;
+    private final CodigoQrRepository codigoQrRepository;
     private final ValoracionEventoService valoracionEventoService;
     private final InscripcionRepository inscripcionRepository;
     private final AsistenciaRepository asistenciaRepository;
     private final ValoracionEventoRepository valoracionEventoRepository;
     private final EventoOperativoService eventoOperativoService;
     private final CloudStorageService cloudStorageService;
+    private final VecinoNotificacionService vecinoNotificacionService;
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
 
     public Page<EventoPanelAdministrativoDto> obtenerEventosPanelAdministrativo(
@@ -262,10 +268,14 @@ public class EventoService {
                 toCategoriaPanelAdministrativoDto(evento),
                 evento.getCostoReferencial(),
                 evento.getAforoMaximo(),
+                calcularCuposDisponibles(evento),
                 evento.getEdadMin(),
                 evento.getEdadMax(),
                 requiereControlAsistencia(evento),
                 toLocalDateTime(evento.getEventoActualizadoEn() != null ? evento.getEventoActualizadoEn() : evento.getTiempoActualizado()),
+                evento.getMotivoCancelacion(),
+                toLocalDateTime(evento.getFechaCancelacion()),
+                evento.getUsuarioCancelacion() != null ? evento.getUsuarioCancelacion().getId() : null,
                 calcularCompletitud(evento),
                 construirAlertasFichaEventoPanelAdministrativoDto(evento),
                 construirCriteriosFicha(evento),
@@ -720,9 +730,39 @@ public class EventoService {
     }
 
     @Transactional
+    public EventoPanelAdministrativoDto cancelarEventoAdministrativo(
+            Integer id,
+            CancelarEventoRequestDto request,
+            HttpServletRequest httpServletRequest
+    ) {
+        String motivoNormalizado = validarMotivoCancelacion(request != null ? request.motivo() : null);
+        return cancelarEvento(
+                id,
+                motivoNormalizado,
+                "CANCELAR_EVENTO_ADMINISTRADOR",
+                httpServletRequest
+        );
+    }
+
+    @Transactional
     public EventoPanelAdministrativoDto cancelarEventoDirectivo(
             Integer id,
             String motivo,
+            HttpServletRequest httpServletRequest
+    ) {
+        String motivoNormalizado = validarMotivoCancelacion(motivo);
+        return cancelarEvento(
+                id,
+                motivoNormalizado,
+                "CANCELAR_EVENTO_DIRECTIVO",
+                httpServletRequest
+        );
+    }
+
+    private EventoPanelAdministrativoDto cancelarEvento(
+            Integer id,
+            String motivoNormalizado,
+            String accionBitacora,
             HttpServletRequest httpServletRequest
     ) {
         Usuario usuario = usuarioAutenticadoService.obtenerUsuarioAutenticado();
@@ -730,33 +770,73 @@ public class EventoService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evento no encontrado"));
         String estadoAnterior = evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : "";
 
-        if ("CANCELADO".equals(estadoAnterior)) {
-            return toPanelAdministrativoDto(evento);
+        if ("FINALIZADO".equals(estadoAnterior)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "No se puede cancelar un evento finalizado");
         }
+
+        if ("CANCELADO".equals(estadoAnterior)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El evento ya se encuentra cancelado");
+        }
+
+        List<Inscripcion> inscripcionesConfirmadas = inscripcionRepository.findByEventoIdAndEstadoInscripcion(
+                evento.getId(),
+                EstadoInscripcion.CONFIRMADA
+        );
 
         EstadoEvento estadoCancelado = obtenerEstadoEvento("CANCELADO");
         Instant ahora = Instant.now();
         evento.setEstadoEvento(estadoCancelado);
+        evento.setMotivoCancelacion(motivoNormalizado);
+        evento.setFechaCancelacion(ahora);
+        evento.setUsuarioCancelacion(usuario);
         evento.setTiempoActualizado(ahora);
         evento.setEventoActualizadoEn(ahora);
 
+        int codigosQrRevocados = codigoQrRepository.revocarActivosPorEvento(evento.getId());
+        int inscripcionesCanceladas = inscripcionRepository.cancelarConfirmadasPorEvento(evento.getId());
+
         Evento eventoGuardado = eventoRepository.save(evento);
-        String motivoNormalizado = normalizarTexto(motivo);
         BitacoraAccion bitacoraAccion = bitacoraAccionService.guardarAccion(
-                "CANCELAR_EVENTO_DIRECTIVO",
+                accionBitacora,
                 "EVENTO",
                 eventoGuardado.getId(),
                 "Se cancelo el evento \"" + valorDetalle(eventoGuardado.getTitulo()) + "\" de estado "
                         + valorDetalle(estadoAnterior)
-                        + (motivoNormalizado != null ? ". Motivo: " + motivoNormalizado : ""),
+                        + ". Motivo: " + motivoNormalizado
+                        + ". Inscripciones canceladas: " + inscripcionesCanceladas
+                        + ". QR revocados: " + codigosQrRevocados,
                 usuario,
                 httpServletRequest
         );
 
         notificacionService.notificarEventoCanceladoAdministradores(eventoGuardado, usuario, bitacoraAccion);
         notificacionService.notificarEventoCanceladoDirectivos(eventoGuardado, usuario, bitacoraAccion);
+        notificarVecinosEventoCancelado(inscripcionesConfirmadas, motivoNormalizado);
 
         return toPanelAdministrativoDto(eventoGuardado);
+    }
+
+    private String validarMotivoCancelacion(String motivo) {
+        String motivoNormalizado = normalizarTexto(motivo);
+        if (!hasText(motivoNormalizado)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El motivo de cancelacion es obligatorio");
+        }
+        return motivoNormalizado;
+    }
+
+    private void notificarVecinosEventoCancelado(List<Inscripcion> inscripcionesConfirmadas, String motivoNormalizado) {
+        for (Inscripcion inscripcion : inscripcionesConfirmadas) {
+            vecinoNotificacionService.enviarCorreoEventoCancelado(inscripcion, motivoNormalizado);
+        }
+    }
+
+    private Integer calcularCuposDisponibles(Evento evento) {
+        if (evento == null || evento.getId() == null || evento.getAforoMaximo() == null) {
+            return 0;
+        }
+
+        long inscritosActivos = inscripcionRepository.countActivasByEventoId(evento.getId());
+        return Math.max(0, evento.getAforoMaximo() - (int) inscritosActivos);
     }
 
     private Integer calcularCompletitud(Evento evento) {

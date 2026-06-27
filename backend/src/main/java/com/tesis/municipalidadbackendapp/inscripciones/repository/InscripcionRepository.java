@@ -3,6 +3,7 @@ package com.tesis.municipalidadbackendapp.inscripciones.repository;
 import com.tesis.municipalidadbackendapp.inscripciones.entity.Inscripcion;
 import com.tesis.municipalidadbackendapp.inscripciones.enums.EstadoInscripcion;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -13,6 +14,8 @@ public interface InscripcionRepository extends JpaRepository<Inscripcion, Intege
 
     List<Inscripcion> findByEventoId(Integer eventoId);
 
+    List<Inscripcion> findByEventoIdAndEstadoInscripcion(Integer eventoId, EstadoInscripcion estadoInscripcion);
+
     Long countByEventoId(Integer eventoId);
 
     @Query("""
@@ -22,6 +25,15 @@ public interface InscripcionRepository extends JpaRepository<Inscripcion, Intege
           AND (i.estadoInscripcion = com.tesis.municipalidadbackendapp.inscripciones.enums.EstadoInscripcion.CONFIRMADA OR i.estadoInscripcion IS NULL)
     """)
     Long countActivasByEventoId(@Param("eventoId") Integer eventoId);
+
+    @Modifying
+    @Query("""
+        UPDATE Inscripcion i
+        SET i.estadoInscripcion = com.tesis.municipalidadbackendapp.inscripciones.enums.EstadoInscripcion.CANCELADA
+        WHERE i.evento.id = :eventoId
+          AND i.estadoInscripcion = com.tesis.municipalidadbackendapp.inscripciones.enums.EstadoInscripcion.CONFIRMADA
+    """)
+    int cancelarConfirmadasPorEvento(@Param("eventoId") Integer eventoId);
 
     Optional<Inscripcion> findByEventoIdAndVecinoId(Integer eventoId, Integer vecinoId);
 

@@ -129,6 +129,11 @@ export async function eliminarEventoGestion(id){
     return response.data
 }
 
+export async function cancelarEventoGestion(id, { motivo = '' } = {}){
+    const response = await api.patch(`eventos/admin/operacion/${id}/cancelar`, { motivo });
+    return response.data
+}
+
 export async function guardarUbicacionConfiguracion(ubicacion){
     const response = await api.post("ubicacion/admin/guardar_ubicacion", ubicacion);
     return response.data

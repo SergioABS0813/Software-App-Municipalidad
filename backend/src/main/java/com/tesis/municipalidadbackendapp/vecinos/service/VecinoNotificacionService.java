@@ -72,6 +72,32 @@ public class VecinoNotificacionService {
         );
     }
 
+    public void notificarCambiosCuenta(
+            String emailDestino,
+            String nombre,
+            boolean cambioCelular,
+            boolean cambioFechaNacimiento,
+            boolean cambioAceptacionDatos
+    ) {
+        if (!StringUtils.hasText(emailDestino)) {
+            return;
+        }
+
+        enviarCorreoHtml(
+                emailDestino,
+                "Cambios en tu cuenta vecinal",
+                construirPlantillaHtml(
+                        "Cambios en tu cuenta",
+                        """
+                        <p style="margin:0 0 14px;">Hola <strong>%s</strong>,</p>
+                        <p style="margin:0 0 14px;">Te informamos que se realizaron cambios en los datos de tu cuenta vecinal.</p>
+                        %s
+                        <p style="margin:0;">Si no reconoces esta actualizacion, comunicate con la Municipalidad de San Miguel.</p>
+                        """.formatted(escapeHtml(nombre), construirDetalleCambiosCuenta(cambioCelular, cambioFechaNacimiento, cambioAceptacionDatos))
+                )
+        );
+    }
+
     public void enviarConstanciaInscripcion(Inscripcion inscripcion) {
         enviarConstanciaInscripcion(inscripcion, null);
     }
@@ -128,6 +154,47 @@ public class VecinoNotificacionService {
                         )
                 ),
                 qrImage
+        );
+    }
+
+    public void enviarCorreoEventoCancelado(Inscripcion inscripcion, String motivo) {
+        if (inscripcion == null || inscripcion.getVecino() == null || inscripcion.getEvento() == null) {
+            return;
+        }
+
+        String emailDestino = inscripcion.getVecino().getEmail();
+        if (!StringUtils.hasText(emailDestino)) {
+            return;
+        }
+
+        Evento evento = inscripcion.getEvento();
+        String fechaEvento = formatDateTime(evento.getFechaHoraInicio());
+        String ubicacion = evento.getUbicacion() != null && StringUtils.hasText(evento.getUbicacion().getNombre())
+                ? evento.getUbicacion().getNombre()
+                : "Por confirmar";
+
+        enviarCorreoHtml(
+                emailDestino,
+                "Evento cancelado - " + evento.getTitulo(),
+                construirPlantillaHtml(
+                        "Evento cancelado",
+                        """
+                        <p style="margin:0 0 14px;">Hola <strong>%s</strong>,</p>
+                        <p style="margin:0 0 14px;">Te informamos que el evento <strong>%s</strong> fue cancelado.</p>
+                        <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%%;margin:18px 0;border-collapse:collapse;font-size:14px;">
+                          <tr><td style="padding:8px 0;color:#526b85;width:145px;">Fecha y hora</td><td style="padding:8px 0;color:#0f172a;">%s</td></tr>
+                          <tr><td style="padding:8px 0;color:#526b85;">Lugar</td><td style="padding:8px 0;color:#0f172a;">%s</td></tr>
+                          <tr><td style="padding:8px 0;color:#526b85;">Motivo</td><td style="padding:8px 0;color:#0f172a;">%s</td></tr>
+                        </table>
+                        <p style="margin:0;">Tu inscripcion y el codigo QR asociado quedaron cancelados automaticamente.</p>
+                        """.formatted(
+                                escapeHtml(StringUtils.hasText(inscripcion.getVecino().getNombre()) ? inscripcion.getVecino().getNombre() : "vecino"),
+                                escapeHtml(evento.getTitulo()),
+                                escapeHtml(fechaEvento),
+                                escapeHtml(ubicacion),
+                                escapeHtml(motivo)
+                        )
+                )
         );
     }
 
@@ -238,6 +305,25 @@ public class VecinoNotificacionService {
         return detalle.toString();
     }
 
+    private String construirDetalleCambiosCuenta(boolean cambioCelular, boolean cambioFechaNacimiento, boolean cambioAceptacionDatos) {
+        StringBuilder detalle = new StringBuilder("<ul style=\"margin:16px 0 16px 20px;padding:0;\">");
+
+        if (cambioCelular) {
+            detalle.append("<li>Celular actualizado.</li>");
+        }
+
+        if (cambioFechaNacimiento) {
+            detalle.append("<li>Fecha de nacimiento actualizada.</li>");
+        }
+
+        if (cambioAceptacionDatos) {
+            detalle.append("<li>Preferencia de tratamiento de datos actualizada.</li>");
+        }
+
+        detalle.append("</ul>");
+        return detalle.toString();
+    }
+
     private void enviarCorreoHtml(String email, String subject, String html) {
         enviarCorreoHtml(email, subject, html, null);
     }
@@ -294,23 +380,23 @@ public class VecinoNotificacionService {
                     <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="background:#eef6fb;padding:28px 14px;">
                       <tr>
                         <td align="center">
-                          <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="max-width:814px;background:#ffffff;border:1px solid #1f8bf2;border-radius:10px;overflow:hidden;">
+                          <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="max-width:550px;background:#ffffff;border:1px solid #1f8bf2;border-radius:10px;overflow:hidden;">
                             <tr>
-                              <td style="background:#1f86e8;padding:38px 24px 34px;text-align:center;color:#ffffff;">
-                                <div style="font-size:31px;line-height:1.2;font-weight:800;letter-spacing:.2px;">
+                              <td style="background:#1f86e8;padding:24px 22px 22px;text-align:center;color:#ffffff;">
+                                <div style="font-size:24px;line-height:1.2;font-weight:800;letter-spacing:.2px;">
                                   <span style="color:#084c8d;">Municipalidad</span> de San Miguel
                                 </div>
-                                <div style="margin-top:14px;font-size:16px;font-weight:700;">Sistema de Gestión de Eventos</div>
+                                <div style="margin-top:5px;font-size:18px;font-weight:700;">Sistema de Gestión de Eventos</div>
                               </td>
                             </tr>
                             <tr>
-                              <td style="padding:38px 36px 42px;font-size:18px;line-height:1.55;">
-                                <h1 style="margin:0 0 24px;font-size:20px;line-height:1.3;font-weight:500;color:#0f172a;">%s</h1>
+                              <td style="padding:20px 32px 24px;font-size:14px;line-height:1.65;">
+                                <h1 style="margin:0 0 16px;font-size:18px;line-height:1.3;font-weight:700;color:#0f172a;">%s</h1>
                                 %s
                               </td>
                             </tr>
                             <tr>
-                              <td style="background:#f8fbfd;border-top:1px solid #e2edf5;padding:22px 36px;color:#2f5276;font-size:14px;line-height:1.45;">
+                              <td style="background:#f8fbfd;border-top:1px solid #e2edf5;padding:17px 32px;color:#2f5276;font-size:12.5px;line-height:1.5;">
                                 Este mensaje fue generado automáticamente. Si no solicitaste esta operación, puedes comunicarte con la Municipalidad de San Miguel.
                               </td>
                             </tr>

@@ -831,6 +831,15 @@ function DirectivoDashboard({ onLogout, user }) {
     setIsSidebarDrawerOpen(false);
   }
 
+  function handleDirectiveBrandClick() {
+    closeSidebarDrawer();
+    window.history.pushState(null, '', '/directivo');
+    setSelectedReviewEvent(null);
+    setSelectedReportEvent(null);
+    setCurrentDirectiveView('review');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   function handleNotificationFilterChange(nextFilter) {
     setNotificationFilter(nextFilter);
   }
@@ -1048,7 +1057,7 @@ function DirectivoDashboard({ onLogout, user }) {
           <span aria-hidden="true" />
         </button>
 
-        <button className="admin-brand" type="button" onClick={onLogout}>
+        <button className="admin-brand" type="button" onClick={handleDirectiveBrandClick}>
           <img
             alt="Logo Municipalidad de San Miguel"
             className="municipality-logo brand-logo"

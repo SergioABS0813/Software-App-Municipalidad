@@ -1,6 +1,7 @@
 package com.tesis.municipalidadbackendapp.eventos.controller;
 
 import com.tesis.municipalidadbackendapp.bitacora.dto.BitacoraEventoDto;
+import com.tesis.municipalidadbackendapp.eventos.dto.CancelarEventoRequestDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoPanelAdministrativoDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoReporteDirectivoDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.EventoRegistroRequest;
@@ -10,6 +11,7 @@ import com.tesis.municipalidadbackendapp.eventos.dto.EventoRevisionDirectivaResu
 import com.tesis.municipalidadbackendapp.eventos.dto.ResumenCardsDirectivoDto;
 import com.tesis.municipalidadbackendapp.eventos.service.EventoService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -84,6 +86,15 @@ public class EventoController {
             HttpServletRequest httpServletRequest
     ) {
         return eventoService.finalizarEventoYGenerarValoraciones(id, httpServletRequest);
+    }
+
+    @PatchMapping("admin/operacion/{id}/cancelar")
+    public EventoPanelAdministrativoDto cancelarEventoAdministrativo(
+            @PathVariable Integer id,
+            @Valid @RequestBody CancelarEventoRequestDto request,
+            HttpServletRequest httpServletRequest
+    ) {
+        return eventoService.cancelarEventoAdministrativo(id, request, httpServletRequest);
     }
 
     @GetMapping("admin/card/activos_desde_hoy")
@@ -161,7 +172,7 @@ public class EventoController {
     @PatchMapping("directivo/operacion/{id}/cancelar")
     public EventoPanelAdministrativoDto cancelarEventoDirectivo(
             @PathVariable Integer id,
-            @RequestBody(required = false) CancelarEventoRequest request,
+            @RequestBody(required = false) CancelarEventoRequestDto request,
             HttpServletRequest httpServletRequest
     ) {
         return eventoService.cancelarEventoDirectivo(
@@ -173,7 +184,6 @@ public class EventoController {
 
     public record ObservarEventoRequest(String observacion) {}
 
-    public record CancelarEventoRequest(String motivo) {}
 
 
 
