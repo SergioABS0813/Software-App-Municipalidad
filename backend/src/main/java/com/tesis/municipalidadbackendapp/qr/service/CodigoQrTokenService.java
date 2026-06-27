@@ -16,16 +16,15 @@ public class CodigoQrTokenService {
     private final SecureRandom secureRandom = new SecureRandom();
 
     public String generarTokenSeguro() {
-        byte[] bytes = new byte[32];
+        byte[] bytes = new byte[16];
         secureRandom.nextBytes(bytes);
         return Base64.getUrlEncoder()
                 .withoutPadding()
                 .encodeToString(bytes);
     }
 
-    public String construirContenidoQr(String tokenHash) {
-
-        return PREFIJO_QR + tokenHash;
+    public String construirContenidoQr(String token) {
+        return PREFIJO_QR + token;
     }
 
     public String extraerTokenDesdeContenidoQr(String contenidoQr){

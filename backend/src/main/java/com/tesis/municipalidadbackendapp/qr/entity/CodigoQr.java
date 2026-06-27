@@ -20,8 +20,8 @@ public class CodigoQr {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(name = "token_hash")
-    private String tokenHash;
+    @Column(name = "token")
+    private String token;
 
     @Column(name = "generado_en")
     private Instant generadoEn;

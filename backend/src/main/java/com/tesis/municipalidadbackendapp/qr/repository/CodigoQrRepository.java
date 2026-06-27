@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface CodigoQrRepository extends JpaRepository<CodigoQr, Integer> {
-    Optional<CodigoQr> findByTokenHash(String tokenHash);
+    Optional<CodigoQr> findByToken(String token);
 
     List<CodigoQr> findByInscripcion_IdAndEstadoQr(Integer inscripcion_Id, EstadoQr estadoQr);
 

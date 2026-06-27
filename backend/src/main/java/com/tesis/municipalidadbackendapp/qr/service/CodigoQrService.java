@@ -24,13 +24,17 @@ public class CodigoQrService {
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
     private final InscripcionRepository  inscripcionRepository;
 
+    // OJO PARA VALIDAR QR VOY A VALIDAR POR EL LENGTH DEL PREFIJO y NO PORQUE SEA EXACTAMENTE IGUAL YA QUE HAY UN DETALLE CON LAS MINUSCULAS
+
     public CodigoQrResponseDto obtenerQrActivoPorInscripcion(Integer inscripcionId){
         return codigoQrRepository.findByInscripcion_IdAndEstadoQr(inscripcionId, EstadoQr.ACTIVO)
                 .stream()
                 .findFirst()
                 .map(codigoQr -> {
-                    String contenidoQr = codigoQrTokenService.construirContenidoQr(codigoQr.getTokenHash());
-                    byte[] qrPng = qrImageService.generarQrPngConLogo(contenidoQr);
+                    String contenidoQr = codigoQrTokenService.construirContenidoQr(codigoQr.getToken());
+                    System.out.println("TOKEN BD: " + codigoQr.getToken());
+                    System.out.println("CONTENIDO QR GENERADO: " + contenidoQr);
+                    byte[] qrPng = qrImageService.generarQrPngProfesional(contenidoQr);
                     String base64 = Base64.getEncoder().encodeToString(qrPng);
                     String dataUrl = "data:image/png;base64," + base64;
                     return new CodigoQrResponseDto(dataUrl);
@@ -43,10 +47,9 @@ public class CodigoQrService {
     public CodigoQrResponseDto generarQrParaInscripcion(Integer inscripcionId) {
         revocarQrsActivosPorInscripcion(inscripcionId);
         String token = codigoQrTokenService.generarTokenSeguro();
-        String token_hash = codigoQrTokenService.calcularHashSha256(token);
         String contenidoQr = codigoQrTokenService.construirContenidoQr(token);
         ZonedDateTime generadoEn = ZonedDateTime.now(ZONA_LIMA).withZoneSameInstant(ZoneId.of("UTC"));
-        System.out.println(generadoEn);
+
         // Fecha de expiracion es cuando acaba el evento
         inscripcionRepository.findById(inscripcionId)
                 .ifPresent(inscripcion -> {
@@ -56,14 +59,14 @@ public class CodigoQrService {
                     }
                     CodigoQr codigoQr = new CodigoQr();
                     codigoQr.setInscripcion(inscripcion);
-                    codigoQr.setTokenHash(token_hash);
+                    codigoQr.setToken(token);
                     codigoQr.setGeneradoEn(generadoEn.toInstant());
                     codigoQr.setFechaExpiracion(fechaExpiracion != null ? fechaExpiracion.toInstant() : null);
                     codigoQr.setEstadoQr(EstadoQr.ACTIVO);
                     codigoQrRepository.save(codigoQr);
                 });
 
-        byte[] qrPng = qrImageService.generarQrPngConLogo(contenidoQr);
+        byte[] qrPng = qrImageService.generarQrPngProfesional(contenidoQr);
         String base64 = Base64.getEncoder().encodeToString(qrPng);
         String dataUrl = "data:image/png;base64," + base64;
         return new CodigoQrResponseDto(dataUrl);
