@@ -510,14 +510,16 @@ export default function PublicEventDetail({
             <h2>{reservationCardTitle}</h2>
           </div>
 
-          <div className={`reservation-availability ${availabilityState.tone}`}>
-            <strong>{availabilityState.label}</strong>
-            <span>
-              {availabilityState.isAvailable
-                ? 'Disponibles para este evento'
-                : 'No hay disponibilidad por ahora'}
-            </span>
-          </div>
+          {requiresRegistration && (
+            <div className={`reservation-availability ${availabilityState.tone}`}>
+              <strong>{availabilityState.label}</strong>
+              <span>
+                {availabilityState.isAvailable
+                  ? 'Disponibles para este evento'
+                  : 'No hay disponibilidad por ahora'}
+              </span>
+            </div>
+          )}
 
           {requiresRegistration && event.requiresPayment && (
             <section className="event-payment-summary" aria-label="Informacion de pago">

@@ -190,6 +190,10 @@ function mapPublicEventFromApi(event, index = 0) {
   const cuposDisponibles = event.cuposDisponibles ?? aforoMaximo;
   const venue = event.ubicacionNombre ?? 'Ubicacion por confirmar';
   const address = [event.ubicacionDireccion, event.ubicacionReferencia].filter(Boolean).join(' - ');
+  const requiresControl = event.requiereControlAsistencia ?? event.requiresAttendanceControl ?? true;
+  const requiresPayment = Boolean(event.requierePago ?? event.requiresPayment);
+  const requiresRegistration =
+    event.requiereInscripcion ?? event.requiresRegistration ?? (requiresControl || requiresPayment);
   const resources = Array.isArray(event.recursos)
     ? event.recursos.map((resource) => ({
         fecha_subida: resource.fechaSubida,
@@ -222,8 +226,8 @@ function mapPublicEventFromApi(event, index = 0) {
     venue,
     district: 'San Miguel',
     aforoMaximo,
-    spots: aforoMaximo ?? 0,
-    capacityLabel: aforoMaximo ? `${aforoMaximo} cupos disponibles` : 'Aforo por confirmar',
+    spots: cuposDisponibles ?? 0,
+    capacityLabel: cuposDisponibles !== null && cuposDisponibles !== undefined ? `${cuposDisponibles} cupos disponibles` : 'Aforo por confirmar',
     status: requiresRegistration ? (aforoMaximo ? 'Inscripcion abierta' : 'Entrada disponible') : 'Ingreso libre',
     descripcion_breve: event.descripcionBreve ?? '',
     summary: event.descripcionBreve ?? event.descripcion ?? '',
@@ -250,7 +254,7 @@ function mapPublicEventFromApi(event, index = 0) {
     requiresRegistration,
     requiresAttendanceControl: requiresControl,
     requiresPayment,
-    paymentCost: event.costo ?? event.costoReferencial ?? null,
+    paymentCost: event.costoVecinal ?? event.costo ?? event.costoReferencial ?? null,
     paymentInstructions: event.instruccionesPago ?? '',
   };
 }
@@ -2345,10 +2349,12 @@ function PortalHome({
                 <CalendarClockIcon />
                 {featuredEvent.date} · {featuredEvent.time}
               </span>
-              <span>
-                <UsersIcon />
-                {featuredEvent.capacityLabel}
-              </span>
+              {featuredEvent.capacityLabel && (
+                <span>
+                  <UsersIcon />
+                  {featuredEvent.capacityLabel}
+                </span>
+              )}
             </div>
             <button
               className="primary-button featured-action"

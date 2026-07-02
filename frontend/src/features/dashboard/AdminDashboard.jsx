@@ -423,13 +423,15 @@ function buildEventCreatePayload(form, actionType) {
     costoVecinal: requiresPayment ? numberOrNull(getNamedFormValue(form, 'paymentCost')) : null,
     instruccionesPago: requiresPayment ? emptyToNull(getNamedFormValue(form, 'paymentInstructions')) : null,
     ubicacionId: numberOrNull(getNamedFormValue(form, 'ubicacion_id')),
-    aforoMaximo: capacityMode === 'none' ? 0 : positiveCapacityOrZero(getNamedFormValue(form, 'capacity')),
+    aforoMaximo: requiresRegistration
+      ? (capacityMode === 'none' ? null : positiveCapacityOrZero(getNamedFormValue(form, 'capacity')))
+      : null,
     publicoTipo: audienceType,
     edadMin: audienceType === 'OBJETIVO' ? numberOrNull(getNamedFormValue(form, 'edad_minima')) : null,
     edadMax: audienceType === 'OBJETIVO' ? numberOrNull(getNamedFormValue(form, 'edad_maxima')) : null,
-    metaTipo: attendanceGoalEnabled ? emptyToNull(getNamedFormValue(form, 'attendanceGoalType')) : null,
-    metaValor: attendanceGoalEnabled ? numberOrNull(getNamedFormValue(form, 'attendanceGoalValue')) : null,
-    encuestaSatisfaccionHabilitado: isNamedChecked(form, 'surveyEnabled'),
+    metaTipo: requiresRegistration && attendanceGoalEnabled ? emptyToNull(getNamedFormValue(form, 'attendanceGoalType')) : null,
+    metaValor: requiresRegistration && attendanceGoalEnabled ? numberOrNull(getNamedFormValue(form, 'attendanceGoalValue')) : null,
+    encuestaSatisfaccionHabilitado: requiresRegistration && isNamedChecked(form, 'surveyEnabled') ? true : null,
     requiereInscripcion: requiresRegistration,
     requiereControlAsistencia,
     enviarRevision: actionType === 'review',
@@ -913,6 +915,10 @@ function hasValidAudienceConfig(event) {
 }
 
 function requiresAttendanceControl(event) {
+  if (event?.requiresRegistration === false || event?.requiereInscripcion === false) {
+    return false;
+  }
+
   return event?.requiereControlAsistencia !== false;
 }
 
@@ -1146,7 +1152,7 @@ function getEventChecklist(event, options = {}) {
         hasValidEventSchedule(event) &&
         hasValue(event.publico_tipo) &&
         hasValidAudienceConfig(event) &&
-        hasValidAforo(event),
+        (!requiresEventRegistration(event) || hasValidAforo(event)),
       completeLabel: 'Fechas completas',
       pendingLabel: 'Falta programación o aforo',
     },
@@ -1213,7 +1219,7 @@ function getCreationEventChecklist(event) {
     {
       complete:
         hasValidEventSchedule(event) &&
-        hasValidAforo(event) &&
+        (!requiresEventRegistration(event) || hasValidAforo(event)) &&
         hasValue(event.referenceCost) &&
         hasValue(event.publico_tipo) &&
         hasValidAudienceConfig(event),
@@ -1304,18 +1310,19 @@ function getChecklistEventFromForm(form, event, catalogs = {}) {
       ),
       VIDEO: Boolean(event.resources?.VIDEO || getNamedFormValue(form, 'videoUrl') || hasNamedFile(form, 'videoFile')),
     },
-    aforoMaximo:
-      getNamedFormValue(form, 'capacityMode') === 'none'
-        ? 0
-        : positiveCapacityOrZero(getNamedFormValue(form, 'capacity')),
-    capacityMode: getNamedFormValue(form, 'capacityMode'),
-    encuestaComentarioHabilitado: isNamedChecked(form, 'surveyCommentsEnabled'),
-    encuestaSatisfaccionHabilitada: isNamedChecked(form, 'surveyEnabled'),
-    metaAsistenciaHabilitada: isNamedChecked(form, 'attendanceGoalEnabled'),
-    metaTipo: isNamedChecked(form, 'attendanceGoalEnabled')
+    aforoMaximo: requiresRegistration
+      ? (getNamedFormValue(form, 'capacityMode') === 'none'
+        ? null
+        : positiveCapacityOrZero(getNamedFormValue(form, 'capacity')))
+      : null,
+    capacityMode: requiresRegistration ? getNamedFormValue(form, 'capacityMode') : 'none',
+    encuestaComentarioHabilitado: requiresRegistration && isNamedChecked(form, 'surveyCommentsEnabled'),
+    encuestaSatisfaccionHabilitada: requiresRegistration && isNamedChecked(form, 'surveyEnabled'),
+    metaAsistenciaHabilitada: requiresRegistration && isNamedChecked(form, 'attendanceGoalEnabled'),
+    metaTipo: requiresRegistration && isNamedChecked(form, 'attendanceGoalEnabled')
       ? getNamedFormValue(form, 'attendanceGoalType')
       : null,
-    metaValor: isNamedChecked(form, 'attendanceGoalEnabled')
+    metaValor: requiresRegistration && isNamedChecked(form, 'attendanceGoalEnabled')
       ? getNamedFormValue(form, 'attendanceGoalValue')
       : null,
     requiresRegistration,
@@ -1323,10 +1330,11 @@ function getChecklistEventFromForm(form, event, catalogs = {}) {
     requiereInscripcion: requiresRegistration,
     requiereControlAsistencia: requiresControl,
     operativosAsignadosIds: requiresControl ? getSelectedOperativeIdsFromForm(form) : [],
-    spots:
-      getNamedFormValue(form, 'capacityMode') === 'none'
+    spots: requiresRegistration
+      ? (getNamedFormValue(form, 'capacityMode') === 'none'
         ? ''
-        : positiveCapacityOrZero(getNamedFormValue(form, 'capacity')),
+        : positiveCapacityOrZero(getNamedFormValue(form, 'capacity')))
+      : '',
     time: getNamedFormValue(form, 'eventEnd'),
     title: getNamedFormValue(form, 'title'),
     ubicacion_id: selectedLocationId,
@@ -1434,7 +1442,7 @@ function getMissingReviewFields(form, existingEvent = null) {
     }
   }
 
-  if (capacityMode !== 'none' && Number(getNamedFormValue(form, 'capacity')) <= 0) {
+  if (requiresRegistration && capacityMode !== 'none' && Number(getNamedFormValue(form, 'capacity')) <= 0) {
     missingFields.push('Aforo máximo');
   }
 
@@ -1448,7 +1456,7 @@ function getMissingReviewFields(form, existingEvent = null) {
     }
   }
 
-  if (attendanceGoalEnabled) {
+  if (requiresRegistration && attendanceGoalEnabled) {
     if (!attendanceGoalType) {
       missingFields.push('Tipo de meta de asistencia');
     }
@@ -3408,37 +3416,43 @@ function OperativeAssignmentSection({
   );
 }
 
+function RegistrationRequirementField({ checked = true, onChange }) {
+  return (
+    <label className="form-switch-field span-2">
+      <input
+        checked={checked}
+        name="requiresRegistration"
+        type="checkbox"
+        onChange={(event) => onChange?.(event.target.checked)}
+      />
+      <span>
+        <strong>Requiere inscripcion previa</strong>
+        <small>
+          Activa esta opcion cuando el vecino deba reservar o preinscribirse desde el portal publico.
+        </small>
+      </span>
+    </label>
+  );
+}
+
 function AttendanceControlSection({
   onControlChange,
-  onRegistrationChange,
   requiresControl = true,
   requiresRegistration = true,
 }) {
+  if (!requiresRegistration) {
+    return null;
+  }
+
   return (
     <article className="event-form-section attendance-control-section" id="control-asistencia">
       <div className="form-section-heading">
-        <span className="section-kicker">Control de asistencia</span>
-        <h2>Validación de ingreso</h2>
+        <span className="section-kicker">Validacion</span>
+        <h2>Validacion de ingreso</h2>
       </div>
       <label className="form-switch-field">
         <input
-          checked={requiresRegistration}
-          disabled={requiresControl}
-          name="requiresRegistration"
-          type="checkbox"
-          onChange={(event) => onRegistrationChange?.(event.target.checked)}
-        />
-        <span>
-          <strong>Requiere inscripcion previa</strong>
-          <small>
-            Activa esta opcion cuando el vecino deba reservar o preinscribirse desde el portal publico.
-          </small>
-        </span>
-      </label>
-      <label className="form-switch-field">
-        <input
           checked={requiresControl}
-          disabled={!requiresRegistration}
           name="requiresAttendanceControl"
           type="checkbox"
           onChange={(event) => onControlChange?.(event.target.checked)}
@@ -7785,6 +7799,10 @@ function NewEventView({
                   </label>
                 </>
               )}
+              <RegistrationRequirementField
+                checked={requiresRegistration}
+                onChange={handleRegistrationChange}
+              />
               {requiresRegistration && (
                 <PaymentConfigurationFields
                   checked={requiresPayment}
@@ -7795,20 +7813,23 @@ function NewEventView({
             </div>
           </article>
 
-          <EvaluationTrackingSection
-            capacityMode={capacityMode}
-            goalEnabled={goalEnabled}
-            goalType={goalType}
-            surveyCommentsEnabled={surveyCommentsEnabled}
-            surveyEnabled={surveyEnabled}
-          />
+          {requiresRegistration && (
+            <>
+              <EvaluationTrackingSection
+                capacityMode={capacityMode}
+                goalEnabled={goalEnabled}
+                goalType={goalType}
+                surveyCommentsEnabled={surveyCommentsEnabled}
+                surveyEnabled={surveyEnabled}
+              />
 
-          <AttendanceControlSection
-            requiresControl={requiresControl}
-            requiresRegistration={requiresRegistration}
-            onControlChange={handleControlChange}
-            onRegistrationChange={handleRegistrationChange}
-          />
+              <AttendanceControlSection
+                requiresControl={requiresControl}
+                requiresRegistration={requiresRegistration}
+                onControlChange={handleControlChange}
+              />
+            </>
+          )}
 
           {requiresControl && (
             <OperativeAssignmentSection
@@ -8256,6 +8277,10 @@ function EditEventView({
                   </label>
                 </>
               )}
+              <RegistrationRequirementField
+                checked={requiresRegistration}
+                onChange={handleRegistrationChange}
+              />
               {requiresRegistration && (
                 <PaymentConfigurationFields
                   checked={requiresPayment}
@@ -8268,22 +8293,25 @@ function EditEventView({
             </div>
           </article>
 
-          <EvaluationTrackingSection
-            capacityMode={capacityMode}
-            capacityValue={event.aforoMaximo ?? event.spots ?? ''}
-            goalEnabled={goalEnabled}
-            goalType={goalType}
-            goalValue={event.metaValor ?? ''}
-            surveyCommentsEnabled={surveyCommentsEnabled}
-            surveyEnabled={surveyEnabled}
-          />
+          {requiresRegistration && (
+            <>
+              <EvaluationTrackingSection
+                capacityMode={capacityMode}
+                capacityValue={event.aforoMaximo ?? event.spots ?? ''}
+                goalEnabled={goalEnabled}
+                goalType={goalType}
+                goalValue={event.metaValor ?? ''}
+                surveyCommentsEnabled={surveyCommentsEnabled}
+                surveyEnabled={surveyEnabled}
+              />
 
-          <AttendanceControlSection
-            requiresControl={requiresControl}
-            requiresRegistration={requiresRegistration}
-            onControlChange={handleControlChange}
-            onRegistrationChange={handleRegistrationChange}
-          />
+              <AttendanceControlSection
+                requiresControl={requiresControl}
+                requiresRegistration={requiresRegistration}
+                onControlChange={handleControlChange}
+              />
+            </>
+          )}
 
           {requiresControl && (
             <OperativeAssignmentSection

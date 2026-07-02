@@ -475,14 +475,15 @@ public class EventoService {
         evento.setFechaHoraInicio(toInstant(request.fechaHoraInicio()));
         evento.setFechaHoraFin(toInstant(request.fechaHoraFin()));
         evento.setCostoReferencial(request.costoReferencial());
+        boolean requiereInscripcion = requiereInscripcion(request);
         aplicarConfiguracionPago(evento, request);
-        evento.setRequiereInscripcion(requiereInscripcion(request) ? (byte) 1 : (byte) 0);
+        evento.setRequiereInscripcion(requiereInscripcion ? (byte) 1 : (byte) 0);
         evento.setEstadoEvento(estadoEvento);
         evento.setUbicacion(ubicacion);
-        evento.setAforoMaximo(normalizarAforoMaximo(request.aforoMaximo()));
-        evento.setMetaTipo(normalizarTexto(request.metaTipo()));
-        evento.setMetaValor(request.metaValor());
-        evento.setEncuestaSatisfaccionHabilitado(Boolean.TRUE.equals(request.encuestaSatisfaccionHabilitado()) ? (byte) 1 : (byte) 0);
+        evento.setAforoMaximo(requiereInscripcion ? normalizarAforoMaximo(request.aforoMaximo()) : null);
+        evento.setMetaTipo(requiereInscripcion ? normalizarTexto(request.metaTipo()) : null);
+        evento.setMetaValor(requiereInscripcion ? request.metaValor() : null);
+        evento.setEncuestaSatisfaccionHabilitado(requiereInscripcion ? (Boolean.TRUE.equals(request.encuestaSatisfaccionHabilitado()) ? (byte) 1 : (byte) 0) : null);
         evento.setRequiereControlAsistencia(requiereControlAsistencia(request) ? (byte) 1 : (byte) 0);
         evento.setTiempoCreado(ahora);
         evento.setTiempoActualizado(ahora);
@@ -577,14 +578,15 @@ public class EventoService {
         evento.setFechaHoraInicio(toInstant(request.fechaHoraInicio()));
         evento.setFechaHoraFin(toInstant(request.fechaHoraFin()));
         evento.setCostoReferencial(request.costoReferencial());
+        boolean requiereInscripcion = requiereInscripcion(request);
         aplicarConfiguracionPago(evento, request);
-        evento.setRequiereInscripcion(requiereInscripcion(request) ? (byte) 1 : (byte) 0);
+        evento.setRequiereInscripcion(requiereInscripcion ? (byte) 1 : (byte) 0);
         evento.setEstadoEvento(estadoEvento);
         evento.setUbicacion(ubicacion);
-        evento.setAforoMaximo(normalizarAforoMaximo(request.aforoMaximo()));
-        evento.setMetaTipo(normalizarTexto(request.metaTipo()));
-        evento.setMetaValor(request.metaValor());
-        evento.setEncuestaSatisfaccionHabilitado(Boolean.TRUE.equals(request.encuestaSatisfaccionHabilitado()) ? (byte) 1 : (byte) 0);
+        evento.setAforoMaximo(requiereInscripcion ? normalizarAforoMaximo(request.aforoMaximo()) : null);
+        evento.setMetaTipo(requiereInscripcion ? normalizarTexto(request.metaTipo()) : null);
+        evento.setMetaValor(requiereInscripcion ? request.metaValor() : null);
+        evento.setEncuestaSatisfaccionHabilitado(requiereInscripcion ? (Boolean.TRUE.equals(request.encuestaSatisfaccionHabilitado()) ? (byte) 1 : (byte) 0) : null);
         evento.setRequiereControlAsistencia(requiereControlAsistencia(request) ? (byte) 1 : (byte) 0);
         evento.setTiempoActualizado(ahora);
         evento.setEventoActualizadoEn(ahora);
@@ -908,11 +910,9 @@ public class EventoService {
                     "La fecha de fin del evento debe ser posterior a la fecha de inicio"
             );
         }
-
-        boolean requiereControl = requiereControlAsistencia(request);
         boolean requiereInscripcion = requiereInscripcion(request);
 
-        if (Boolean.FALSE.equals(request.requiereInscripcion()) && requiereControl) {
+        if (Boolean.FALSE.equals(request.requiereInscripcion()) && Boolean.TRUE.equals(request.requiereControlAsistencia())) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "El control de asistencia solo esta disponible para eventos con inscripcion previa"
@@ -975,13 +975,8 @@ public class EventoService {
         if (request == null) {
             return true;
         }
-        if (Boolean.TRUE.equals(request.requiereInscripcion())) {
-            return true;
-        }
-        if (Boolean.FALSE.equals(request.requiereInscripcion())) {
-            return false;
-        }
-        return requiereControlAsistencia(request) || Boolean.TRUE.equals(request.requierePago());
+
+        return request.requiereInscripcion() == null || Boolean.TRUE.equals(request.requiereInscripcion());
     }
 
     private Categoria obtenerCategoriaOpcional(Integer categoriaId) {
@@ -1055,11 +1050,11 @@ public class EventoService {
                 && personalOperativoCompleto(request);
     }
     private boolean tieneAforoValido(EventoRegistroRequest request) {
-        return request.aforoMaximo() == null || request.aforoMaximo() >= 0;
+        return !requiereInscripcion(request) || request.aforoMaximo() == null || request.aforoMaximo() >= 0;
     }
 
     private Integer normalizarAforoMaximo(Integer aforoMaximo) {
-        return aforoMaximo == null ? 0 : aforoMaximo;
+        return aforoMaximo;
     }
 
     private String obtenerEstadoActualizacion(Evento evento, EventoRegistroRequest request) {
@@ -1139,9 +1134,10 @@ public class EventoService {
     }
 
     private boolean requiereControlAsistencia(EventoRegistroRequest request) {
-        return request == null
+        return requiereInscripcion(request)
+                && (request == null
                 || request.requiereControlAsistencia() == null
-                || Boolean.TRUE.equals(request.requiereControlAsistencia());
+                || Boolean.TRUE.equals(request.requiereControlAsistencia()));
     }
 
     private boolean personalOperativoCompleto(Evento evento) {
