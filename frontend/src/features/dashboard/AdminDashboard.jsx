@@ -19,11 +19,18 @@ import {
   getCuentasVecinales,
   getCategoriasConfiguracion,
   getEstadosEventoGestion,
+  getEventosActivosDesdeHoyCard,
+  getEventosBorradoresCard,
   getEventosGestion,
+  getEventosObservadosCard,
+  getEventosParaRevisionCard,
   getUbicacionesConfiguracion,
   getNotificacionesAdministrador,
   getRecursosEvento,
   getOperativosActivos,
+  getPagosInscripcionPendientes,
+  getPagoInscripcionDetalle,
+  observarPagoInscripcion,
   getUsuarioInternoDetalle,
   getUsuariosInternos,
   getRolesUsuariosInternos,
@@ -34,46 +41,44 @@ import {
   marcarNotificacionComoLeida,
   subirRecursoEvento,
   consultaDni,
+  validarPagoInscripcion,
 } from '../../services/dashboardService';
 import { getApiErrorMessage } from '../../services/api/api';
 import { CardSkeleton, EmptyState, ErrorState, EventFormSkeleton, TableSkeleton } from '../../components/feedback/LoadingStates';
 import LoadingButton from '../../components/feedback/LoadingButton';
 
-function getManagementStats(events) {
+function getManagementStats(counts) {
   return [
     {
       icon: CalendarCheckLineIcon,
       label: 'Activos',
       tone: 'is-published',
       trend: 'desde hoy',
-      value: events.filter((event) => event.state === 'PUBLICADO').length,
+      value: counts.activosDesdeHoy,
     },
     {
       icon: FileEditLineIcon,
       label: 'Borradores',
       tone: 'is-draft',
       trend: 'requieren completar datos',
-      value: events.filter((event) => event.state === 'BORRADOR').length,
+      value: counts.borradores,
     },
     {
       icon: ClipboardCheckLineIcon,
-      label: 'Para revisión',
+      label: 'Para revision',
       tone: 'is-review',
       trend: 'pendientes del directivo',
-      value: events.filter((event) =>
-        event.state === 'PARA_REVISION',
-      ).length,
+      value: counts.paraRevision,
     },
     {
       icon: TriangleAlertLineIcon,
       label: 'Observados',
       tone: 'is-observed',
       trend: 'requieren correcciones',
-      value: events.filter((event) => event.state === 'OBSERVADO').length,
+      value: counts.observados,
     },
   ];
 }
-
 const adminNotifications = [
   {
     id: 1,
@@ -112,6 +117,8 @@ const adminNotifications = [
     unread: true,
   },
 ];
+
+const defaultPaymentInstructions = 'Ej. Realizar el pago de S/ 10.00 en caja municipal o mediante deposito al Banco de la Nacion. Luego, subir el comprobante en la plataforma...';
 
 const eventFormSections = [
   { id: 'datos-generales', label: 'Datos generales' },
@@ -264,6 +271,9 @@ function mapManagementEventFromApi(event) {
   const coverUrl = getPublicPreviewCoverUrl(resourceItems);
 
   const directiveObservation = event.ultimaObservacionDirectiva ?? event.ultimaObservacion ?? null;
+  const requiresControl = event.requiereControlAsistencia ?? true;
+  const requiresPayment = Boolean(event.requierePago);
+  const requiresRegistration = event.requiereInscripcion ?? (requiresControl || requiresPayment);
 
   return {
     id: event.id,
@@ -283,12 +293,17 @@ function mapManagementEventFromApi(event) {
     categoria_id: event.categoria?.id ?? '',
     ubicacion_id: event.ubicacionId ?? '',
     referenceCost: event.costoReferencial ?? '',
+    requiresPayment,
+    paymentCost: event.costoVecinal ?? '',
+    paymentInstructions: event.instruccionesPago ?? '',
     aforoMaximo: event.aforoMaximo ?? '',
     cuposDisponibles: event.cuposDisponibles ?? event.aforoMaximo ?? 0,
     spots: event.cuposDisponibles ?? event.aforoMaximo ?? 0,
     edad_minima: event.edadMin ?? '',
     edad_maxima: event.edadMax ?? '',
-    requiereControlAsistencia: event.requiereControlAsistencia ?? true,
+    requiresRegistration,
+    requiereInscripcion: requiresRegistration,
+    requiereControlAsistencia: requiresControl,
     motivoCancelacion: event.motivoCancelacion ?? '',
     fechaCancelacion: event.fechaCancelacion ?? '',
     usuarioCancelacionId: event.usuarioCancelacionId ?? null,
@@ -391,7 +406,9 @@ function buildEventCreatePayload(form, actionType) {
   const audienceType = getNamedFormValue(form, 'publico_tipo') || 'GENERAL';
   const capacityMode = getNamedFormValue(form, 'capacityMode');
   const attendanceGoalEnabled = isNamedChecked(form, 'attendanceGoalEnabled');
-  const requiereControlAsistencia = isNamedChecked(form, 'requiresAttendanceControl');
+  const requiresRegistration = isNamedChecked(form, 'requiresRegistration');
+  const requiereControlAsistencia = requiresRegistration && isNamedChecked(form, 'requiresAttendanceControl');
+  const requiresPayment = requiresRegistration && isNamedChecked(form, 'requiresPayment');
 
   return {
     titulo: emptyToNull(getNamedFormValue(form, 'title')),
@@ -402,6 +419,9 @@ function buildEventCreatePayload(form, actionType) {
     fechaHoraInicio: emptyToNull(getNamedFormValue(form, 'eventStart')),
     fechaHoraFin: emptyToNull(getNamedFormValue(form, 'eventEnd')),
     costoReferencial: numberOrNull(getNamedFormValue(form, 'referenceCost')),
+    requierePago: requiresPayment,
+    costoVecinal: requiresPayment ? numberOrNull(getNamedFormValue(form, 'paymentCost')) : null,
+    instruccionesPago: requiresPayment ? emptyToNull(getNamedFormValue(form, 'paymentInstructions')) : null,
     ubicacionId: numberOrNull(getNamedFormValue(form, 'ubicacion_id')),
     aforoMaximo: capacityMode === 'none' ? 0 : positiveCapacityOrZero(getNamedFormValue(form, 'capacity')),
     publicoTipo: audienceType,
@@ -410,6 +430,7 @@ function buildEventCreatePayload(form, actionType) {
     metaTipo: attendanceGoalEnabled ? emptyToNull(getNamedFormValue(form, 'attendanceGoalType')) : null,
     metaValor: attendanceGoalEnabled ? numberOrNull(getNamedFormValue(form, 'attendanceGoalValue')) : null,
     encuestaSatisfaccionHabilitado: isNamedChecked(form, 'surveyEnabled'),
+    requiereInscripcion: requiresRegistration,
     requiereControlAsistencia,
     enviarRevision: actionType === 'review',
     operativosAsignadosIds: requiereControlAsistencia ? getSelectedOperativeIdsFromForm(form) : [],
@@ -895,6 +916,18 @@ function requiresAttendanceControl(event) {
   return event?.requiereControlAsistencia !== false;
 }
 
+function requiresEventRegistration(event) {
+  if (typeof event?.requiresRegistration === 'boolean') {
+    return event.requiresRegistration;
+  }
+
+  if (typeof event?.requiereInscripcion === 'boolean') {
+    return event.requiereInscripcion;
+  }
+
+  return requiresAttendanceControl(event) || Boolean(event?.requiresPayment);
+}
+
 function hasAssignedOperatives(event) {
   return Array.isArray(event?.operativosAsignadosIds) && event.operativosAsignadosIds.length > 0;
 }
@@ -1237,6 +1270,9 @@ function getChecklistEventFromForm(form, event, catalogs = {}) {
   const ageMax = audienceType === 'OBJETIVO' ? getNamedFormValue(form, 'edad_maxima') : '';
   const selectedAreaId = getNamedFormValue(form, 'area_municipal_id');
   const selectedArea = getMunicipalAreaById(selectedAreaId);
+  const requiresRegistration = isNamedChecked(form, 'requiresRegistration');
+  const requiresControl = requiresRegistration && isNamedChecked(form, 'requiresAttendanceControl');
+  const requiresPayment = requiresRegistration && isNamedChecked(form, 'requiresPayment');
 
   return {
     ...event,
@@ -1282,8 +1318,11 @@ function getChecklistEventFromForm(form, event, catalogs = {}) {
     metaValor: isNamedChecked(form, 'attendanceGoalEnabled')
       ? getNamedFormValue(form, 'attendanceGoalValue')
       : null,
-    requiereControlAsistencia: isNamedChecked(form, 'requiresAttendanceControl'),
-    operativosAsignadosIds: getSelectedOperativeIdsFromForm(form),
+    requiresRegistration,
+    requiresPayment,
+    requiereInscripcion: requiresRegistration,
+    requiereControlAsistencia: requiresControl,
+    operativosAsignadosIds: requiresControl ? getSelectedOperativeIdsFromForm(form) : [],
     spots:
       getNamedFormValue(form, 'capacityMode') === 'none'
         ? ''
@@ -1363,7 +1402,9 @@ function getMissingReviewFields(form, existingEvent = null) {
   const maxAge = Number(getNamedFormValue(form, 'edad_maxima'));
   const eventStart = getNamedFormValue(form, 'eventStart');
   const eventEnd = getNamedFormValue(form, 'eventEnd');
-  const requiereControlAsistencia = isNamedChecked(form, 'requiresAttendanceControl');
+  const requiresRegistration = isNamedChecked(form, 'requiresRegistration');
+  const requiereControlAsistencia = requiresRegistration && isNamedChecked(form, 'requiresAttendanceControl');
+  const requiresPayment = requiresRegistration && isNamedChecked(form, 'requiresPayment');
 
   if (shortDescription.length > 45) {
     missingFields.push('Descripción breve de máximo 45 caracteres');
@@ -1381,6 +1422,16 @@ function getMissingReviewFields(form, existingEvent = null) {
     !hasValidOrderedItems(parseOrderedEventItems(getNamedFormValue(form, 'requisitos_evento_json')))
   ) {
     missingFields.push('Requisitos del evento');
+  }
+
+  if (requiresPayment) {
+    if (Number(getNamedFormValue(form, 'paymentCost')) <= 0) {
+      missingFields.push('Monto de pago por inscripcion');
+    }
+
+    if (!hasValue(getNamedFormValue(form, 'paymentInstructions'))) {
+      missingFields.push('Instrucciones de pago');
+    }
   }
 
   if (capacityMode !== 'none' && Number(getNamedFormValue(form, 'capacity')) <= 0) {
@@ -1426,10 +1477,482 @@ function getMissingReviewFields(form, existingEvent = null) {
   return missingFields;
 }
 
+function formatPaymentDate(value) {
+  const date = value ? new Date(value) : null;
+
+  if (!date || Number.isNaN(date.getTime())) {
+    return 'Por confirmar';
+  }
+
+  return new Intl.DateTimeFormat('es-PE', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
+}
+
+function formatPaymentAmount(value) {
+  const amount = Number(value);
+
+  if (!Number.isFinite(amount)) {
+    return 'S/ 0.00';
+  }
+
+  return new Intl.NumberFormat('es-PE', {
+    currency: 'PEN',
+    style: 'currency',
+  }).format(amount);
+}
+
+function isPdfReceipt(url = '') {
+  return /\.pdf(?:$|[?#])/i.test(url);
+}
+
+const paymentStatusFilters = [
+  { label: 'Todos', value: 'TODOS' },
+  { label: 'En revision', value: 'EN_REVISION' },
+  { label: 'Validado', value: 'VALIDADO' },
+  { label: 'Rechazado', value: 'RECHAZADO' },
+  { label: 'Observado', value: 'OBSERVADO' },
+];
+
+const paymentOrderOptions = [
+  { label: 'Mas recientes primero', value: 'RECIENTES' },
+  { label: 'Mas antiguos primero', value: 'ANTIGUOS' },
+  { label: 'Mayor monto', value: 'MAYOR_MONTO' },
+  { label: 'Menor monto', value: 'MENOR_MONTO' },
+];
+
+function PaymentStateBadge({ state }) {
+  const stateLabels = {
+    EN_REVISION: 'En revision',
+    VALIDADO: 'Validado',
+    RECHAZADO: 'Rechazado',
+    OBSERVADO: 'Observado',
+  };
+  const stateTones = {
+    EN_REVISION: 'state-review',
+    VALIDADO: 'state-published',
+    RECHAZADO: 'state-cancelled',
+    OBSERVADO: 'state-observed',
+  };
+
+  return (
+    <span className={`state-badge ${stateTones[state] ?? 'state-default'}`}>
+      {stateLabels[state] ?? formatEventState(state)}
+    </span>
+  );
+}
+
+function AdminPaymentsValidationPage() {
+  const [payments, setPayments] = useState([]);
+  const [selectedPaymentId, setSelectedPaymentId] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('TODOS');
+  const [searchValue, setSearchValue] = useState('');
+  const [orderValue, setOrderValue] = useState('RECIENTES');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const loadPayments = useCallback(() => {
+    setIsLoading(true);
+    setError('');
+
+    getPagosInscripcionPendientes({
+      busqueda: searchValue.trim(),
+      estado: statusFilter,
+      orden: orderValue,
+    })
+      .then((response) => {
+        setPayments(Array.isArray(response) ? response : []);
+      })
+      .catch((requestError) => {
+        console.error('No se pudieron cargar los pagos por validar.', requestError);
+        setError(getApiErrorMessage(requestError, 'No se pudieron cargar los pagos por validar.'));
+      })
+      .finally(() => setIsLoading(false));
+  }, [orderValue, searchValue, statusFilter]);
+
+  useEffect(() => {
+    loadPayments();
+  }, [loadPayments, reloadKey]);
+
+  if (selectedPaymentId) {
+    return (
+      <AdminPaymentReviewDetail
+        paymentId={selectedPaymentId}
+        onBack={(message = '') => {
+          setSelectedPaymentId(null);
+          setReloadKey((currentKey) => currentKey + 1);
+          if (message) {
+            setNotice(message);
+          }
+        }}
+        onChanged={() => setReloadKey((currentKey) => currentKey + 1)}
+      />
+    );
+  }
+
+  return (
+    <>
+      <header className="admin-topbar">
+        <div>
+          <span className="section-kicker">Pagos de inscripcion</span>
+          <h1>Validacion manual de comprobantes</h1>
+        </div>
+      </header>
+
+      <section className="admin-table-panel payments-validation-panel">
+        <div className="admin-panel-heading">
+          <div>
+            <span className="section-kicker">Revision</span>
+            <h2>Comprobantes de pago</h2>
+          </div>
+          <button
+            aria-label="Actualizar comprobantes"
+            className="payments-refresh-button"
+            data-tooltip="Actualizar"
+            disabled={isLoading}
+            type="button"
+            onClick={loadPayments}
+          >
+            <RefreshIcon />
+          </button>
+        </div>
+
+        <div className="payments-filter-grid" aria-label="Filtros de pagos de inscripcion">
+          <label>
+            Buscar vecino
+            <input
+              value={searchValue}
+              placeholder="Nombre o DNI"
+              onChange={(event) => setSearchValue(event.target.value)}
+            />
+          </label>
+          <label>
+            Estado del comprobante
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              {paymentStatusFilters.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Ordenamiento
+            <select value={orderValue} onChange={(event) => setOrderValue(event.target.value)}>
+              {paymentOrderOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {notice && <p className="settings-inline-notice">{notice}</p>}
+
+        <div className="admin-table payments-validation-table">
+          <div className="admin-table-row admin-table-head">
+            <span>Vecino</span>
+            <span>Evento</span>
+            <span>Pago</span>
+            <span>Estado</span>
+            <span>Accion</span>
+          </div>
+          {isLoading ? (
+            <TableSkeleton columns={5} rows={4} />
+          ) : error ? (
+            <ErrorState description={error} onRetry={loadPayments} />
+          ) : payments.length === 0 ? (
+            <EmptyState title="No hay pagos registrados" description="Los comprobantes enviados apareceran en esta vista." />
+          ) : payments.map((payment) => (
+            <div className="admin-table-row" key={payment.id}>
+              <span>
+                <strong>{payment.vecinoNombre || 'Vecino'}</strong>
+                <small>DNI {payment.vecinoDni || 'sin registrar'}</small>
+              </span>
+              <span>
+                <strong>{payment.eventoTitulo || 'Evento municipal'}</strong>
+                <small>Inscripcion #{payment.inscripcionId}</small>
+              </span>
+              <span>
+                <strong>{formatPaymentAmount(payment.monto)}</strong>
+                <small>{payment.medioPago || 'Medio no indicado'} - {formatPaymentDate(payment.fechaPago)}</small>
+              </span>
+              <span><PaymentStateBadge state={payment.estadoPago || payment.estadoInscripcion} /></span>
+              <span className="payment-validation-actions">
+                <button
+                  aria-label="Ver comprobante"
+                  className="table-icon-action is-detail neighbor-detail-action"
+                  data-tooltip="Ver comprobante"
+                  type="button"
+                  onClick={() => {
+                    setNotice('');
+                    setSelectedPaymentId(payment.id);
+                  }}
+                >
+                  <ViewIcon />
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function AdminPaymentReviewDetail({ paymentId, onBack, onChanged }) {
+  const [payment, setPayment] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [observation, setObservation] = useState('');
+  const [isObservationOpen, setIsObservationOpen] = useState(false);
+  const [isValidationOpen, setIsValidationOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const loadPayment = useCallback(() => {
+    setIsLoading(true);
+    setError('');
+
+    getPagoInscripcionDetalle(paymentId)
+      .then((response) => setPayment(response ?? null))
+      .catch((requestError) => {
+        console.error('No se pudo cargar el detalle del pago.', requestError);
+        setError(getApiErrorMessage(requestError, 'No se pudo cargar el detalle del pago.'));
+      })
+      .finally(() => setIsLoading(false));
+  }, [paymentId]);
+
+  useEffect(() => {
+    loadPayment();
+  }, [loadPayment]);
+
+  async function validatePayment() {
+    if (!payment || isProcessing) {
+      return;
+    }
+
+    setIsProcessing(true);
+    setActionError('');
+    setNotice('');
+
+    try {
+      const response = await validarPagoInscripcion(payment.id);
+      const successMessage = response?.estadoInscripcion === 'CANCELADA' && response?.motivoCancelacion === 'AFORO_COMPLETO'
+        ? 'El pago fue validado, pero la inscripcion se cancelo automaticamente porque ya no habia cupos disponibles.'
+        : 'Pago validado. La inscripcion quedo confirmada y el QR fue generado.';
+      setPayment(response);
+      setIsValidationOpen(false);
+      onChanged?.();
+      onBack(successMessage);
+    } catch (requestError) {
+      setActionError(getApiErrorMessage(requestError, 'No se pudo validar el pago.'));
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
+  function openValidationModal() {
+    setActionError('');
+    setIsValidationOpen(true);
+  }
+
+  async function observePayment(event) {
+    event.preventDefault();
+
+    if (!payment || isProcessing) {
+      return;
+    }
+
+    if (!observation.trim()) {
+      setActionError('Ingresa la observacion para el vecino.');
+      return;
+    }
+
+    setIsProcessing(true);
+    setActionError('');
+    setNotice('');
+
+    try {
+      const response = await observarPagoInscripcion(payment.id, observation.trim());
+      setPayment(response);
+      setIsObservationOpen(false);
+      setObservation('');
+      onChanged?.();
+      setNotice('Pago observado. El vecino recibira la indicacion para corregir el comprobante.');
+    } catch (requestError) {
+      setActionError(getApiErrorMessage(requestError, 'No se pudo observar el pago.'));
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
+  function openObservationModal() {
+    setObservation('');
+    setActionError('');
+    setIsObservationOpen(true);
+  }
+
+  const canReviewPayment = payment && !['VALIDADO', 'RECHAZADO'].includes(payment.estadoPago);
+
+  return (
+    <>
+      <header className="admin-topbar payment-detail-topbar">
+        <div>
+          <button className="detail-back-link" type="button" onClick={onBack}>
+            &larr; Volver a pagos
+          </button>
+          <span className="section-kicker">Comprobante de pago</span>
+          <h1>{payment?.eventoTitulo || 'Detalle de comprobante'}</h1>
+        </div>
+        {payment && <PaymentStateBadge state={payment.estadoPago} />}
+      </header>
+
+      {notice && <p className="settings-inline-notice">{notice}</p>}
+      {actionError && !isObservationOpen && !isValidationOpen && <p className="settings-inline-error">{actionError}</p>}
+
+      {isLoading ? (
+        <section className="admin-panel payment-review-detail"><TableSkeleton columns={2} rows={3} /></section>
+      ) : error ? (
+        <section className="admin-panel"><ErrorState description={error} onRetry={loadPayment} /></section>
+      ) : !payment ? (
+        <section className="admin-panel"><EmptyState title="Pago no encontrado" description="No se pudo ubicar el comprobante solicitado." /></section>
+      ) : (
+        <section className="admin-panel payment-review-detail is-standalone" aria-label="Detalle de comprobante">
+          <div className="payment-receipt-preview">
+            <div className="payment-receipt-toolbar">
+              <div>
+                <span className="section-kicker">Comprobante</span>
+                <h2>{payment.eventoTitulo || 'Evento municipal'}</h2>
+              </div>
+              {payment.comprobanteUrl && (
+                <a className="payment-open-file-button" href={payment.comprobanteUrl} rel="noopener noreferrer" target="_blank">
+                  Abrir archivo
+                </a>
+              )}
+            </div>
+            <div className="payment-receipt-frame">
+              {payment.comprobanteUrl ? (
+                isPdfReceipt(payment.comprobanteUrl) ? (
+                  <iframe title="Comprobante de pago" src={payment.comprobanteUrl} />
+                ) : (
+                  <img alt="Comprobante de pago" src={payment.comprobanteUrl} />
+                )
+              ) : (
+                <span>No hay comprobante disponible.</span>
+              )}
+            </div>
+          </div>
+
+          <aside className="payment-review-summary">
+            <span className="section-kicker">Datos de validacion</span>
+            <dl>
+              <div>
+                <dt>Vecino</dt>
+                <dd>
+                  <strong>{payment.vecinoNombre || 'Vecino'}</strong>
+                  <small>DNI {payment.vecinoDni || 'sin registrar'}</small>
+                </dd>
+              </div>
+              <div>
+                <dt>Evento</dt>
+                <dd>{payment.eventoTitulo || 'Evento municipal'}</dd>
+              </div>
+              <div>
+                <dt>Costo de inscripcion</dt>
+                <dd>{formatPaymentAmount(payment.monto)}</dd>
+              </div>
+              <div>
+                <dt>Medio de pago</dt>
+                <dd>{payment.medioPago || 'No indicado'}</dd>
+              </div>
+              <div>
+                <dt>Numero de operacion</dt>
+                <dd>{payment.numeroOperacion || 'No indicado'}</dd>
+              </div>
+              <div>
+                <dt>Fecha de pago</dt>
+                <dd>{formatPaymentDate(payment.fechaPago)}</dd>
+              </div>
+              {payment.observacion && (
+                <div>
+                  <dt>Observacion</dt>
+                  <dd>{payment.observacion}</dd>
+                </div>
+              )}
+            </dl>
+            {canReviewPayment && (
+              <div className="payment-review-actions">
+                <button className="table-text-action observe" disabled={isProcessing} type="button" onClick={openObservationModal}>
+                  Observar
+                </button>
+                <button className="primary-button" disabled={isProcessing} type="button" onClick={openValidationModal}>
+                  Validar
+                </button>
+              </div>
+            )}
+          </aside>
+        </section>
+      )}
+
+      {isValidationOpen && payment && (
+        <div className="modal-backdrop" role="presentation">
+          <div className="confirm-modal event-delete-modal" role="dialog" aria-modal="true" aria-labelledby="payment-validation-title">
+            <h2 id="payment-validation-title">Validar comprobante</h2>
+            <p>
+              &iquest;Estas seguro de validar el comprobante de pago de {payment.vecinoNombre || 'este vecino'} para el evento {payment.eventoTitulo || 'municipal'}?
+            </p>
+            <p>
+              Al confirmar, la inscripcion quedara validada y se notificara al vecino por correo electronico.
+            </p>
+            {actionError && <p className="settings-inline-error">{actionError}</p>}
+            <div className="modal-actions">
+              <button className="back-button" disabled={isProcessing} type="button" onClick={() => setIsValidationOpen(false)}>
+                Cancelar
+              </button>
+              <button className="primary-button" disabled={isProcessing} type="button" onClick={validatePayment}>
+                {isProcessing ? 'Validando...' : 'Validar comprobante'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {isObservationOpen && payment && (
+        <div className="modal-backdrop" role="presentation">
+          <form className="confirm-modal event-delete-modal" onSubmit={observePayment}>
+            <h2>Observar pago</h2>
+            <p>Indica que debe corregir el vecino para volver a enviar el comprobante.</p>
+            <label className="event-cancel-form">
+              Observacion
+              <textarea
+                maxLength={500}
+                value={observation}
+                onChange={(changeEvent) => setObservation(changeEvent.target.value)}
+              />
+            </label>
+            {actionError && <p className="settings-inline-error">{actionError}</p>}
+            <div className="modal-actions">
+              <button className="back-button" disabled={isProcessing} type="button" onClick={() => setIsObservationOpen(false)}>
+                Cancelar
+              </button>
+              <button className="primary-button danger-action" disabled={isProcessing} type="submit">
+                {isProcessing ? 'Enviando...' : 'Enviar observacion'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </>
+  );
+}
 function AdminDashboard({ onLogout, user }) {
   const [currentAdminView, setCurrentAdminView] = useState(() =>
-    window.location.pathname === '/admin/vecinos'
-      ? 'neighbors'
+    window.location.pathname === '/admin/pagos'
+      ? 'payments'
+      : window.location.pathname === '/admin/vecinos'
+        ? 'neighbors'
       : window.location.pathname === '/admin/configuracion' ||
           window.location.pathname === '/admin/configuracion/san-miguel'
         ? 'settings-users'
@@ -1448,6 +1971,13 @@ function AdminDashboard({ onLogout, user }) {
   const [isSidebarTransitioning, setIsSidebarTransitioning] = useState(false);
   const [isSidebarDrawerOpen, setIsSidebarDrawerOpen] = useState(false);
   const [eventItems, setEventItems] = useState([]);
+  const [managementCardCounts, setManagementCardCounts] = useState({
+    activosDesdeHoy: 0,
+    borradores: 0,
+    observados: 0,
+    paraRevision: 0,
+  });
+  const [isLoadingManagementCards, setIsLoadingManagementCards] = useState(true);
   const [eventCategoryCatalog, setEventCategoryCatalog] = useState([]);
   const [eventAreaCatalog, setEventAreaCatalog] = useState(eventOrganizerAreas);
   const [eventLocationCatalog, setEventLocationCatalog] = useState(registeredLocations);
@@ -1499,7 +2029,7 @@ function AdminDashboard({ onLogout, user }) {
   const isSettingsView = currentAdminView.startsWith('settings-');
   const adminUser = user ?? fallbackAdminUser;
   const adminUserName = getUserDisplayName(adminUser);
-  const managementStats = useMemo(() => getManagementStats(eventItems), [eventItems]);
+  const managementStats = useMemo(() => getManagementStats(managementCardCounts), [managementCardCounts]);
 
   useEffect(() => () => {
     if (sidebarTransitionTimeoutRef.current) {
@@ -1533,6 +2063,35 @@ function AdminDashboard({ onLogout, user }) {
     },
     [eventCategoryCatalog],
   );
+  const loadManagementCards = useCallback(() => {
+    setIsLoadingManagementCards(true);
+
+    return Promise.all([
+      getEventosActivosDesdeHoyCard(),
+      getEventosBorradoresCard(),
+      getEventosParaRevisionCard(),
+      getEventosObservadosCard(),
+    ])
+      .then(([activosDesdeHoy, borradores, paraRevision, observados]) => {
+        setManagementCardCounts({
+          activosDesdeHoy: Number(activosDesdeHoy) || 0,
+          borradores: Number(borradores) || 0,
+          observados: Number(observados) || 0,
+          paraRevision: Number(paraRevision) || 0,
+        });
+      })
+      .catch((error) => {
+        console.error('No se pudieron cargar los indicadores generales de eventos.', error);
+        setManagementCardCounts({
+          activosDesdeHoy: 0,
+          borradores: 0,
+          observados: 0,
+          paraRevision: 0,
+        });
+      })
+      .finally(() => setIsLoadingManagementCards(false));
+  }, []);
+
   const loadAdminNotifications = useCallback((nextFilter = notificationFilter) => {
     const soloNoLeidas = nextFilter === 'unread';
     setIsLoadingNotifications(true);
@@ -1649,6 +2208,10 @@ function AdminDashboard({ onLogout, user }) {
       isMounted = false;
     };
   }, [categoryFilter, eventsPage.number, eventsReloadKey, searchTerm, stateFilter]);
+
+  useEffect(() => {
+    loadManagementCards();
+  }, [eventsReloadKey, loadManagementCards]);
 
   useEffect(() => {
     loadAdminNotifications(notificationFilter);
@@ -2255,6 +2818,19 @@ function AdminDashboard({ onLogout, user }) {
             </button>
             <button
               className={
+                currentAdminView === 'payments' ? 'admin-nav-link active' : 'admin-nav-link'
+              }
+              type="button"
+              onClick={() => {
+                closeSidebarDrawer();
+                window.history.pushState(null, '', '/admin/pagos');
+                setCurrentAdminView('payments');
+              }}
+            >
+              Pagos por validar
+            </button>
+            <button
+              className={
                 currentAdminView === 'neighbors' ? 'admin-nav-link active' : 'admin-nav-link'
               }
               type="button"
@@ -2374,6 +2950,8 @@ function AdminDashboard({ onLogout, user }) {
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           />
+        ) : currentAdminView === 'payments' ? (
+          <AdminPaymentsValidationPage />
         ) : currentAdminView === 'neighbors' ? (
           <NeighborAccountsPage adminUserName={adminUserName} />
         ) : currentAdminView === 'settings-users' ? (
@@ -2417,7 +2995,7 @@ function AdminDashboard({ onLogout, user }) {
             </header>
 
             <section className="admin-stats" id="resumen" aria-label="Resumen de gestion">
-              {isLoadingEvents ? <CardSkeleton count={4} /> : managementStats.map((stat) => (
+              {isLoadingManagementCards ? <CardSkeleton count={4} /> : managementStats.map((stat) => (
                 <article
                   className={`admin-stat-card management-stat-card ${stat.tone}`}
                   key={stat.label}
@@ -2830,7 +3408,12 @@ function OperativeAssignmentSection({
   );
 }
 
-function AttendanceControlSection({ requiresControl = true }) {
+function AttendanceControlSection({
+  onControlChange,
+  onRegistrationChange,
+  requiresControl = true,
+  requiresRegistration = true,
+}) {
   return (
     <article className="event-form-section attendance-control-section" id="control-asistencia">
       <div className="form-section-heading">
@@ -2839,21 +3422,37 @@ function AttendanceControlSection({ requiresControl = true }) {
       </div>
       <label className="form-switch-field">
         <input
-          defaultChecked={requiresControl}
+          checked={requiresRegistration}
+          disabled={requiresControl}
+          name="requiresRegistration"
+          type="checkbox"
+          onChange={(event) => onRegistrationChange?.(event.target.checked)}
+        />
+        <span>
+          <strong>Requiere inscripcion previa</strong>
+          <small>
+            Activa esta opcion cuando el vecino deba reservar o preinscribirse desde el portal publico.
+          </small>
+        </span>
+      </label>
+      <label className="form-switch-field">
+        <input
+          checked={requiresControl}
+          disabled={!requiresRegistration}
           name="requiresAttendanceControl"
           type="checkbox"
+          onChange={(event) => onControlChange?.(event.target.checked)}
         />
         <span>
           <strong>Este evento requiere control de asistencia</strong>
           <small>
-            Activa esta opción si el ingreso de asistentes será validado por personal operativo mediante QR o búsqueda manual.
+            Activa esta opcion si el ingreso de asistentes sera validado por personal operativo mediante QR o busqueda manual.
           </small>
         </span>
       </label>
     </article>
   );
 }
-
 function AdminPublicEventPreview({ event, onBack, onRequestCancel }) {
   const [isOperativesOpen, setIsOperativesOpen] = useState(false);
   const operativesPopoverRef = useRef(null);
@@ -2933,6 +3532,7 @@ function AdminPublicEventPreview({ event, onBack, onRequestCancel }) {
         backLabel="Volver al panel de eventos"
         event={previewEvent}
         onBack={onBack}
+        reservationActionClassName="admin-cancel-event-action"
         reservationActionDisabled={!canCancelEvent}
         reservationActionLabel="Cancelar evento"
         reservationCardKicker="ADMINISTRACION"
@@ -3156,7 +3756,7 @@ function ExistingEventResources({ deletingResourceId = null, error = '', isLoadi
                 <em>{typeLabel}</em>
                 <strong title={title}>{title}</strong>
                 <small>
-                  {[resource.mimeType, fileSize].filter(Boolean).join(' Â· ') || 'Metadata no disponible'}
+                  {[resource.mimeType, fileSize].filter(Boolean).join(' · ') || 'Metadata no disponible'}
                 </small>
               </span>
               {resource.signedUrl && (
@@ -3524,6 +4124,16 @@ function OperativeUsersIcon() {
       <path d="M5 21a7 7 0 0 1 14 0" />
       <path d="M19 8a3 3 0 0 1 2 2.8" />
       <path d="M3 10.8A3 3 0 0 1 5 8" />
+    </svg>
+  );
+}
+function RefreshIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M20 11a8 8 0 0 0-14.7-4.4L4 8" />
+      <path d="M4 4v4h4" />
+      <path d="M4 13a8 8 0 0 0 14.7 4.4L20 16" />
+      <path d="M20 20v-4h-4" />
     </svg>
   );
 }
@@ -6902,6 +7512,59 @@ function EvaluationTrackingSection({
   );
 }
 
+function PaymentConfigurationFields({
+  checked = false,
+  defaultCost = '',
+  defaultInstructions = '',
+  enabled = true,
+  onToggle,
+}) {
+  const showPaymentFields = enabled && checked;
+
+  return (
+    <>
+      <label className="form-switch-field span-2">
+        <input
+          checked={checked}
+          disabled={!enabled}
+          name="requiresPayment"
+          type="checkbox"
+          onChange={(event) => onToggle?.(event.target.checked)}
+        />
+        <span>
+          <strong>Requiere pago por inscripcion</strong>
+          <small>Activa la validacion manual de comprobantes antes de confirmar la inscripcion del vecino.</small>
+        </span>
+      </label>
+
+      {showPaymentFields && (
+        <>
+          <label className="form-field">
+            Monto por inscripcion
+            <input
+              defaultValue={defaultCost}
+              min="0.01"
+              name="paymentCost"
+              placeholder="10.00"
+              step="0.01"
+              type="number"
+            />
+          </label>
+          <label className="form-field span-2">
+            Instrucciones de pago
+            <textarea
+              defaultValue={defaultInstructions}
+              name="paymentInstructions"
+              placeholder={defaultPaymentInstructions}
+              rows={4}
+            />
+          </label>
+        </>
+      )}
+    </>
+  );
+}
+
 function NewEventView({
   areas = eventOrganizerAreas,
   categories = [],
@@ -6921,9 +7584,13 @@ function NewEventView({
   const [surveyEnabled, setSurveyEnabled] = useState(false);
   const [surveyCommentsEnabled, setSurveyCommentsEnabled] = useState(false);
   const [eventStartValue, setEventStartValue] = useState('');
+  const [requiresRegistration, setRequiresRegistration] = useState(true);
   const [requiresControl, setRequiresControl] = useState(true);
+  const [requiresPayment, setRequiresPayment] = useState(false);
   const [selectedOperativeIds, setSelectedOperativeIds] = useState([]);
   const [checklistEvent, setChecklistEvent] = useState(() => ({
+    requiresRegistration: true,
+    requiereInscripcion: true,
     requiereControlAsistencia: true,
     resources: {},
     state: 'BORRADOR',
@@ -6944,16 +7611,49 @@ function NewEventView({
     setSurveyEnabled(isNamedChecked(form, 'surveyEnabled'));
     setSurveyCommentsEnabled(isNamedChecked(form, 'surveyCommentsEnabled'));
     setEventStartValue(getNamedFormValue(form, 'eventStart'));
-    setRequiresControl(isNamedChecked(form, 'requiresAttendanceControl'));
-    setSelectedOperativeIds(getSelectedOperativeIdsFromForm(form));
+    const nextRequiresRegistration = isNamedChecked(form, 'requiresRegistration');
+    const nextRequiresControl = nextRequiresRegistration && isNamedChecked(form, 'requiresAttendanceControl');
+    const nextRequiresPayment = nextRequiresRegistration && isNamedChecked(form, 'requiresPayment');
+    setRequiresRegistration(nextRequiresRegistration);
+    setRequiresControl(nextRequiresControl);
+    setRequiresPayment(nextRequiresPayment);
+    setSelectedOperativeIds(nextRequiresControl ? getSelectedOperativeIdsFromForm(form) : []);
     setChecklistEvent(
       getChecklistEventFromForm(form, {
+        requiresRegistration: true,
+        requiereInscripcion: true,
         requiereControlAsistencia: true,
         resources: {},
         state: 'BORRADOR',
       }, { categories, locations }),
     );
     setMissingReviewFields(getMissingReviewFields(form));
+  }
+
+  function handleRegistrationChange(checked) {
+    setRequiresRegistration(checked);
+    if (!checked) {
+      setRequiresControl(false);
+      setRequiresPayment(false);
+      setSelectedOperativeIds([]);
+    }
+    window.setTimeout(syncChecklistFromForm, 0);
+  }
+
+  function handleControlChange(checked) {
+    setRequiresControl(checked);
+    if (checked) {
+      setRequiresRegistration(true);
+    }
+    window.setTimeout(syncChecklistFromForm, 0);
+  }
+
+  function handlePaymentToggle(checked) {
+    setRequiresPayment(checked);
+    if (checked) {
+      setRequiresRegistration(true);
+    }
+    window.setTimeout(syncChecklistFromForm, 0);
   }
 
   function requestEventAction(actionType) {
@@ -7085,6 +7785,13 @@ function NewEventView({
                   </label>
                 </>
               )}
+              {requiresRegistration && (
+                <PaymentConfigurationFields
+                  checked={requiresPayment}
+                  enabled={requiresRegistration}
+                  onToggle={handlePaymentToggle}
+                />
+              )}
             </div>
           </article>
 
@@ -7096,7 +7803,12 @@ function NewEventView({
             surveyEnabled={surveyEnabled}
           />
 
-          <AttendanceControlSection requiresControl />
+          <AttendanceControlSection
+            requiresControl={requiresControl}
+            requiresRegistration={requiresRegistration}
+            onControlChange={handleControlChange}
+            onRegistrationChange={handleRegistrationChange}
+          />
 
           {requiresControl && (
             <OperativeAssignmentSection
@@ -7268,7 +7980,9 @@ function EditEventView({
   const [surveyEnabled, setSurveyEnabled] = useState(Boolean(event.encuestaSatisfaccionHabilitada));
   const [surveyCommentsEnabled, setSurveyCommentsEnabled] = useState(Boolean(event.encuestaComentarioHabilitado));
   const [eventStartValue, setEventStartValue] = useState(() => getEventStartDateTimeValue(event));
+  const [requiresRegistration, setRequiresRegistration] = useState(() => requiresEventRegistration(event));
   const [requiresControl, setRequiresControl] = useState(() => requiresAttendanceControl(event));
+  const [requiresPayment, setRequiresPayment] = useState(() => Boolean(event.requiresPayment));
   const [selectedOperativeIds, setSelectedOperativeIds] = useState(() => event.operativosAsignadosIds ?? []);
   const [checklistEvent, setChecklistEvent] = useState(() => eventWithResources);
   const [hasFormChanges, setHasFormChanges] = useState(false);
@@ -7288,9 +8002,43 @@ function EditEventView({
     setSurveyEnabled(isNamedChecked(formRef.current, 'surveyEnabled'));
     setSurveyCommentsEnabled(isNamedChecked(formRef.current, 'surveyCommentsEnabled'));
     setEventStartValue(getNamedFormValue(formRef.current, 'eventStart'));
-    setRequiresControl(isNamedChecked(formRef.current, 'requiresAttendanceControl'));
-    setSelectedOperativeIds(getSelectedOperativeIdsFromForm(formRef.current));
+    const nextRequiresRegistration = isNamedChecked(formRef.current, 'requiresRegistration');
+    const nextRequiresControl = nextRequiresRegistration && isNamedChecked(formRef.current, 'requiresAttendanceControl');
+    const nextRequiresPayment = nextRequiresRegistration && isNamedChecked(formRef.current, 'requiresPayment');
+    setRequiresRegistration(nextRequiresRegistration);
+    setRequiresControl(nextRequiresControl);
+    setRequiresPayment(nextRequiresPayment);
+    setSelectedOperativeIds(nextRequiresControl ? getSelectedOperativeIdsFromForm(formRef.current) : []);
     setChecklistEvent(getChecklistEventFromForm(formRef.current, eventWithResources, { categories, locations }));
+  }
+
+  function handleRegistrationChange(checked) {
+    setRequiresRegistration(checked);
+    if (!checked) {
+      setRequiresControl(false);
+      setRequiresPayment(false);
+      setSelectedOperativeIds([]);
+    }
+    setHasFormChanges(true);
+    window.setTimeout(syncChecklistFromForm, 0);
+  }
+
+  function handleControlChange(checked) {
+    setRequiresControl(checked);
+    if (checked) {
+      setRequiresRegistration(true);
+    }
+    setHasFormChanges(true);
+    window.setTimeout(syncChecklistFromForm, 0);
+  }
+
+  function handlePaymentToggle(checked) {
+    setRequiresPayment(checked);
+    if (checked) {
+      setRequiresRegistration(true);
+    }
+    setHasFormChanges(true);
+    window.setTimeout(syncChecklistFromForm, 0);
   }
 
   function requestEventAction(actionType, payloadActionType) {
@@ -7508,6 +8256,15 @@ function EditEventView({
                   </label>
                 </>
               )}
+              {requiresRegistration && (
+                <PaymentConfigurationFields
+                  checked={requiresPayment}
+                  defaultCost={event.paymentCost ?? ''}
+                  defaultInstructions={event.paymentInstructions ?? ''}
+                  enabled={requiresRegistration}
+                  onToggle={handlePaymentToggle}
+                />
+              )}
             </div>
           </article>
 
@@ -7521,7 +8278,12 @@ function EditEventView({
             surveyEnabled={surveyEnabled}
           />
 
-          <AttendanceControlSection requiresControl={requiresControl} />
+          <AttendanceControlSection
+            requiresControl={requiresControl}
+            requiresRegistration={requiresRegistration}
+            onControlChange={handleControlChange}
+            onRegistrationChange={handleRegistrationChange}
+          />
 
           {requiresControl && (
             <OperativeAssignmentSection

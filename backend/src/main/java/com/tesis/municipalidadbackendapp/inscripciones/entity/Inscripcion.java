@@ -51,5 +51,15 @@ public class Inscripcion {
     @Column(name="estado_inscripcion", length = 45)
     private EstadoInscripcion estadoInscripcion;
 
+    @Size(max = 45)
+    @Column(name = "motivo_cancelacion", length = 45)
+    private String motivoCancelacion;
+
+    @Column(name = "observacion_cancelacion", columnDefinition = "TEXT")
+    private String observacionCancelacion;
+
+    @Column(name = "fecha_cancelacion")
+    private Instant fechaCancelacion;
+
 
 }

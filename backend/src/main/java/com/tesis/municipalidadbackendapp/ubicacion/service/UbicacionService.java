@@ -89,7 +89,7 @@ public class UbicacionService {
 
     private void validarLongitudesUbicacion(UbicacionRequest request) {
         validarLongitudMaxima(request.nombre(), "El nombre");
-        validarLongitudMaxima(request.direccion(), "La direcciÃ³n");
+        validarLongitudMaxima(request.direccion(), "La dirección");
         validarLongitudMaxima(request.referencia(), "La referencia");
     }
 

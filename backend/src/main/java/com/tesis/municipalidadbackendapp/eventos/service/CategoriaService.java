@@ -70,14 +70,14 @@ public class CategoriaService {
         Categoria categoria = categoriaRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
-                        "CategorÃ­a no encontrada"
+                        "Categoría no encontrada"
                 ));
         Long eventosAsociados = eventoRepository.countByCategoriaId(id);
 
         if (eventosAsociados > 0) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "No se puede eliminar la categorÃ­a porque tiene eventos asociados"
+                    "No se puede eliminar la categoría porque tiene eventos asociados"
             );
         }
 
@@ -87,7 +87,7 @@ public class CategoriaService {
                 "ELIMINAR_CATEGORIA",
                 "CATEGORIA",
                 categoria.getId(),
-                "Se eliminÃ³ la categorÃ­a con nombre: " + categoria.getNombre(),
+                "Se eliminó la categoría con nombre: " + categoria.getNombre(),
                 usuario,
                 httpServletRequest
         );

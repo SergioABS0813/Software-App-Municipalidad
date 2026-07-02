@@ -6,6 +6,8 @@ import com.tesis.municipalidadbackendapp.inscripciones.dto.InscripcionEventoResp
 import com.tesis.municipalidadbackendapp.inscripciones.entity.Inscripcion;
 import com.tesis.municipalidadbackendapp.inscripciones.enums.EstadoInscripcion;
 import com.tesis.municipalidadbackendapp.inscripciones.repository.InscripcionRepository;
+import com.tesis.municipalidadbackendapp.pago_inscripcion.entity.PagoInscripcion;
+import com.tesis.municipalidadbackendapp.pago_inscripcion.repository.PagoInscripcionRepository;
 import com.tesis.municipalidadbackendapp.qr.dto.CodigoQrResponseDto;
 import com.tesis.municipalidadbackendapp.qr.service.CodigoQrService;
 import com.tesis.municipalidadbackendapp.vecinos.entity.Vecino;
@@ -33,12 +35,17 @@ public class InscripcionEventoService {
     private final VecinoRepository vecinoRepository;
     private final VecinoNotificacionService vecinoNotificacionService;
     private final CodigoQrService codigoQrService;
+    private final PagoInscripcionRepository pagoInscripcionRepository;
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
 
     @Transactional
     public InscripcionEventoResponse inscribirEvento(Integer eventoId) {
         Vecino vecino = obtenerVecinoAutenticado();
         Evento evento = obtenerEventoPublicado(eventoId);
+
+        if (!requiereInscripcion(evento)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Este evento no requiere inscripcion previa");
+        }
 
         return inscripcionRepository.findByEventoIdAndVecinoId(eventoId, vecino.getId())
                 .map(inscripcion -> resolverInscripcionExistente(inscripcion, evento, vecino))
@@ -59,7 +66,13 @@ public class InscripcionEventoService {
                         vecino.getNombre(),
                         null,
                         null,
-                        "NO_INSCRITO"
+                        "NO_INSCRITO",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
                 ));
     }
 
@@ -68,20 +81,23 @@ public class InscripcionEventoService {
         Vecino vecino = obtenerVecinoAutenticado();
         Inscripcion inscripcion = inscripcionRepository
                 .findByEventoIdAndVecinoId(eventoId, vecino.getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No tienes una inscripcion confirmada para este evento"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No tienes una inscripcion para este evento"));
 
         if (inscripcion.getEstadoInscripcion() == EstadoInscripcion.CANCELADA) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "La inscripcion ya se encuentra cancelada");
         }
 
         inscripcion.setEstadoInscripcion(EstadoInscripcion.CANCELADA);
+        inscripcion.setFechaCancelacion(Instant.now());
         codigoQrService.revocarQrsActivosPorInscripcion(inscripcion.getId());
 
         return toResponse(inscripcion);
     }
 
     private InscripcionEventoResponse resolverInscripcionExistente(Inscripcion inscripcion, Evento evento, Vecino vecino) {
-        if (inscripcion.getEstadoInscripcion() == EstadoInscripcion.CONFIRMADA) {
+        if (inscripcion.getEstadoInscripcion() == EstadoInscripcion.CONFIRMADA
+                || inscripcion.getEstadoInscripcion() == EstadoInscripcion.PENDIENTE_PAGO
+                || inscripcion.getEstadoInscripcion() == EstadoInscripcion.PAGO_OBSERVADO) {
             return toResponse(inscripcion);
         }
 
@@ -89,8 +105,13 @@ public class InscripcionEventoService {
             return reactivarInscripcion(inscripcion, evento, vecino);
         }
 
+        if (requierePago(evento)) {
+            inscripcion.setEstadoInscripcion(EstadoInscripcion.PENDIENTE_PAGO);
+            return toResponse(inscripcionRepository.save(inscripcion));
+        }
+
         inscripcion.setEstadoInscripcion(EstadoInscripcion.CONFIRMADA);
-        return toResponse(inscripcion);
+        return guardarConfirmadaYNotificar(inscripcion);
     }
 
     private InscripcionEventoResponse registrarNuevaInscripcion(Evento evento, Vecino vecino) {
@@ -103,9 +124,13 @@ public class InscripcionEventoService {
         inscripcion.setFechaInscripcion(ahora.toInstant());
         inscripcion.setOrigenInscripcion("PORTAL_PUBLICO");
         inscripcion.setCodigoInscripcion(generarCodigoInscripcion(evento, vecino, ahora.toInstant()));
-        inscripcion.setEstadoInscripcion(EstadoInscripcion.CONFIRMADA);
-        System.out.println(EstadoInscripcion.CONFIRMADA);
 
+        if (requierePago(evento)) {
+            inscripcion.setEstadoInscripcion(EstadoInscripcion.PENDIENTE_PAGO);
+            return toResponse(inscripcionRepository.save(inscripcion));
+        }
+
+        inscripcion.setEstadoInscripcion(EstadoInscripcion.CONFIRMADA);
         return guardarConfirmadaYNotificar(inscripcion);
     }
 
@@ -116,15 +141,27 @@ public class InscripcionEventoService {
         inscripcion.setFechaInscripcion(ahora);
         inscripcion.setOrigenInscripcion("PORTAL_PUBLICO");
         inscripcion.setCodigoInscripcion(generarCodigoInscripcion(evento, vecino, ahora));
-        inscripcion.setEstadoInscripcion(EstadoInscripcion.CONFIRMADA);
+        inscripcion.setMotivoCancelacion(null);
+        inscripcion.setObservacionCancelacion(null);
+        inscripcion.setFechaCancelacion(null);
 
+        if (requierePago(evento)) {
+            inscripcion.setEstadoInscripcion(EstadoInscripcion.PENDIENTE_PAGO);
+            return toResponse(inscripcionRepository.save(inscripcion));
+        }
+
+        inscripcion.setEstadoInscripcion(EstadoInscripcion.CONFIRMADA);
         return guardarConfirmadaYNotificar(inscripcion);
     }
 
     private InscripcionEventoResponse guardarConfirmadaYNotificar(Inscripcion inscripcion) {
         Inscripcion guardada = inscripcionRepository.save(inscripcion);
-        CodigoQrResponseDto qr = codigoQrService.generarQrParaInscripcion(guardada.getId());
-        vecinoNotificacionService.enviarConstanciaInscripcion(guardada, qr.qrDataUrl());
+        if (requiereControlAsistencia(guardada.getEvento())) {
+            CodigoQrResponseDto qr = codigoQrService.generarQrParaInscripcion(guardada.getId());
+            vecinoNotificacionService.enviarConstanciaInscripcion(guardada, qr.qrDataUrl());
+        } else {
+            vecinoNotificacionService.enviarConstanciaInscripcion(guardada);
+        }
         return toResponse(guardada);
     }
 
@@ -148,6 +185,26 @@ public class InscripcionEventoService {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "El evento ya no tiene cupos disponibles");
             }
         }
+    }
+
+    private boolean requierePago(Evento evento) {
+        return evento != null && evento.getRequierePago() != null && evento.getRequierePago() == 1;
+    }
+
+    private boolean requiereInscripcion(Evento evento) {
+        if (evento == null) {
+            return true;
+        }
+        if (evento.getRequiereInscripcion() != null) {
+            return evento.getRequiereInscripcion() == 1;
+        }
+        return requiereControlAsistencia(evento) || requierePago(evento);
+    }
+
+    private boolean requiereControlAsistencia(Evento evento) {
+        return evento != null
+                && evento.getRequiereControlAsistencia() != null
+                && evento.getRequiereControlAsistencia() == 1;
     }
 
     private Vecino obtenerVecinoAutenticado() {
@@ -174,6 +231,9 @@ public class InscripcionEventoService {
         String estado = inscripcion.getEstadoInscripcion() != null
                 ? inscripcion.getEstadoInscripcion().name()
                 : EstadoInscripcion.CONFIRMADA.name();
+        PagoInscripcion pago = inscripcion.getId() != null
+                ? pagoInscripcionRepository.findByInscripcionId(inscripcion.getId()).orElse(null)
+                : null;
 
         return new InscripcionEventoResponse(
                 inscripcion.getId(),
@@ -183,7 +243,13 @@ public class InscripcionEventoService {
                 inscripcion.getVecino().getNombre(),
                 inscripcion.getCodigoInscripcion(),
                 inscripcion.getFechaInscripcion(),
-                estado
+                estado,
+                pago != null ? pago.getId() : null,
+                pago != null ? pago.getEstadoPago() : null,
+                pago != null ? pago.getObservacion() : null,
+                pago != null ? pago.getUrlComprobante() : null,
+                inscripcion.getMotivoCancelacion(),
+                inscripcion.getObservacionCancelacion()
         );
     }
 }

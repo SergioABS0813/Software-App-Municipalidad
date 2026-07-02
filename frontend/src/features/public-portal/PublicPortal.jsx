@@ -25,8 +25,16 @@ import {
   recuperarContrasena,
   obtenerPerfilVecino,
   actualizarPerfilVecino,
+  subirComprobantePago,
 } from '../../services/publicPortalService';
 import LoadingButton from '../../components/feedback/LoadingButton';
+
+const emptyPaymentForm = {
+  medioPago: '',
+  numeroOperacion: '',
+  fechaPago: '',
+  archivo: null,
+};
 
 const institutionalUsers = [
   {
@@ -179,6 +187,7 @@ function normalizePublicEventsPage(response) {
 
 function mapPublicEventFromApi(event, index = 0) {
   const aforoMaximo = event.aforoMaximo ?? null;
+  const cuposDisponibles = event.cuposDisponibles ?? aforoMaximo;
   const venue = event.ubicacionNombre ?? 'Ubicacion por confirmar';
   const address = [event.ubicacionDireccion, event.ubicacionReferencia].filter(Boolean).join(' - ');
   const resources = Array.isArray(event.recursos)
@@ -215,7 +224,7 @@ function mapPublicEventFromApi(event, index = 0) {
     aforoMaximo,
     spots: aforoMaximo ?? 0,
     capacityLabel: aforoMaximo ? `${aforoMaximo} cupos disponibles` : 'Aforo por confirmar',
-    status: aforoMaximo ? 'Inscripcion abierta' : 'Entrada disponible',
+    status: requiresRegistration ? (aforoMaximo ? 'Inscripcion abierta' : 'Entrada disponible') : 'Ingreso libre',
     descripcion_breve: event.descripcionBreve ?? '',
     summary: event.descripcionBreve ?? event.descripcion ?? '',
     accent: portalAccentOptions[index % portalAccentOptions.length],
@@ -238,6 +247,11 @@ function mapPublicEventFromApi(event, index = 0) {
     recursos: resources,
     latitude: event.latitud,
     longitude: event.longitud,
+    requiresRegistration,
+    requiresAttendanceControl: requiresControl,
+    requiresPayment,
+    paymentCost: event.costo ?? event.costoReferencial ?? null,
+    paymentInstructions: event.instruccionesPago ?? '',
   };
 }
 function getCurrentInternalPath() {
@@ -421,6 +435,10 @@ function PublicPortal() {
   const [detailOriginPath, setDetailOriginPath] = useState(eventsListPath);
   const [loginNotice, setLoginNotice] = useState('');
   const [sessionExpiredMessage, setSessionExpiredMessage] = useState('');
+  const [paymentForm, setPaymentForm] = useState(emptyPaymentForm);
+  const [paymentError, setPaymentError] = useState('');
+  const [paymentNotice, setPaymentNotice] = useState('');
+  const [isUploadingPaymentReceipt, setIsUploadingPaymentReceipt] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -665,7 +683,7 @@ function PublicPortal() {
     const inscriptionId = selectedEventRegistration?.id;
     const isConfirmed = selectedEventRegistration?.estado === 'CONFIRMADA';
 
-    if (!inscriptionId || !isConfirmed) {
+    if (!inscriptionId || !isConfirmed || selectedEvent?.requiresAttendanceControl === false) {
       setRegistrationQrDataUrl('');
       setRegistrationQrError('');
       setIsLoadingRegistrationQr(false);
@@ -703,7 +721,7 @@ function PublicPortal() {
     return () => {
       isMounted = false;
     };
-  }, [selectedEventRegistration?.estado, selectedEventRegistration?.id]);
+  }, [selectedEvent?.requiresAttendanceControl, selectedEventRegistration?.estado, selectedEventRegistration?.id]);
 
   const filteredEvents = portalEvents;
 
@@ -740,6 +758,10 @@ function PublicPortal() {
     setIsLoadingRegistrationStatus(false);
     setRegistrationActionError('');
     setLoginNotice('');
+    setPaymentForm(emptyPaymentForm);
+    setPaymentError('');
+    setPaymentNotice('');
+    setIsUploadingPaymentReceipt(false);
     setDetailOriginPath(from);
     window.history.pushState(
       { from },
@@ -766,6 +788,10 @@ function PublicPortal() {
     setIsLoadingRegistrationStatus(false);
     setRegistrationActionError('');
     setLoginNotice('');
+    setPaymentForm(emptyPaymentForm);
+    setPaymentError('');
+    setPaymentNotice('');
+    setIsUploadingPaymentReceipt(false);
     window.history.pushState(null, '', fallbackPath);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -789,34 +815,48 @@ function PublicPortal() {
 
     setIsSubmittingRegistration(true);
     setRegistrationError('');
+    setPaymentError('');
+    setPaymentNotice('');
 
     try {
       const response = await inscribirEventoPublicado(selectedEvent.id);
       const inscriptionId = response?.id;
-      let qrDataUrl = '';
-      let qrError = '';
+      const isConfirmed = response?.estado === 'CONFIRMADA';
 
+      setSelectedEventRegistration(response);
       setReceiptCode(response.codigoInscripcion ?? `EC-${selectedEvent.id}`);
       setReceiptQrDataUrl('');
       setReceiptQrError('');
+      setIsConfirmOpen(false);
 
-      if (inscriptionId) {
-        try {
-          const qrResponse = await obtenerQrActivoInscripcion(inscriptionId);
-          qrDataUrl = qrResponse?.qrDataUrl ?? '';
-          qrError = qrDataUrl ? '' : 'No se recibio la imagen del codigo QR.';
-        } catch (qrRequestError) {
-          console.error('No se pudo cargar el QR de la inscripcion.', qrRequestError);
-          qrError = getApiErrorMessage(qrRequestError, 'No se pudo cargar el codigo QR.');
+      if (!isConfirmed) {
+        setIsRegistered(false);
+        setPaymentNotice('Tu preinscripcion fue registrada. Sube tu comprobante para que el administrador valide el pago.');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
+      let qrDataUrl = '';
+      let qrError = '';
+
+      if (selectedEvent.requiresAttendanceControl !== false) {
+        if (inscriptionId) {
+          try {
+            const qrResponse = await obtenerQrActivoInscripcion(inscriptionId);
+            qrDataUrl = qrResponse?.qrDataUrl ?? '';
+            qrError = qrDataUrl ? '' : 'No se recibio la imagen del codigo QR.';
+          } catch (qrRequestError) {
+            console.error('No se pudo cargar el QR de la inscripcion.', qrRequestError);
+            qrError = getApiErrorMessage(qrRequestError, 'No se pudo cargar el codigo QR.');
+          }
+        } else {
+          qrError = 'No se recibio el identificador de la inscripcion para cargar el QR.';
         }
-      } else {
-        qrError = 'No se recibio el identificador de la inscripcion para cargar el QR.';
       }
 
       setReceiptQrDataUrl(qrDataUrl);
       setReceiptQrError(qrError);
       setIsRegistered(true);
-      setIsConfirmOpen(false);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       setRegistrationError(getApiErrorMessage(error, 'No se pudo registrar tu inscripcion.'));
@@ -825,6 +865,55 @@ function PublicPortal() {
     }
   }
 
+  function handlePaymentFieldChange(field, value) {
+    setPaymentForm((currentForm) => ({
+      ...currentForm,
+      [field]: value,
+    }));
+    setPaymentError('');
+  }
+
+  function handlePaymentFileChange(file) {
+    setPaymentForm((currentForm) => ({
+      ...currentForm,
+      archivo: file,
+    }));
+    setPaymentError('');
+  }
+
+  async function submitPaymentReceipt(event) {
+    event.preventDefault();
+
+    if (!selectedEventRegistration?.id || isUploadingPaymentReceipt) {
+      return;
+    }
+
+    if (selectedEventRegistration?.estadoPago === 'EN_REVISION') {
+      setPaymentError('Tu comprobante ya fue enviado y esta pendiente de revision.');
+      return;
+    }
+
+    if (!paymentForm.medioPago.trim() || !paymentForm.numeroOperacion.trim() || !paymentForm.fechaPago || !paymentForm.archivo) {
+      setPaymentError('Completa el medio de pago, numero de operacion, fecha y comprobante.');
+      return;
+    }
+
+    setIsUploadingPaymentReceipt(true);
+    setPaymentError('');
+    setPaymentNotice('');
+
+    try {
+      await subirComprobantePago(selectedEventRegistration.id, paymentForm);
+      const updatedRegistration = await obtenerInscripcionActualEvento(selectedEvent.id);
+      setSelectedEventRegistration(updatedRegistration);
+      setPaymentForm(emptyPaymentForm);
+      setPaymentNotice('Comprobante enviado. El administrador revisara el pago y recibiras la confirmacion en tu correo.');
+    } catch (error) {
+      setPaymentError(getApiErrorMessage(error, 'No se pudo enviar el comprobante.'));
+    } finally {
+      setIsUploadingPaymentReceipt(false);
+    }
+  }
   async function cancelEventRegistration() {
     if (!selectedEvent || isCancellingRegistration) {
       return;
@@ -868,6 +957,10 @@ function PublicPortal() {
 
     setIsLoginRequiredOpen(false);
     setLoginNotice('');
+    setPaymentForm(emptyPaymentForm);
+    setPaymentError('');
+    setPaymentNotice('');
+    setIsUploadingPaymentReceipt(false);
     setIsConfirmOpen(false);
     setAuthError('');
     setAuthMode('login');
@@ -896,6 +989,10 @@ function PublicPortal() {
 
   function openRegister() {
     setLoginNotice('');
+    setPaymentForm(emptyPaymentForm);
+    setPaymentError('');
+    setPaymentNotice('');
+    setIsUploadingPaymentReceipt(false);
     setSelectedEvent(null);
     setIsConfirmOpen(false);
     setIsLoginRequiredOpen(false);
@@ -911,6 +1008,10 @@ function PublicPortal() {
 
   function openRecoverPassword() {
     setLoginNotice('');
+    setPaymentForm(emptyPaymentForm);
+    setPaymentError('');
+    setPaymentNotice('');
+    setIsUploadingPaymentReceipt(false);
     setCurrentView('recoverPassword');
     setSelectedEvent(null);
     setIsConfirmOpen(false);
@@ -939,6 +1040,10 @@ function PublicPortal() {
     setIsConfirmOpen(false);
     setIsLoginRequiredOpen(false);
     setLoginNotice('');
+    setPaymentForm(emptyPaymentForm);
+    setPaymentError('');
+    setPaymentNotice('');
+    setIsUploadingPaymentReceipt(false);
     window.history.pushState(null, '', eventsListPath);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -974,6 +1079,10 @@ function PublicPortal() {
 
       setAuthenticatedUser(citizenUser);
       setLoginNotice('');
+    setPaymentForm(emptyPaymentForm);
+    setPaymentError('');
+    setPaymentNotice('');
+    setIsUploadingPaymentReceipt(false);
       setCurrentView('portal');
       setSelectedEvent(redirectEvent ?? null);
       setIsConfirmOpen(false);
@@ -987,6 +1096,10 @@ function PublicPortal() {
     setAuthenticatedUser(user);
     clearCitizenSession();
     setLoginNotice('');
+    setPaymentForm(emptyPaymentForm);
+    setPaymentError('');
+    setPaymentNotice('');
+    setIsUploadingPaymentReceipt(false);
     const viewByRole = {
       ADMINISTRADOR: 'admin',
       DIRECTIVO: 'directivo',
@@ -1086,8 +1199,15 @@ function PublicPortal() {
               registrationQrError={registrationQrError}
               registrationStatus={selectedEventRegistration?.estado ?? 'NO_INSCRITO'}
               isLoadingRegistrationQr={isLoadingRegistrationQr}
+              paymentForm={paymentForm}
+              paymentError={paymentError}
+              paymentNotice={paymentNotice}
+              isUploadingPaymentReceipt={isUploadingPaymentReceipt}
               onBack={closeEventDetail}
               onCancelRegistration={cancelEventRegistration}
+              onPaymentFieldChange={handlePaymentFieldChange}
+              onPaymentFileChange={handlePaymentFileChange}
+              onPaymentSubmit={submitPaymentReceipt}
               onSubmit={submitRegistration}
             />
           )}
@@ -2475,6 +2595,7 @@ function RegistrationReceipt({ event, receiptCode, qrDataUrl, qrError, registrat
     [user?.nombres, user?.apellidos].filter(Boolean).join(' ') ||
     'Sergio André Bustamante Villanueva';
   const participantDni = registration.documentNumber || user?.dni || '12345678';
+  const requiresAttendanceControl = event.requiresAttendanceControl !== false;
 
   function downloadReceipt() {
     // TODO: conectar con endpoint de descarga de constancia cuando exista backend.
@@ -2489,20 +2610,23 @@ function RegistrationReceipt({ event, receiptCode, qrDataUrl, qrError, registrat
             <span className="section-kicker">Constancia de inscripción</span>
             <h1 id="receipt-title">Inscripción confirmada</h1>
             <p>
-              Tu reserva fue registrada correctamente. Presenta el código QR el
-              día del evento.
+              {requiresAttendanceControl
+                ? 'Tu reserva fue registrada correctamente. Presenta el codigo QR el dia del evento.'
+                : 'Tu reserva fue registrada correctamente. Conserva este codigo como constancia.'}
             </p>
           </div>
-          {qrDataUrl ? (
-            <img
-              alt={`Codigo QR de la inscripcion ${receiptCode}`}
-              className="qr-preview"
-              src={qrDataUrl}
-            />
-          ) : (
-            <div className="qr-preview qr-placeholder" role="status">
-              <span>{qrError || 'QR no disponible'}</span>
-            </div>
+          {requiresAttendanceControl && (
+            qrDataUrl ? (
+              <img
+                alt={`Codigo QR de la inscripcion ${receiptCode}`}
+                className="qr-preview"
+                src={qrDataUrl}
+              />
+            ) : (
+              <div className="qr-preview qr-placeholder" role="status">
+                <span>{qrError || 'QR no disponible'}</span>
+              </div>
+            )
           )}
         </header>
 

@@ -2023,7 +2023,7 @@ function openReportPdf(report) {
           <div class="card"><span>Inscritos</span><strong>${report.registered}</strong></div>
           <div class="card"><span>Asistentes</span><strong>${report.totalAttendance}</strong></div>
           <div class="card"><span>Tasa asistencia</span><strong>${report.turnoutRate}%</strong></div>
-          <div class="card"><span>${report.usedCapacityRate === null ? 'ValidaciÃ³n digital' : 'Aforo utilizado'}</span><strong>${report.usedCapacityRate === null ? report.digitalValidationRate : report.usedCapacityRate}%</strong></div>
+          <div class="card"><span>${report.usedCapacityRate === null ? 'Validación digital' : 'Aforo utilizado'}</span><strong>${report.usedCapacityRate === null ? report.digitalValidationRate : report.usedCapacityRate}%</strong></div>
         </section>
         <h2>Indicadores de control</h2>
         <table>

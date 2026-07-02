@@ -11,6 +11,7 @@ public record EventoReporteDirectivoDto(
         LocalDateTime fechaHoraFin,
         LocalDateTime finalizadoEn,
         String estadoCodigo,
+        Boolean requiereInscripcion,
         Boolean requiereControlAsistencia,
         Boolean encuestaSatisfaccionHabilitada,
         Integer totalInscritos,
@@ -22,6 +23,9 @@ public record EventoReporteDirectivoDto(
         Double promedioSatisfaccion,
         Integer totalValoraciones,
         Float costoReferencial,
+        Boolean requierePago,
+        Float costoVecinal,
+        String instruccionesPago,
         Integer aforoMaximo,
         String metaTipo,
         Float metaValor

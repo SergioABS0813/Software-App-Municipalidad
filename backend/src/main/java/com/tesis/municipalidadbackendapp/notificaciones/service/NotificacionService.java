@@ -156,7 +156,7 @@ public class NotificacionService {
     public void notificarEventoPublicadoAdministradores(Evento evento, Usuario directivo, BitacoraAccion bitacoraAccion) {
         notificarAdministradores(
                 "Evento publicado",
-                "%s publicó el evento \"%s\".".formatted(nombreUsuario(directivo), tituloEvento(evento)),
+                "%s publico el evento \"%s\".".formatted(nombreUsuario(directivo), tituloEvento(evento)),
                 "EVENTO_PUBLICADO",
                 "/admin/eventos/%d/detalle".formatted(evento.getId()),
                 directivo,
@@ -164,14 +164,15 @@ public class NotificacionService {
         );
     }
 
-    public void notificarEventoCanceladoAdministradores(Evento evento, Usuario directivo, BitacoraAccion bitacoraAccion) {
+    public void notificarEventoCanceladoAdministradores(Evento evento, Usuario usuario, BitacoraAccion bitacoraAccion) {
         notificarAdministradores(
                 "Evento cancelado",
-                "%s canceló el evento \"%s\".".formatted(nombreUsuario(directivo), tituloEvento(evento)),
+                "%s cancelo el evento \"%s\".".formatted(nombreUsuario(usuario), tituloEvento(evento)),
                 "EVENTO_CANCELADO",
                 "/admin/eventos/%d/detalle".formatted(evento.getId()),
-                directivo,
-                bitacoraAccion
+                usuario,
+                bitacoraAccion,
+                true
         );
     }
 

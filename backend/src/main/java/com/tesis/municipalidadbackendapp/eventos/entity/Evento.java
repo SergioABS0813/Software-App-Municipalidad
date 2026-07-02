@@ -94,6 +94,9 @@ public class Evento {
     @Column(name = "requiere_control_asistencia", nullable = false)
     private Byte requiereControlAsistencia = 1;
 
+    @Column(name = "requiere_inscripcion", nullable = false)
+    private Byte requiereInscripcion = 1;
+
     @Column(name = "motivo_cancelacion", columnDefinition = "TEXT")
     private String motivoCancelacion;
 
@@ -103,6 +106,15 @@ public class Evento {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_cancelacion_id")
     private Usuario usuarioCancelacion;
+
+    @Column(name="requiere_pago")
+    private Byte requierePago;
+
+    @Column(name="costo_vecinal")
+    private Float costoVecinal;
+
+    @Column(name="instrucciones_pago", columnDefinition = "TEXT")
+    private String instruccionesPago;
 
 
 }

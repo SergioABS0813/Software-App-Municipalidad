@@ -1234,6 +1234,359 @@
   grid-template-columns: minmax(240px, 1fr) 220px;
 }
 
+.payments-validation-panel .admin-panel-heading {
+  align-items: center;
+}
+
+.payments-refresh-button {
+  align-items: center;
+  background: var(--brand-soft);
+  border: 1px solid rgba(10, 86, 194, 0.16);
+  border-radius: 999px;
+  box-shadow: 0 10px 24px rgba(10, 86, 194, 0.06);
+  color: #0284c7;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 850;
+  height: 40px;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0;
+  position: relative;
+  width: 40px;
+}
+
+.payments-refresh-button svg {
+  fill: none;
+  height: 18px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 18px;
+}
+
+.payment-open-file-button {
+  align-items: center;
+  background: var(--brand-soft);
+  border: 1px solid rgba(10, 86, 194, 0.16);
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(10, 86, 194, 0.06);
+  color: #0284c7;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 850;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  text-decoration: none;
+}
+
+.payment-open-file-button:hover,
+.payment-open-file-button:focus-visible {
+  border-color: rgba(10, 86, 194, 0.28);
+  box-shadow: 0 12px 26px rgba(10, 86, 194, 0.11);
+  outline: none;
+}
+
+.payments-refresh-button:hover,
+.payments-refresh-button:focus-visible {
+  border-color: rgba(10, 86, 194, 0.28);
+  box-shadow: 0 12px 26px rgba(10, 86, 194, 0.11);
+  outline: none;
+}
+
+.payments-refresh-button:disabled {
+  background: #edf3f8;
+  border-color: var(--color-border);
+  box-shadow: none;
+  color: #6c8198;
+  cursor: not-allowed;
+}
+
+.payments-filter-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 220px) minmax(210px, 250px);
+  margin: 18px 0 16px;
+}
+
+.payments-filter-grid label {
+  color: #24415f;
+  display: grid;
+  gap: 7px;
+  font-size: 0.8rem;
+  font-weight: 680;
+}
+
+.payments-filter-grid input,
+.payments-filter-grid select {
+  background: var(--brand-soft);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: #294766;
+  font: inherit;
+  font-weight: 620;
+  min-height: 42px;
+  min-width: 0;
+  padding: 0 12px;
+}
+
+.payments-filter-grid input::placeholder {
+  color: #6c8198;
+  font-weight: 500;
+  opacity: 1;
+}
+
+.payments-filter-grid input:focus,
+.payments-filter-grid select:focus {
+  border-color: rgba(2, 132, 199, 0.42);
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
+  outline: none;
+}
+
+.payment-detail-topbar {
+  align-items: end;
+}
+
+.payment-detail-topbar .detail-back-link {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: #526b85;
+  cursor: pointer;
+  display: inline-flex;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 750;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 0;
+  width: fit-content;
+}
+
+.payment-detail-topbar .detail-back-link:hover,
+.payment-detail-topbar .detail-back-link:focus-visible {
+  color: var(--brand-primary);
+  outline: none;
+}
+
+.payments-validation-table {
+  overflow-x: visible;
+}
+
+.payments-validation-table .admin-table-row {
+  gap: 12px;
+  grid-template-columns: minmax(0, 30fr) minmax(0, 35fr) minmax(0, 17fr) minmax(0, 12fr) minmax(38px, 6fr);
+  min-width: 0;
+}
+
+.payments-validation-table .admin-table-row > span {
+  min-width: 0;
+}
+
+.payments-validation-table .admin-table-row > span:nth-child(4),
+.payments-validation-table .admin-table-row > span:last-child {
+  justify-self: start;
+}
+
+.payment-validation-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+.payment-validation-actions .table-icon-action {
+  min-width: 38px;
+  padding: 0;
+  text-decoration: none;
+}
+.payment-review-detail {
+  align-items: start;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  margin-top: 20px;
+}
+
+.payment-receipt-preview {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.payment-receipt-toolbar {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.payment-receipt-toolbar h2 {
+  color: var(--color-text-strong);
+  font-size: 1.28rem;
+  line-height: 1.2;
+  margin: 5px 0 0;
+}
+
+.payment-receipt-frame {
+  align-items: center;
+  background: #f8fbfd;
+  border: 1px solid #dbe6ef;
+  border-radius: 8px;
+  display: flex;
+  justify-content: center;
+  min-height: 520px;
+  overflow: hidden;
+  padding: 14px;
+}
+
+.payment-receipt-frame iframe,
+.payment-receipt-frame img {
+  background: #ffffff;
+  border: 0;
+  border-radius: 6px;
+  display: block;
+  height: 500px;
+  max-height: 70vh;
+  max-width: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+.payment-receipt-frame img {
+  width: auto;
+}
+
+.payment-receipt-frame span {
+  color: var(--color-text-muted);
+  font-weight: 700;
+}
+
+.payment-review-summary {
+  background: #f8fbfd;
+  border: 1px solid #dbe6ef;
+  border-radius: 8px;
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.payment-review-summary dl {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.payment-review-summary dl > div {
+  border-top: 1px solid #e2e8f0;
+  display: grid;
+  gap: 5px;
+  padding-top: 12px;
+}
+
+.payment-review-summary dl > div:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.payment-review-summary dt {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.payment-review-summary dd {
+  color: #334f6b;
+  display: grid;
+  gap: 3px;
+  font-size: 0.92rem;
+  font-weight: 650;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.payment-review-summary dd strong {
+  color: var(--color-text-strong);
+  font-size: 0.98rem;
+  font-weight: 760;
+}
+
+.payment-review-summary dd small {
+  color: #6c8198;
+  font-size: 0.78rem;
+  font-weight: 520;
+}
+
+.payment-review-actions {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.payment-review-actions .primary-button {
+  min-height: 42px;
+}
+
+.payment-review-actions .table-text-action {
+  align-items: center;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 850;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 18px;
+  width: 100%;
+}
+
+.payment-review-actions .table-text-action.observe {
+  background: #fff4ed;
+  border: 1px solid rgba(194, 65, 12, 0.16);
+  color: #c2410c;
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+}
+
+.payment-review-actions .table-text-action.observe:hover,
+.payment-review-actions .table-text-action.observe:focus-visible {
+  background: #ffeadc;
+  border-color: rgba(194, 65, 12, 0.28);
+  box-shadow: 0 10px 22px rgba(194, 65, 12, 0.12);
+  color: #9a3412;
+  outline: none;
+}
+
+.payment-review-actions .table-text-action.observe:disabled:hover {
+  background: #fff4ed;
+  border-color: rgba(194, 65, 12, 0.16);
+  box-shadow: none;
+  color: #c2410c;
+}
+
+.payment-review-actions .table-text-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+@media (max-width: 1100px) {
+  .payments-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .payment-review-detail {
+    grid-template-columns: 1fr;
+  }
+}
 .neighbor-table-panel {
   overflow: visible;
 }
@@ -2869,6 +3222,26 @@
 .admin-public-preview-operatives-button:focus-visible {
   outline: 3px solid rgba(31, 134, 232, 0.18);
   outline-offset: 2px;
+}
+
+.reservation-button.admin-cancel-event-action {
+  background: #fff7f3;
+  border: 1px solid rgba(194, 65, 12, 0.22);
+  color: #c2410c;
+}
+
+.reservation-button.admin-cancel-event-action:hover,
+.reservation-button.admin-cancel-event-action:focus-visible {
+  background: #fff0eb;
+  border-color: rgba(194, 65, 12, 0.34);
+  color: #9a3412;
+}
+
+.reservation-button.admin-cancel-event-action:disabled,
+.reservation-button.admin-cancel-event-action:disabled:hover {
+  background: #f4ebe7;
+  border-color: rgba(154, 52, 18, 0.16);
+  color: #9b7a6d;
 }
 
 .admin-public-preview-operatives-popover {

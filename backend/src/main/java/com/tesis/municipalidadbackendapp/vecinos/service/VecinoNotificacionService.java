@@ -122,10 +122,13 @@ public class VecinoNotificacionService {
                 : "Por confirmar";
         String qrContentId = "qrInscripcion" + inscripcion.getId();
         InlineImage qrImage = construirQrInlineImage(qrDataUrl, qrContentId);
-        if (qrImage == null) {
+        if (StringUtils.hasText(qrDataUrl) && qrImage == null) {
             log.warn("No se adjunto QR en correo de inscripcion. inscripcionId={}", inscripcion.getId());
         }
         String qrHtml = construirQrInscripcionHtml(qrImage);
+        String instruccionIngreso = qrImage != null
+                ? "Presenta este codigo o el QR el dia del evento para validar tu participacion."
+                : "Conserva este codigo como constancia de tu inscripcion.";
 
         enviarCorreoHtml(
                 emailDestino,
@@ -141,7 +144,7 @@ public class VecinoNotificacionService {
                           <tr><td style="padding:10px 0;color:#526b85;">Lugar</td><td style="padding:10px 0;">%s</td></tr>
                           <tr><td style="padding:10px 0;color:#526b85;">Direccion</td><td style="padding:10px 0;">%s</td></tr>
                         </table>
-                        <p>Presenta este codigo o el QR el dia del evento para validar tu participacion.</p>
+                        <p>%s</p>
                         %s
                         """.formatted(
                                 escapeHtml(StringUtils.hasText(inscripcion.getVecino().getNombre()) ? inscripcion.getVecino().getNombre() : "vecino"),
@@ -150,6 +153,7 @@ public class VecinoNotificacionService {
                                 escapeHtml(fechaEvento),
                                 escapeHtml(ubicacion),
                                 escapeHtml(direccion),
+                                escapeHtml(instruccionIngreso),
                                 qrHtml
                         )
                 ),
@@ -172,6 +176,9 @@ public class VecinoNotificacionService {
         String ubicacion = evento.getUbicacion() != null && StringUtils.hasText(evento.getUbicacion().getNombre())
                 ? evento.getUbicacion().getNombre()
                 : "Por confirmar";
+        String mensajeCancelacion = requiereControlAsistencia(evento)
+                ? "Tu inscripcion y el codigo QR asociado quedaron cancelados automaticamente."
+                : "Tu inscripcion quedo cancelada automaticamente.";
 
         enviarCorreoHtml(
                 emailDestino,
@@ -186,16 +193,143 @@ public class VecinoNotificacionService {
                           <tr><td style="padding:8px 0;color:#526b85;">Lugar</td><td style="padding:8px 0;color:#0f172a;">%s</td></tr>
                           <tr><td style="padding:8px 0;color:#526b85;">Motivo</td><td style="padding:8px 0;color:#0f172a;">%s</td></tr>
                         </table>
-                        <p style="margin:0;">Tu inscripcion y el codigo QR asociado quedaron cancelados automaticamente.</p>
+                        <p style="margin:0;">%s</p>
                         """.formatted(
                                 escapeHtml(StringUtils.hasText(inscripcion.getVecino().getNombre()) ? inscripcion.getVecino().getNombre() : "vecino"),
                                 escapeHtml(evento.getTitulo()),
                                 escapeHtml(fechaEvento),
                                 escapeHtml(ubicacion),
-                                escapeHtml(motivo)
+                                escapeHtml(motivo),
+                                escapeHtml(mensajeCancelacion)
                         )
                 )
         );
+    }
+
+    public void enviarCorreoComprobantePagoRecibido(Inscripcion inscripcion) {
+        if (inscripcion == null || inscripcion.getVecino() == null || inscripcion.getEvento() == null) {
+            return;
+        }
+        String emailDestino = inscripcion.getVecino().getEmail();
+        if (!StringUtils.hasText(emailDestino)) {
+            return;
+        }
+        Evento evento = inscripcion.getEvento();
+        String fechaEvento = formatDateTime(evento.getFechaHoraInicio());
+        String ubicacion = evento.getUbicacion() != null && StringUtils.hasText(evento.getUbicacion().getNombre())
+                ? evento.getUbicacion().getNombre()
+                : "Por confirmar";
+        enviarCorreoHtml(
+                emailDestino,
+                "Comprobante recibido - " + evento.getTitulo(),
+                construirPlantillaHtml(
+                        "Comprobante recibido",
+                        """
+                        <p style="margin:0 0 14px;">Hola <strong>%s</strong>,</p>
+                        <p style="margin:0 0 14px;">Recibimos tu comprobante de pago para el evento <strong>%s</strong>.</p>
+                        <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%%;margin:16px 0;border-collapse:collapse;font-size:14px;background:#ffffff;">
+                          <tr><td style="padding:7px 0;color:#526b85;width:135px;">Fecha y hora</td><td style="padding:7px 0;color:#0f172a;">%s</td></tr>
+                          <tr><td style="padding:7px 0;color:#526b85;">Lugar</td><td style="padding:7px 0;color:#0f172a;">%s</td></tr>
+                          <tr><td style="padding:7px 0;color:#526b85;">Codigo</td><td style="padding:7px 0;color:#0f172a;font-weight:800;">%s</td></tr>
+                        </table>
+                        <p style="margin:0 0 14px;">La Municipalidad verificara el comprobante en las proximas horas. Cuando sea validado, tu inscripcion quedara confirmada en la plataforma.</p>
+                        <p style="margin:0;">Si el comprobante necesita correccion, te enviaremos una observacion por este mismo medio.</p>
+                        """.formatted(
+                                escapeHtml(nombreVecino(inscripcion)),
+                                escapeHtml(evento.getTitulo()),
+                                escapeHtml(fechaEvento),
+                                escapeHtml(ubicacion),
+                                escapeHtml(inscripcion.getCodigoInscripcion())
+                        )
+                )
+        );
+    }
+    public void enviarCorreoPagoObservado(Inscripcion inscripcion, String observacion) {
+        if (inscripcion == null || inscripcion.getVecino() == null || inscripcion.getEvento() == null) {
+            return;
+        }
+        String emailDestino = inscripcion.getVecino().getEmail();
+        if (!StringUtils.hasText(emailDestino)) {
+            return;
+        }
+        enviarCorreoHtml(
+                emailDestino,
+                "Comprobante observado - " + inscripcion.getEvento().getTitulo(),
+                construirPlantillaHtml(
+                        "Comprobante observado",
+                        """
+                        <p style="margin:0 0 14px;">Hola <strong>%s</strong>,</p>
+                        <p style="margin:0 0 14px;">La Municipalidad reviso tu comprobante para el evento <strong>%s</strong> y necesita una correccion.</p>
+                        <p style="margin:0 0 14px;background:#fff7f3;border:1px solid #fed7aa;border-radius:8px;padding:12px;color:#9a3412;"><strong>Observacion:</strong> %s</p>
+                        <p style="margin:0;">Puedes volver a subir un comprobante corregido desde el portal ciudadano.</p>
+                        """.formatted(
+                                escapeHtml(nombreVecino(inscripcion)),
+                                escapeHtml(inscripcion.getEvento().getTitulo()),
+                                escapeHtml(observacion)
+                        )
+                )
+        );
+    }
+
+    public void enviarCorreoPagoValidado(Inscripcion inscripcion) {
+        if (inscripcion == null || inscripcion.getVecino() == null || inscripcion.getEvento() == null) {
+            return;
+        }
+        String emailDestino = inscripcion.getVecino().getEmail();
+        if (!StringUtils.hasText(emailDestino)) {
+            return;
+        }
+        enviarCorreoHtml(
+                emailDestino,
+                "Pago validado - " + inscripcion.getEvento().getTitulo(),
+                construirPlantillaHtml(
+                        "Pago validado",
+                        """
+                        <p style="margin:0 0 14px;">Hola <strong>%s</strong>,</p>
+                        <p style="margin:0 0 14px;">Tu pago para el evento <strong>%s</strong> fue validado correctamente.</p>
+                        <p style="margin:0;">Tu inscripcion ya esta confirmada en la plataforma.</p>
+                        """.formatted(
+                                escapeHtml(nombreVecino(inscripcion)),
+                                escapeHtml(inscripcion.getEvento().getTitulo())
+                        )
+                )
+        );
+    }
+
+    public void enviarCorreoInscripcionCanceladaPorAforo(Inscripcion inscripcion, String whatsappReclamos) {
+        if (inscripcion == null || inscripcion.getVecino() == null || inscripcion.getEvento() == null) {
+            return;
+        }
+        String emailDestino = inscripcion.getVecino().getEmail();
+        if (!StringUtils.hasText(emailDestino)) {
+            return;
+        }
+        enviarCorreoHtml(
+                emailDestino,
+                "Inscripcion no confirmada - " + inscripcion.getEvento().getTitulo(),
+                construirPlantillaHtml(
+                        "Inscripcion no confirmada",
+                        """
+                        <p style="margin:0 0 14px;">Hola <strong>%s</strong>,</p>
+                        <p style="margin:0 0 14px;">Tu pago para el evento <strong>%s</strong> fue revisado, pero la inscripcion no pudo confirmarse porque el aforo disponible se completo antes de la validacion.</p>
+                        <p style="margin:0;">Si realizaste un pago y deseas presentar un reclamo u observacion para la devolucion correspondiente, comunicate al WhatsApp: <strong>%s</strong>.</p>
+                        """.formatted(
+                                escapeHtml(nombreVecino(inscripcion)),
+                                escapeHtml(inscripcion.getEvento().getTitulo()),
+                                escapeHtml(whatsappReclamos)
+                        )
+                )
+        );
+    }
+
+    private boolean requiereControlAsistencia(Evento evento) {
+        return evento != null
+                && evento.getRequiereControlAsistencia() != null
+                && evento.getRequiereControlAsistencia() == 1;
+    }
+
+    private String nombreVecino(Inscripcion inscripcion) {
+        return StringUtils.hasText(inscripcion.getVecino().getNombre()) ? inscripcion.getVecino().getNombre() : "vecino";
     }
 
     public void enviarCorreoValoracionEvento(
@@ -217,13 +351,13 @@ public class VecinoNotificacionService {
                         "Valora tu experiencia",
                         """
                         <p>Hola <strong>%s</strong>,</p>
-                        <p>Gracias por asistir al evento <strong>%s</strong>. Tu opiniÃ³n nos ayuda a mejorar las prÃ³ximas actividades municipales.</p>
+                        <p>Gracias por asistir al evento <strong>%s</strong>. Tu opinión nos ayuda a mejorar las próximas actividades municipales.</p>
                         <p style="margin:28px 0;text-align:center;">
                           <a href="%s" style="display:inline-block;background:#0a56c2;color:#ffffff;text-decoration:none;font-weight:800;border-radius:8px;padding:14px 24px;">
-                            PuntÃºa el evento
+                            Puntúa el evento
                           </a>
                         </p>
-                        <p style="color:#2f5276;">La valoraciÃ³n solo toma unos segundos.</p>
+                        <p style="color:#2f5276;">La valoración solo toma unos segundos.</p>
                         """.formatted(
                                 escapeHtml(StringUtils.hasText(nombre) ? nombre : "vecino"),
                                 escapeHtml(tituloEvento),

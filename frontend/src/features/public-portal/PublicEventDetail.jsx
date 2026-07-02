@@ -139,6 +139,18 @@ function formatRegistrationDate(value) {
     year: 'numeric',
   }).format(date);
 }
+function formatPaymentAmount(value) {
+  const amount = Number(value);
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return 'Monto por confirmar';
+  }
+
+  return new Intl.NumberFormat('es-PE', {
+    currency: 'PEN',
+    style: 'currency',
+  }).format(amount);
+}
 function getEventShortDescription(event) {
   return event.descripcion_breve || event.descripcion || event.summary || event.description || '';
 }
@@ -378,6 +390,11 @@ export default function PublicEventDetail({
   registrationQrError = '',
   registrationStatus = 'NO_INSCRITO',
   isLoadingRegistrationQr = false,
+  paymentForm = {},
+  paymentError = '',
+  paymentNotice = '',
+  isUploadingPaymentReceipt = false,
+  reservationActionClassName = '',
   reservationActionDisabled = null,
   reservationActionLabel = 'Reservar un lugar',
   reservationActionLoadingLabel = 'Verificando...',
@@ -385,14 +402,33 @@ export default function PublicEventDetail({
   reservationCardTitle = 'Reserva tu participación',
   onBack,
   onCancelRegistration,
+  onPaymentFieldChange,
+  onPaymentFileChange,
+  onPaymentSubmit,
   onSubmit,
 }) {
   const mapsUrl = getEventMapsUrl(event);
   const scheduleLabel = getEventScheduleLabel(event);
   const availabilityState = getAvailabilityState(event.spots);
   const isRegistrationConfirmed = registrationStatus === 'CONFIRMADA';
+  const isPendingPayment = registrationStatus === 'PENDIENTE_PAGO';
+  const isPaymentObserved = registrationStatus === 'PAGO_OBSERVADO';
+  const isPaymentUnderReview = currentRegistration?.estadoPago === 'EN_REVISION';
+  const requiresRegistration = event.requiresRegistration !== false;
+  const requiresAttendanceControl = event.requiresAttendanceControl !== false;
+  const paymentFileName = paymentForm.archivo?.name ?? '';
+  const paymentFileInputId = `payment-receipt-${event.id}`;
+  const isPaymentFormDisabled = isUploadingPaymentReceipt || isPaymentUnderReview;
+  const isRegistrationCancelled = registrationStatus === 'CANCELADA';
+  const shouldShowPaymentForm = requiresRegistration && event.requiresPayment && (isPendingPayment || isPaymentObserved);
+  const usesCustomReservationActionLabel = reservationActionLabel !== 'Reservar un lugar';
+  const reservationSubmitLabel = usesCustomReservationActionLabel
+    ? reservationActionLabel
+    : requiresRegistration && event.requiresPayment
+      ? 'Preinscribirme'
+      : reservationActionLabel;
   const [isRegistrationDetailOpen, setIsRegistrationDetailOpen] = useState(false);
-  const defaultReservationActionDisabled = isLoadingRegistrationStatus || isCancellingRegistration || (!isRegistrationConfirmed && !availabilityState.isAvailable);
+  const defaultReservationActionDisabled = !requiresRegistration || isLoadingRegistrationStatus || isCancellingRegistration || shouldShowPaymentForm || isRegistrationCancelled || (!isRegistrationConfirmed && !availabilityState.isAvailable);
   const isReservationActionDisabled = reservationActionDisabled ?? defaultReservationActionDisabled;
   const requirementItems = getOrderedTextItems(event.requisitos_evento ?? event.requirements);
   const agendaItems = getOrderedTextItems(event.agenda_evento ?? event.agenda);
@@ -483,6 +519,14 @@ export default function PublicEventDetail({
             </span>
           </div>
 
+          {requiresRegistration && event.requiresPayment && (
+            <section className="event-payment-summary" aria-label="Informacion de pago">
+              <span>Costo del evento</span>
+              <strong>{formatPaymentAmount(event.paymentCost)}</strong>
+              {event.paymentInstructions ? <p>{event.paymentInstructions}</p> : null}
+            </section>
+          )}
+
           <div className="reservation-info-list">
             <div className="reservation-info-row is-muted-value">
               <span className="reservation-icon">
@@ -548,26 +592,116 @@ export default function PublicEventDetail({
             <p className="reservation-error-message" role="alert">{registrationActionError}</p>
           )}
 
-          <form className="reservation-action" onSubmit={onSubmit}>
-            {isRegistrationConfirmed ? (
-              <button
-                className="primary-button reservation-button"
-                disabled={isReservationActionDisabled}
-                type="button"
-                onClick={() => setIsRegistrationDetailOpen((currentValue) => !currentValue)}
-              >
-                {isRegistrationDetailOpen ? 'Ocultar inscripcion' : 'Ver inscripcion'}
-              </button>
-            ) : (
-              <button
-                className="primary-button reservation-button"
-                disabled={isReservationActionDisabled}
-                type="submit"
-              >
-                {isLoadingRegistrationStatus ? reservationActionLoadingLabel : reservationActionLabel}
-              </button>
-            )}
-          </form>
+          {requiresRegistration ? (
+            <form className="reservation-action" onSubmit={onSubmit}>
+              {isRegistrationConfirmed ? (
+                <button
+                  className="primary-button reservation-button"
+                  disabled={isReservationActionDisabled}
+                  type="button"
+                  onClick={() => setIsRegistrationDetailOpen((currentValue) => !currentValue)}
+                >
+                  {isRegistrationDetailOpen ? 'Ocultar inscripcion' : 'Ver inscripcion'}
+                </button>
+              ) : (
+                <button
+                  className={["primary-button", "reservation-button", reservationActionClassName].filter(Boolean).join(" ")}
+                  disabled={isReservationActionDisabled}
+                  type="submit"
+                >
+                  {isLoadingRegistrationStatus ? reservationActionLoadingLabel : reservationSubmitLabel}
+                </button>
+              )}
+            </form>
+          ) : (
+            <section className="payment-status-panel" aria-label="Ingreso libre">
+              <strong>Ingreso libre</strong>
+              <p>No requiere inscripcion previa.</p>
+            </section>
+          )}
+
+          {paymentNotice && (
+            <p className="reservation-status-message" role="status">{paymentNotice}</p>
+          )}
+
+          {isRegistrationCancelled && (
+            <section className="payment-status-panel is-cancelled" aria-label="Inscripcion cancelada">
+              <strong>Inscripcion cancelada</strong>
+              <p>{currentRegistration?.observacionCancelacion || 'No fue posible confirmar esta inscripcion.'}</p>
+              {currentRegistration?.motivoCancelacion === 'AFORO_COMPLETO' && (
+                <small>Si realizaste el pago, comunicate al WhatsApp 999999999 para coordinar la devolucion.</small>
+              )}
+            </section>
+          )}
+
+          {shouldShowPaymentForm && (
+            <section className="payment-upload-panel" aria-label="Comprobante de pago">
+              <div className="payment-upload-heading">
+                <span>{isPaymentObserved ? 'Pago observado' : isPaymentUnderReview ? 'Comprobante enviado' : 'Pago pendiente'}</span>
+                <strong>{isPaymentObserved ? 'Actualiza tu comprobante' : isPaymentUnderReview ? 'En revision municipal' : 'Sube tu comprobante'}</strong>
+                {isPaymentObserved ? (
+                  <p className="payment-observation-message">
+                    <strong>Observacion:</strong> {currentRegistration?.observacionPago || 'El administrador solicito corregir el comprobante.'}
+                  </p>
+                ) : (
+                  <p>
+                    {isPaymentUnderReview
+                      ? 'Tu comprobante ya fue enviado. Espera la revision del administrador para recibir la confirmacion u observacion.'
+                      : 'Validaremos el pago manualmente antes de confirmar tu inscripcion.'}
+                  </p>
+                )}
+              </div>
+              {paymentError && <p className="reservation-error-message" role="alert">{paymentError}</p>}
+              <form className="payment-upload-form" onSubmit={onPaymentSubmit}>
+                <label>
+                  Medio de pago
+                  <input
+                    disabled={isPaymentFormDisabled}
+                    placeholder="Yape, Plin, transferencia..."
+                    type="text"
+                    value={paymentForm.medioPago ?? ''}
+                    onChange={(changeEvent) => onPaymentFieldChange?.('medioPago', changeEvent.target.value)}
+                  />
+                </label>
+                <label>
+                  Numero de operacion
+                  <input
+                    disabled={isPaymentFormDisabled}
+                    placeholder="Codigo o constancia"
+                    type="text"
+                    value={paymentForm.numeroOperacion ?? ''}
+                    onChange={(changeEvent) => onPaymentFieldChange?.('numeroOperacion', changeEvent.target.value)}
+                  />
+                </label>
+                <label>
+                  Fecha de pago
+                  <input
+                    disabled={isPaymentFormDisabled}
+                    type="date"
+                    value={paymentForm.fechaPago ?? ''}
+                    onChange={(changeEvent) => onPaymentFieldChange?.('fechaPago', changeEvent.target.value)}
+                  />
+                </label>
+                <div className="payment-file-field">
+                  <span>Comprobante</span>
+                  <input
+                    accept="application/pdf,image/jpeg,image/png"
+                    disabled={isPaymentFormDisabled}
+                    id={paymentFileInputId}
+                    type="file"
+                    onChange={(changeEvent) => onPaymentFileChange?.(changeEvent.target.files?.[0] ?? null)}
+                  />
+                  <label className="payment-file-trigger" htmlFor={paymentFileInputId}>
+                    Seleccionar comprobante
+                  </label>
+                  <small>{paymentFileName || 'PDF, JPG o PNG'}</small>
+                </div>
+                <button className="primary-button reservation-button" disabled={isPaymentFormDisabled} type="submit">
+                  {isUploadingPaymentReceipt ? 'Enviando...' : isPaymentUnderReview ? 'Comprobante en revision' : 'Enviar comprobante'}
+                </button>
+              </form>
+            </section>
+          )}
 
           {isRegistrationConfirmed && isRegistrationDetailOpen && (
             <section className="registration-summary-panel" aria-label="Datos de tu inscripcion">
@@ -581,18 +715,20 @@ export default function PublicEventDetail({
                   <dd>{formatRegistrationDate(currentRegistration?.fechaInscripcion)}</dd>
                 </div>
               </dl>
-              <div className="registration-summary-qr" aria-live="polite">
-                {isLoadingRegistrationQr ? (
-                  <span>Cargando QR...</span>
-                ) : registrationQrDataUrl ? (
-                  <img
-                    alt={`Codigo QR de la inscripcion ${currentRegistration?.codigoInscripcion ?? ''}`.trim()}
-                    src={registrationQrDataUrl}
-                  />
-                ) : (
-                  <span>{registrationQrError || 'QR no disponible'}</span>
-                )}
-              </div>
+              {requiresAttendanceControl && (
+                <div className="registration-summary-qr" aria-live="polite">
+                  {isLoadingRegistrationQr ? (
+                    <span>Cargando QR...</span>
+                  ) : registrationQrDataUrl ? (
+                    <img
+                      alt={`Codigo QR de la inscripcion ${currentRegistration?.codigoInscripcion ?? ''}`.trim()}
+                      src={registrationQrDataUrl}
+                    />
+                  ) : (
+                    <span>{registrationQrError || 'QR no disponible'}</span>
+                  )}
+                </div>
+              )}
               <button
                 className="primary-button reservation-button reservation-cancel-button"
                 disabled={isCancellingRegistration}

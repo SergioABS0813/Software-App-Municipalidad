@@ -45,7 +45,7 @@ public class CloudStorageService {
                 StringUtils.hasText(archivo.getOriginalFilename()) ? archivo.getOriginalFilename() : "recurso"
         );
         String objectPath = construirObjectPath(eventoId, tipoNormalizado, nombreOriginal);
-        BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(obtenerBucket(), objectPath))
+        BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(obtenerBucketRecursos(), objectPath))
                 .setContentType(archivo.getContentType())
                 .build();
 
@@ -65,18 +65,54 @@ public class CloudStorageService {
         );
     }
 
+    public UploadedObject subirComprobantePago(Integer inscripcionId, MultipartFile archivo) {
+        validarComprobantePago(archivo);
+
+        String nombreOriginal = StringUtils.cleanPath(
+                StringUtils.hasText(archivo.getOriginalFilename()) ? archivo.getOriginalFilename() : "comprobante"
+        );
+        String nombreSeguro = normalizarNombreArchivo(nombreOriginal);
+        String objectPath = "inscripciones/%d/comprobantes/%s-%s".formatted(inscripcionId, UUID.randomUUID(), nombreSeguro);
+        BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(obtenerBucketInscripciones(), objectPath))
+                .setContentType(archivo.getContentType())
+                .build();
+
+        try {
+            storage.create(blobInfo, archivo.getBytes());
+        } catch (IOException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No se pudo leer el comprobante", exception);
+        } catch (RuntimeException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo subir el comprobante a Google Cloud Storage", exception);
+        }
+
+        return new UploadedObject(
+                objectPath,
+                nombreOriginal,
+                archivo.getContentType(),
+                archivo.getSize()
+        );
+    }
+
     public void eliminar(String objectPath) {
         if (!StringUtils.hasText(objectPath)) {
             return;
         }
-        storage.delete(BlobId.of(obtenerBucket(), objectPath));
+        storage.delete(BlobId.of(obtenerBucketRecursos(), objectPath));
     }
 
     public String generarSignedUrl(String objectPath) {
+        return generarSignedUrl(objectPath, obtenerBucketRecursos());
+    }
+
+    public String generarSignedUrlInscripcion(String objectPath) {
+        return generarSignedUrl(objectPath, obtenerBucketInscripciones());
+    }
+
+    private String generarSignedUrl(String objectPath, String bucketName) {
         if (!StringUtils.hasText(objectPath)) {
             return null;
         }
-        BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(obtenerBucket(), objectPath)).build();
+        BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, objectPath)).build();
         URL signedUrl = storage.signUrl(
                 blobInfo,
                 Math.max(1, properties.getSignedUrlMinutes()),
@@ -107,6 +143,23 @@ public class CloudStorageService {
         String carpeta = CARPETAS_POR_TIPO.get(tipoRecurso);
         String nombreSeguro = normalizarNombreArchivo(nombreOriginal);
         return "eventos/%d/%s/%s-%s".formatted(eventoId, carpeta, UUID.randomUUID(), nombreSeguro);
+    }
+
+    private void validarComprobantePago(MultipartFile archivo) {
+        if (archivo == null || archivo.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El comprobante es obligatorio");
+        }
+
+        String contentType = archivo.getContentType();
+        boolean permitido = "application/pdf".equals(contentType)
+                || "image/jpeg".equals(contentType)
+                || "image/png".equals(contentType);
+        if (!permitido) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El comprobante debe ser PDF, JPG o PNG");
+        }
+        if (archivo.getSize() > MAX_DOCUMENT_BYTES) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El comprobante no debe superar 25 MB");
+        }
     }
 
     private void validarArchivo(String tipoRecurso, MultipartFile archivo) {
@@ -166,11 +219,21 @@ public class CloudStorageService {
         }
     }
 
-    private String obtenerBucket() {
+    private String obtenerBucketRecursos() {
         if (!StringUtils.hasText(properties.getBucketRecursos())) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No se configuro GCS_BUCKET_RECURSOS");
         }
         return properties.getBucketRecursos();
+    }
+
+    private String obtenerBucketInscripciones() {
+        if (!StringUtils.hasText(properties.getBucketInscripciones())) {
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "No se configuró GCS_BUCKET_INSCRIPCIONES"
+            );
+        }
+        return properties.getBucketInscripciones();
     }
 
     private String normalizarNombreArchivo(String nombreArchivo) {

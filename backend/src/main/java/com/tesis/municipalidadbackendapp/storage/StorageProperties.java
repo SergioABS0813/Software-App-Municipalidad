@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "app.storage")
 public class StorageProperties {
     private String bucketRecursos;
+    private String bucketInscripciones;
     private int signedUrlMinutes = 30;
 
     public String getBucketRecursos() {
@@ -23,5 +24,13 @@ public class StorageProperties {
 
     public void setSignedUrlMinutes(int signedUrlMinutes) {
         this.signedUrlMinutes = signedUrlMinutes;
+    }
+
+    public String getBucketInscripciones() {
+        return bucketInscripciones;
+    }
+
+    public void setBucketInscripciones(String bucketInscripciones) {
+        this.bucketInscripciones = bucketInscripciones;
     }
 }

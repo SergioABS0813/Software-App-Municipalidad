@@ -96,6 +96,26 @@ export async function getEstadosEventoGestion(){
     return response.data
 }
 
+export async function getEventosActivosDesdeHoyCard(){
+    const response = await api.get("eventos/admin/card/activos_desde_hoy");
+    return response.data
+}
+
+export async function getEventosBorradoresCard(){
+    const response = await api.get("eventos/admin/card/borradores");
+    return response.data
+}
+
+export async function getEventosParaRevisionCard(){
+    const response = await api.get("eventos/admin/card/para_revision");
+    return response.data
+}
+
+export async function getEventosObservadosCard(){
+    const response = await api.get("eventos/admin/card/observados");
+    return response.data
+}
+
 export async function guardarEventoGestion(evento){
     const response = await api.post("eventos/admin/operacion", evento);
     return response.data
@@ -132,6 +152,31 @@ export async function eliminarEventoGestion(id){
 export async function cancelarEventoGestion(id, { motivo = '' } = {}){
     const response = await api.patch(`eventos/admin/operacion/${id}/cancelar`, { motivo });
     return response.data
+}
+
+export async function getPagosInscripcionPendientes(filters = {}){
+    const params = new URLSearchParams();
+    if (filters.estado) params.set('estado', filters.estado);
+    if (filters.busqueda) params.set('busqueda', filters.busqueda);
+    if (filters.orden) params.set('orden', filters.orden);
+    const queryString = params.toString();
+    const response = await api.get(`admin/pagos-inscripcion${queryString ? `?${queryString}` : ''}`);
+    return response.data;
+}
+
+export async function getPagoInscripcionDetalle(id){
+    const response = await api.get(`admin/pagos-inscripcion/${id}`);
+    return response.data;
+}
+
+export async function validarPagoInscripcion(id){
+    const response = await api.post(`admin/pagos-inscripcion/${id}/validar`);
+    return response.data;
+}
+
+export async function observarPagoInscripcion(id, observacion){
+    const response = await api.post(`admin/pagos-inscripcion/${id}/observar`, { observacion });
+    return response.data;
 }
 
 export async function guardarUbicacionConfiguracion(ubicacion){

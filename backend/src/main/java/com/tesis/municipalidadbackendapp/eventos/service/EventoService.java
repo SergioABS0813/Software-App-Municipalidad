@@ -191,6 +191,7 @@ public class EventoService {
                 toLocalDateTime(evento.getFechaHoraFin()),
                 toLocalDateTime(evento.getEventoActualizadoEn() != null ? evento.getEventoActualizadoEn() : evento.getTiempoActualizado()),
                 evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : null,
+                requiereInscripcion(evento),
                 requiereControl,
                 evento.getEncuestaSatisfaccionHabilitado() != null && evento.getEncuestaSatisfaccionHabilitado() == 1,
                 totalInscritos,
@@ -202,6 +203,9 @@ public class EventoService {
                 promedioSatisfaccion,
                 totalValoraciones,
                 evento.getCostoReferencial(),
+                requierePago(evento),
+                evento.getCostoVecinal(),
+                evento.getInstruccionesPago(),
                 evento.getAforoMaximo(),
                 evento.getMetaTipo(),
                 evento.getMetaValor()
@@ -267,10 +271,14 @@ public class EventoService {
                 evento.getAreaMunicipal() != null ? evento.getAreaMunicipal().getNombre() : null,
                 toCategoriaPanelAdministrativoDto(evento),
                 evento.getCostoReferencial(),
+                requierePago(evento),
+                evento.getCostoVecinal(),
+                evento.getInstruccionesPago(),
                 evento.getAforoMaximo(),
                 calcularCuposDisponibles(evento),
                 evento.getEdadMin(),
                 evento.getEdadMax(),
+                requiereInscripcion(evento),
                 requiereControlAsistencia(evento),
                 toLocalDateTime(evento.getEventoActualizadoEn() != null ? evento.getEventoActualizadoEn() : evento.getTiempoActualizado()),
                 evento.getMotivoCancelacion(),
@@ -307,9 +315,13 @@ public class EventoService {
                 ubicacion != null ? ubicacion.getLatitud() : null,
                 ubicacion != null ? ubicacion.getLongitud() : null,
                 evento.getCostoReferencial(),
+                evento.getRequierePago() != null && evento.getRequierePago() == 1,
+                evento.getCostoVecinal(),
+                evento.getInstruccionesPago(),
                 evento.getAforoMaximo(),
                 evento.getEdadMin(),
                 evento.getEdadMax(),
+                requiereInscripcion(evento),
                 requiereControlAsistencia(evento),
                 obtenerAgendaPublicaDto(evento),
                 obtenerRequisitosPublicosDto(evento),
@@ -380,9 +392,13 @@ public class EventoService {
                 evento.getCategoria() != null ? evento.getCategoria().getNombre() : null,
                 evento.getAreaMunicipal() != null ? evento.getAreaMunicipal().getNombre() : null,
                 evento.getCostoReferencial(),
+                requierePago(evento),
+                evento.getCostoVecinal(),
+                evento.getInstruccionesPago(),
                 evento.getAforoMaximo(),
                 evento.getEdadMin(),
                 evento.getEdadMax(),
+                requiereInscripcion(evento),
                 requiereControlAsistencia(evento),
                 toLocalDateTime(evento.getEventoActualizadoEn() != null
                         ? evento.getEventoActualizadoEn()
@@ -459,6 +475,8 @@ public class EventoService {
         evento.setFechaHoraInicio(toInstant(request.fechaHoraInicio()));
         evento.setFechaHoraFin(toInstant(request.fechaHoraFin()));
         evento.setCostoReferencial(request.costoReferencial());
+        aplicarConfiguracionPago(evento, request);
+        evento.setRequiereInscripcion(requiereInscripcion(request) ? (byte) 1 : (byte) 0);
         evento.setEstadoEvento(estadoEvento);
         evento.setUbicacion(ubicacion);
         evento.setAforoMaximo(normalizarAforoMaximo(request.aforoMaximo()));
@@ -559,6 +577,8 @@ public class EventoService {
         evento.setFechaHoraInicio(toInstant(request.fechaHoraInicio()));
         evento.setFechaHoraFin(toInstant(request.fechaHoraFin()));
         evento.setCostoReferencial(request.costoReferencial());
+        aplicarConfiguracionPago(evento, request);
+        evento.setRequiereInscripcion(requiereInscripcion(request) ? (byte) 1 : (byte) 0);
         evento.setEstadoEvento(estadoEvento);
         evento.setUbicacion(ubicacion);
         evento.setAforoMaximo(normalizarAforoMaximo(request.aforoMaximo()));
@@ -888,6 +908,80 @@ public class EventoService {
                     "La fecha de fin del evento debe ser posterior a la fecha de inicio"
             );
         }
+
+        boolean requiereControl = requiereControlAsistencia(request);
+        boolean requiereInscripcion = requiereInscripcion(request);
+
+        if (Boolean.FALSE.equals(request.requiereInscripcion()) && requiereControl) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "El control de asistencia solo esta disponible para eventos con inscripcion previa"
+            );
+        }
+
+        if (Boolean.FALSE.equals(request.requiereInscripcion()) && Boolean.TRUE.equals(request.requierePago())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Un evento con pago por inscripcion debe requerir inscripcion previa"
+            );
+        }
+
+        if (Boolean.TRUE.equals(request.requierePago()) && !requiereInscripcion) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Un evento con pago por inscripcion debe requerir inscripcion previa"
+            );
+        }
+        if (Boolean.TRUE.equals(request.requierePago())) {
+            if (request.costoVecinal() == null || request.costoVecinal() <= 0) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "El monto de pago por inscripcion debe ser mayor a cero"
+                );
+            }
+
+            if (!hasText(request.instruccionesPago())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Las instrucciones de pago son obligatorias"
+                );
+            }
+        }
+    }
+
+    private void aplicarConfiguracionPago(Evento evento, EventoRegistroRequest request) {
+        boolean requiereInscripcion = requiereInscripcion(request);
+        boolean requierePago = requiereInscripcion && Boolean.TRUE.equals(request.requierePago());
+        evento.setRequierePago(requierePago ? (byte) 1 : (byte) 0);
+        evento.setCostoVecinal(requierePago ? request.costoVecinal() : null);
+        evento.setInstruccionesPago(requierePago ? normalizarTexto(request.instruccionesPago()) : null);
+    }
+
+    private boolean requierePago(Evento evento) {
+        return evento.getRequierePago() != null && evento.getRequierePago() == 1;
+    }
+
+    private boolean requiereInscripcion(Evento evento) {
+        if (evento == null) {
+            return true;
+        }
+        if (evento.getRequiereInscripcion() != null) {
+            return evento.getRequiereInscripcion() == 1;
+        }
+        return requiereControlAsistencia(evento) || requierePago(evento);
+    }
+
+    private boolean requiereInscripcion(EventoRegistroRequest request) {
+        if (request == null) {
+            return true;
+        }
+        if (Boolean.TRUE.equals(request.requiereInscripcion())) {
+            return true;
+        }
+        if (Boolean.FALSE.equals(request.requiereInscripcion())) {
+            return false;
+        }
+        return requiereControlAsistencia(request) || Boolean.TRUE.equals(request.requierePago());
     }
 
     private Categoria obtenerCategoriaOpcional(Integer categoriaId) {

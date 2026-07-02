@@ -10,6 +10,12 @@ public record InscripcionEventoResponse(
         String vecinoNombre,
         String codigoInscripcion,
         Instant fechaInscripcion,
-        String estado
+        String estado,
+        Integer pagoId,
+        String estadoPago,
+        String observacionPago,
+        String comprobanteUrl,
+        String motivoCancelacion,
+        String observacionCancelacion
 ) {
 }

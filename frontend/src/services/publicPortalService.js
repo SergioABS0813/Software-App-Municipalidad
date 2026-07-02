@@ -1,6 +1,6 @@
 import api from './api/api';
 
-// Recuperar contraseÃ±a
+// Recuperar contraseña
 export async function recuperarContrasena(correo, dni){
     const response = await api.post('auth/forgot-password', {
         correo,
@@ -30,6 +30,16 @@ export async function obtenerCategoriasPublicas(){
 }
 export async function inscribirEventoPublicado(eventoId){
     const response = await api.post(`inscripciones/eventos/${eventoId}`);
+    return response.data;
+}
+export async function subirComprobantePago(inscripcionId, { medioPago, numeroOperacion, fechaPago, archivo }){
+    const formData = new FormData();
+    formData.append('medioPago', medioPago);
+    formData.append('numeroOperacion', numeroOperacion);
+    formData.append('fechaPago', fechaPago);
+    formData.append('archivo', archivo);
+
+    const response = await api.post(`inscripciones/${inscripcionId}/pago/comprobante`, formData);
     return response.data;
 }
 export async function obtenerInscripcionActualEvento(eventoId){

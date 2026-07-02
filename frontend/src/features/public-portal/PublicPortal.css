@@ -1219,12 +1219,21 @@
   border-color: #e2e8f0;
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  box-sizing: border-box;
   display: grid;
   gap: 18px;
   height: fit-content;
+  min-width: 0;
+  overflow: hidden;
   padding: 24px;
   position: sticky;
   top: 96px;
+}
+
+.reservation-card > * {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .reservation-card-header {
@@ -1236,10 +1245,13 @@
   background: var(--brand-sky);
   border: 1px solid rgba(10, 167, 216, 0.24);
   border-radius: 12px;
+  box-sizing: border-box;
   color: var(--brand-primary);
   display: grid;
   gap: 4px;
+  max-width: 100%;
   padding: 16px 18px;
+  width: 100%;
 }
 
 .reservation-availability strong {
@@ -1496,6 +1508,171 @@
   text-align: center;
 }
 
+.event-payment-summary,
+.payment-upload-panel,
+.payment-status-panel {
+  background: #f8fbfd;
+  border: 1px solid #dbe6ef;
+  border-radius: 8px;
+  box-sizing: border-box;
+  display: grid;
+  gap: 10px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 14px;
+  width: 100%;
+}
+
+.event-payment-summary span,
+.payment-upload-heading span {
+  color: var(--brand-primary);
+  font-size: 0.72rem;
+  font-weight: 760;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.event-payment-summary strong,
+.payment-upload-heading strong,
+.payment-status-panel strong {
+  color: var(--color-text-strong);
+  font-size: 0.98rem;
+  font-weight: 760;
+}
+
+.event-payment-summary p,
+.payment-upload-heading p,
+.payment-status-panel p,
+.payment-status-panel small {
+  color: #526b85;
+  font-size: 0.86rem;
+  font-weight: 500;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.payment-observation-message {
+  background: #fff7f3;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #9a3412;
+  padding: 12px;
+}
+
+.payment-upload-heading .payment-observation-message strong {
+  color: #9a3412;
+  font-size: inherit;
+  font-weight: 850;
+}
+
+.payment-status-panel.is-cancelled {
+  background: #fff4ed;
+  border-color: rgba(194, 65, 12, 0.18);
+}
+
+.payment-status-panel.is-cancelled strong {
+  color: #c2410c;
+}
+
+.payment-upload-heading,
+.payment-upload-form {
+  display: grid;
+  gap: 10px;
+}
+
+.payment-upload-form label {
+  color: #334f6b;
+  display: grid;
+  font-size: 0.84rem;
+  font-weight: 650;
+  gap: 6px;
+  min-width: 0;
+}
+
+.payment-upload-form input {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-sizing: border-box;
+  color: var(--color-text-strong);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  min-height: 42px;
+  min-width: 0;
+  padding: 9px 11px;
+  width: 100%;
+}
+
+.payment-upload-form input:focus {
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px rgba(31, 134, 232, 0.14);
+  outline: none;
+}
+
+.payment-upload-form input:disabled,
+.payment-file-field input:disabled + .payment-file-trigger {
+  background: #f1f5f9;
+  border-color: #dbe6ef;
+  color: #6c8198;
+  cursor: not-allowed;
+  opacity: 0.82;
+}
+
+.payment-file-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.payment-file-field > span {
+  color: #334f6b;
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.payment-file-field input[type='file'] {
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+}
+
+.payment-file-trigger {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-sizing: border-box;
+  color: var(--brand-primary);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.9rem;
+  font-weight: 720;
+  justify-content: center;
+  min-height: 42px;
+  padding: 9px 11px;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+  width: 100%;
+}
+
+.payment-file-trigger:hover {
+  background: var(--brand-soft);
+  border-color: rgba(10, 86, 194, 0.24);
+  box-shadow: 0 8px 18px rgba(10, 86, 194, 0.08);
+}
+
+.payment-file-field small {
+  color: #526b85;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
 .reservation-cancel-button {
   background: #fff4ed;
   border-color: #fed7aa;
