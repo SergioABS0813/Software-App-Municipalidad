@@ -13,6 +13,16 @@ import java.util.Optional;
 public interface CodigoQrRepository extends JpaRepository<CodigoQr, Integer> {
     Optional<CodigoQr> findByToken(String token);
 
+    @Query("""
+        SELECT qr
+        FROM CodigoQr qr
+        JOIN FETCH qr.inscripcion i
+        JOIN FETCH i.evento e
+        JOIN FETCH i.vecino v
+        WHERE qr.token = :token
+    """)
+    Optional<CodigoQr> findDetalleByToken(@Param("token") String token);
+
     List<CodigoQr> findByInscripcion_IdAndEstadoQr(Integer inscripcion_Id, EstadoQr estadoQr);
 
     @Modifying

@@ -170,7 +170,10 @@ public class InscripcionEventoService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evento no encontrado"));
 
         String estadoEvento = evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : "";
-        if (!"PUBLICADO".equals(estadoEvento)) {
+        if ("FINALIZADO".equals(estadoEvento)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El evento ya finalizo y no admite nuevas inscripciones");
+        }
+        if (!"PUBLICADO".equals(estadoEvento) && !"EN_CURSO".equals(estadoEvento)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "El evento no esta disponible para inscripcion");
         }
 

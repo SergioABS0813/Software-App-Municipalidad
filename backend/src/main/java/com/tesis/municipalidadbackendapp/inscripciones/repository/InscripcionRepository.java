@@ -16,6 +16,38 @@ public interface InscripcionRepository extends JpaRepository<Inscripcion, Intege
 
     List<Inscripcion> findByEventoIdAndEstadoInscripcion(Integer eventoId, EstadoInscripcion estadoInscripcion);
 
+    @Query("""
+        SELECT i
+        FROM Inscripcion i
+        JOIN FETCH i.evento e
+        JOIN FETCH i.vecino v
+        WHERE e.id = :eventoId
+          AND (
+            LOWER(TRIM(i.codigoInscripcion)) = LOWER(:codigoInscripcion)
+            OR (:dni IS NOT NULL AND v.dni = :dni)
+          )
+    """)
+    Optional<Inscripcion> findOperativaByEventoAndIdentificador(
+            @Param("eventoId") Integer eventoId,
+            @Param("codigoInscripcion") String codigoInscripcion,
+            @Param("dni") String dni
+    );
+
+    @Query("""
+        SELECT i
+        FROM Inscripcion i
+        JOIN FETCH i.evento e
+        JOIN FETCH i.vecino v
+        WHERE e.id = :eventoId
+          AND i.estadoInscripcion = :estadoInscripcion
+          AND v.email IS NOT NULL
+          AND trim(v.email) <> ''
+    """)
+    List<Inscripcion> findConfirmadasConVecinoParaRecordatorio(
+            @Param("eventoId") Integer eventoId,
+            @Param("estadoInscripcion") EstadoInscripcion estadoInscripcion
+    );
+
     Long countByEventoId(Integer eventoId);
 
     @Query("""

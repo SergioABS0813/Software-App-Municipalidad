@@ -654,7 +654,7 @@ function getEventStateTone(state) {
   const stateToneMap = {
     BORRADOR: 'state-draft',
     CANCELADO: 'state-cancelled',
-    CERRADO: 'state-closed',
+    EN_CURSO: 'state-active',
     FINALIZADO: 'state-finished',
     OBSERVADO: 'state-observed',
     PUBLICADO: 'state-published',
@@ -4086,9 +4086,9 @@ function getStateSummaryText(state) {
   const stateMessages = {
     BORRADOR: 'Completa la ficha para enviarla a revisión.',
     CANCELADO: 'Evento cancelado.',
-    CERRADO: 'Evento cerrado.',
     PARA_REVISION: 'Pendiente de revisión directiva.',
-    FINALIZADO: 'Evento cerrado.',
+    EN_CURSO: 'Evento en curso.',
+    FINALIZADO: 'Evento finalizado.',
     OBSERVADO: 'Requiere correcciones antes de reenviar.',
     PUBLICADO: 'Visible en el portal ciudadano.',
   };
@@ -7459,21 +7459,19 @@ function EvaluationTrackingSection({
           </label>
         </fieldset>
 
-        {hasDefinedCapacity && (
-          <label className="form-field">
-            Aforo máximo
-            <input
-              defaultValue={normalizedCapacityValue}
-              min="1"
-              name="capacity"
-              placeholder="120"
-              step="1"
-              type="number"
-              onBlur={keepCapacityAtMinimum}
-              onInput={keepCapacityAtMinimum}
-            />
-          </label>
-        )}
+        <label className="form-field" hidden={!hasDefinedCapacity}>
+          Aforo máximo
+          <input
+            defaultValue={normalizedCapacityValue}
+            min="1"
+            name="capacity"
+            placeholder="120"
+            step="1"
+            type="number"
+            onBlur={keepCapacityAtMinimum}
+            onInput={keepCapacityAtMinimum}
+          />
+        </label>
 
         <label className="form-switch-field span-2">
           <input

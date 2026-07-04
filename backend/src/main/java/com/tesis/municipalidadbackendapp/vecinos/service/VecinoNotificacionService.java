@@ -161,6 +161,52 @@ public class VecinoNotificacionService {
         );
     }
 
+
+    public void enviarConstanciaInscripcionManualValidada(Inscripcion inscripcion) {
+        if (inscripcion == null || inscripcion.getVecino() == null || inscripcion.getEvento() == null) {
+            return;
+        }
+
+        String emailDestino = inscripcion.getVecino().getEmail();
+        if (!StringUtils.hasText(emailDestino)) {
+            return;
+        }
+
+        Evento evento = inscripcion.getEvento();
+        String fechaEvento = formatDateTime(evento.getFechaHoraInicio());
+        String ubicacion = evento.getUbicacion() != null && StringUtils.hasText(evento.getUbicacion().getNombre())
+                ? evento.getUbicacion().getNombre()
+                : "Por confirmar";
+        String direccion = evento.getUbicacion() != null && StringUtils.hasText(evento.getUbicacion().getDireccion())
+                ? evento.getUbicacion().getDireccion()
+                : "Por confirmar";
+
+        enviarCorreoHtml(
+                emailDestino,
+                "Participacion registrada - " + evento.getTitulo(),
+                construirPlantillaHtml(
+                        "Participacion registrada",
+                        """
+                        <p style="margin:0 0 14px;">Hola <strong>%s</strong>,</p>
+                        <p style="margin:0 0 14px;">Te informamos que el equipo municipal registro tu incorporacion al evento <strong>%s</strong> y dejo constancia de tu asistencia en el sistema.</p>
+                        <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%%;margin:18px 0;border-collapse:collapse;font-size:14px;background:#ffffff;">
+                          <tr><td style="padding:8px 0;color:#526b85;width:145px;">Codigo</td><td style="padding:8px 0;color:#0f172a;font-weight:800;">%s</td></tr>
+                          <tr><td style="padding:8px 0;color:#526b85;">Fecha y hora</td><td style="padding:8px 0;color:#0f172a;">%s</td></tr>
+                          <tr><td style="padding:8px 0;color:#526b85;">Lugar</td><td style="padding:8px 0;color:#0f172a;">%s</td></tr>
+                          <tr><td style="padding:8px 0;color:#526b85;">Direccion</td><td style="padding:8px 0;color:#0f172a;">%s</td></tr>
+                        </table>
+                        <p style="margin:0;">No necesitas realizar ninguna accion adicional. Este mensaje queda como respaldo de tu participacion.</p>
+                        """.formatted(
+                                escapeHtml(nombreVecino(inscripcion)),
+                                escapeHtml(evento.getTitulo()),
+                                escapeHtml(inscripcion.getCodigoInscripcion()),
+                                escapeHtml(fechaEvento),
+                                escapeHtml(ubicacion),
+                                escapeHtml(direccion)
+                        )
+                )
+        );
+    }
     public void enviarCorreoEventoCancelado(Inscripcion inscripcion, String motivo) {
         if (inscripcion == null || inscripcion.getVecino() == null || inscripcion.getEvento() == null) {
             return;
@@ -322,6 +368,52 @@ public class VecinoNotificacionService {
         );
     }
 
+
+    public void enviarRecordatorioEventoUnaHora(Inscripcion inscripcion) {
+        if (inscripcion == null || inscripcion.getVecino() == null || inscripcion.getEvento() == null) {
+            return;
+        }
+
+        String emailDestino = inscripcion.getVecino().getEmail();
+        if (!StringUtils.hasText(emailDestino)) {
+            return;
+        }
+
+        Evento evento = inscripcion.getEvento();
+        String fechaEvento = formatDateTime(evento.getFechaHoraInicio());
+        String ubicacion = evento.getUbicacion() != null && StringUtils.hasText(evento.getUbicacion().getNombre())
+                ? evento.getUbicacion().getNombre()
+                : "Por confirmar";
+        String direccion = evento.getUbicacion() != null && StringUtils.hasText(evento.getUbicacion().getDireccion())
+                ? evento.getUbicacion().getDireccion()
+                : "Por confirmar";
+
+        enviarCorreoHtml(
+                emailDestino,
+                "Recordatorio: tu evento inicia en 1 hora - " + evento.getTitulo(),
+                construirPlantillaHtml(
+                        "Tu evento inicia en 1 hora",
+                        """
+                        <p style="margin:0 0 14px;">Hola <strong>%s</strong>,</p>
+                        <p style="margin:0 0 14px;">Te recordamos que el evento <strong>%s</strong> inicia aproximadamente en 1 hora.</p>
+                        <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%%;margin:18px 0;border-collapse:collapse;font-size:14px;background:#ffffff;">
+                          <tr><td style="padding:8px 0;color:#526b85;width:145px;">Fecha y hora</td><td style="padding:8px 0;color:#0f172a;">%s</td></tr>
+                          <tr><td style="padding:8px 0;color:#526b85;">Lugar</td><td style="padding:8px 0;color:#0f172a;">%s</td></tr>
+                          <tr><td style="padding:8px 0;color:#526b85;">Direccion</td><td style="padding:8px 0;color:#0f172a;">%s</td></tr>
+                          <tr><td style="padding:8px 0;color:#526b85;">Codigo</td><td style="padding:8px 0;color:#0f172a;font-weight:800;">%s</td></tr>
+                        </table>
+                        <p style="margin:0;">Llega con anticipacion y presenta tu codigo de inscripcion al personal municipal si se solicita.</p>
+                        """.formatted(
+                                escapeHtml(nombreVecino(inscripcion)),
+                                escapeHtml(evento.getTitulo()),
+                                escapeHtml(fechaEvento),
+                                escapeHtml(ubicacion),
+                                escapeHtml(direccion),
+                                escapeHtml(inscripcion.getCodigoInscripcion())
+                        )
+                )
+        );
+    }
     private boolean requiereControlAsistencia(Evento evento) {
         return evento != null
                 && evento.getRequiereControlAsistencia() != null

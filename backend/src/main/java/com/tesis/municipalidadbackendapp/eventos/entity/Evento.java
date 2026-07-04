@@ -116,5 +116,8 @@ public class Evento {
     @Column(name="instrucciones_pago", columnDefinition = "TEXT")
     private String instruccionesPago;
 
+    @Column(name = "recordatorio_una_hora_enviado_en")
+    private Instant recordatorioUnaHoraEnviadoEn;
+
 
 }

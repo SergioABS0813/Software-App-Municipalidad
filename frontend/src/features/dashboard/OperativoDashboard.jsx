@@ -1,7 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import municipalLogo from '../../assets/images/municipalidad-logo.png';
 import { getApiErrorMessage } from '../../services/api/api';
-import { getEventosOperativoHoy } from '../../services/dashboardService';
+import {
+  anularAsistenciaOperativo,
+  consultarIdentidadInscripcionManualOperativo,
+  getEventosOperativoHoy,
+  registrarInscripcionManualOperativo,
+  validarAsistenciaManualOperativo,
+  validarQrOperativoImagen,
+} from '../../services/dashboardService';
 import { DashboardSkeleton, ErrorState } from '../../components/feedback/LoadingStates';
 import './AdminDashboard.css';
 import './OperativoDashboard.css';
@@ -12,6 +19,67 @@ const fallbackOperativeUser = {
   role: 'OPERATIVO',
 };
 
+const allowedQrImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+function isAllowedQrImageFile(file) {
+  return file && allowedQrImageTypes.has(file.type);
+}
+
+async function imageFileToPngBlob(file) {
+  if (!isAllowedQrImageFile(file)) {
+    throw new Error('Solo se permiten imagenes JPG, PNG o WebP.');
+  }
+
+  const bitmap = await createImageBitmap(file);
+  const canvas = document.createElement('canvas');
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const context = canvas.getContext('2d');
+  context.drawImage(bitmap, 0, 0);
+  bitmap.close?.();
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('No se pudo procesar la imagen del QR.'));
+        return;
+      }
+
+      resolve(new File([blob], 'qr-upload.png', { type: 'image/png' }));
+    }, 'image/png');
+  });
+}
+
+function splitDniFullName(fullName) {
+  const parts = String(fullName ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (parts.length <= 2) {
+    return {
+      lastNames: parts.slice(1).join(' '),
+      names: parts[0] ?? '',
+    };
+  }
+
+  return {
+    lastNames: parts.slice(-2).join(' '),
+    names: parts.slice(0, -2).join(' '),
+  };
+}
+function canvasToPngFile(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('No se pudo capturar la imagen de la camara.'));
+        return;
+      }
+
+      resolve(new File([blob], 'qr-camera.png', { type: 'image/png' }));
+    }, 'image/png');
+  });
+}
 function getOperativeUserInitials(name) {
   const nameParts = String(name ?? '')
     .trim()
@@ -54,6 +122,46 @@ function getEventControlRange(event) {
   };
 }
 
+function isOperativeWindowActive(event, now) {
+  const { end, start } = getEventControlRange(event);
+
+  if (!start || !end) {
+    return Boolean(event.ventanaOperativaActiva ?? event.operativeWindowActive);
+  }
+
+  const operativeStart = new Date(start.getTime() - 60 * 60 * 1000);
+  const operativeEnd = new Date(end.getTime() + 30 * 60 * 1000);
+
+  return now >= operativeStart && now <= operativeEnd;
+}
+
+function getEventSelectionRank(event, now) {
+  const { end, start } = getEventControlRange(event);
+
+  if (start && end && now >= start && now <= end) {
+    return 0;
+  }
+
+  if (start && now <= start) {
+    return 1;
+  }
+
+  return 2;
+}
+
+function compareOperativeEvents(firstEvent, secondEvent, now) {
+  const firstRank = getEventSelectionRank(firstEvent, now);
+  const secondRank = getEventSelectionRank(secondEvent, now);
+
+  if (firstRank !== secondRank) {
+    return firstRank - secondRank;
+  }
+
+  const firstStart = getEventControlRange(firstEvent).start?.getTime() ?? Number.MAX_SAFE_INTEGER;
+  const secondStart = getEventControlRange(secondEvent).start?.getTime() ?? Number.MAX_SAFE_INTEGER;
+
+  return firstStart - secondStart || (firstEvent.id ?? 0) - (secondEvent.id ?? 0);
+}
 function getOperativeState(event, now) {
   const { end, start } = getEventControlRange(event);
 
@@ -129,6 +237,7 @@ function buildOperativeEvent(event, now) {
   return {
     ...event,
     operativeState: getOperativeState(event, now),
+    operativeWindowActive: isOperativeWindowActive(event, now),
     expiredQr,
     manualValidated,
     pendingAccess: Math.max(registered - qrValidated - manualValidated, 0),
@@ -138,41 +247,6 @@ function buildOperativeEvent(event, now) {
     totalValidated: qrValidated + manualValidated,
   };
 }
-
-const initialRecentValidations = [
-  {
-    code: 'QR-SM-0087',
-    method: 'QR',
-    origin: 'ONLINE',
-    person: 'Mariana Torres',
-    status: 'VALIDADA',
-    time: '10:12 a.m.',
-  },
-  {
-    code: 'MAN-0021',
-    method: 'MANUAL',
-    origin: 'ONLINE',
-    person: 'Luis Ramírez',
-    status: 'VALIDADA',
-    time: '10:18 a.m.',
-  },
-  {
-    code: 'QR-SM-0044',
-    method: 'QR',
-    origin: 'ONLINE',
-    person: 'Rosa Salazar',
-    status: 'ANULADA',
-    time: '10:23 a.m.',
-  },
-  {
-    code: 'INS-MAN-003',
-    method: 'MANUAL',
-    origin: 'MANUAL',
-    person: 'Carmen Paredes',
-    status: 'VALIDADA',
-    time: '10:31 a.m.',
-  },
-];
 
 const operativeSectionIds = [
   'control-acceso',
@@ -228,43 +302,11 @@ function buildValidationFeedback(type, detail = {}) {
   };
 }
 
-function getMockValidationResult(code, event) {
-  const normalizedCode = String(code ?? '').trim().toUpperCase();
-
-  if (!event || !['PUBLICADO', 'EN_CURSO'].includes(event.operativeState)) {
-    return buildValidationFeedback('CLOSED', { code: normalizedCode });
-  }
-
-  if ((event.aforoMaximo ?? event.spots) && event.pendingAccess <= 0) {
-    return buildValidationFeedback('FULL', { code: normalizedCode });
-  }
-
-  if (normalizedCode.includes('DUP')) {
-    return buildValidationFeedback('DUPLICATE', {
-      citizenName: 'Mariana Torres',
-      code: normalizedCode,
-    });
-  }
-
-  if (normalizedCode.includes('OTRO')) {
-    return buildValidationFeedback('OTHER_EVENT', { code: normalizedCode });
-  }
-
-  if (normalizedCode.includes('NO') || normalizedCode.includes('404')) {
-    return buildValidationFeedback('NOT_FOUND', { code: normalizedCode });
-  }
-
-  return buildValidationFeedback('SUCCESS', {
-    citizenName: 'Luis Ramirez',
-    code: normalizedCode || 'QR-SM-0091',
-  });
-}
-
 function OperativoDashboard({ onLogout, user }) {
   const operativeUser = user?.id ? user : { ...fallbackOperativeUser, ...user };
   const operativeUserName =
     operativeUser.fullName || operativeUser.name || fallbackOperativeUser.fullName;
-  const now = useMemo(() => new Date(), []);
+  const [now, setNow] = useState(() => new Date());
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSidebarDrawerOpen, setIsSidebarDrawerOpen] = useState(false);
   const [activeOperativeSection, setActiveOperativeSection] = useState('control-acceso');
@@ -284,38 +326,105 @@ function OperativoDashboard({ onLogout, user }) {
             !['FINALIZADO', 'CANCELADO'].includes(event.state)
           );
         })
+        .sort((firstEvent, secondEvent) => compareOperativeEvents(firstEvent, secondEvent, now))
         .map((event) => buildOperativeEvent(event, now)),
     [now, operativeEventsData],
   );
-  const activeOperativeEvent = operativeEvents[0] ?? null;
+  const activeOperativeEvent =
+    operativeEvents.find((event) => event.operativeState === 'EN_CURSO') ??
+    operativeEvents.find((event) => event.operativeWindowActive) ??
+    operativeEvents[0] ??
+    null;
   const [selectedEventId, setSelectedEventId] = useState(null);
   const [scannerStatus, setScannerStatus] = useState('idle');
+  const [isCameraScannerActive, setIsCameraScannerActive] = useState(false);
+  const [isQrValidationLoading, setIsQrValidationLoading] = useState(false);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const cameraStreamRef = useRef(null);
+  const cameraScanIntervalRef = useRef(null);
+  const qrValidationInFlightRef = useRef(false);
   const [isManualRegistrationOpen, setIsManualRegistrationOpen] = useState(false);
+  const [manualRegistrationIdentity, setManualRegistrationIdentity] = useState(null);
+  const [manualRegistrationIdentityMessage, setManualRegistrationIdentityMessage] = useState('');
+  const [manualRegistrationContactOptions, setManualRegistrationContactOptions] = useState({ email: false, phone: false });
+  const [isSearchingManualRegistrationDni, setIsSearchingManualRegistrationDni] = useState(false);
   const [validationFeedback, setValidationFeedback] = useState(null);
-  const [validations, setValidations] = useState(initialRecentValidations);
+  const [validations, setValidations] = useState([]);
   const [pendingOperativeAction, setPendingOperativeAction] = useState(null);
+  const [pendingOperativePayload, setPendingOperativePayload] = useState(null);
+  const [isManualActionLoading, setIsManualActionLoading] = useState(false);
   const [pendingAnnulment, setPendingAnnulment] = useState(null);
+  const [isAnnulmentLoading, setIsAnnulmentLoading] = useState(false);
   const [operativeValidationIssue, setOperativeValidationIssue] = useState(null);
   const selectedEvent =
     operativeEvents.find((event) => event.id === selectedEventId) ??
     activeOperativeEvent;
   const hasAuthorizedEvent = Boolean(selectedEvent);
-  const validValidationCount = validations.filter(
+  const isOperativeWindowAvailable = Boolean(selectedEvent?.operativeWindowActive);
+  const validValidationCount = selectedEvent?.totalValidated ?? validations.filter(
     (validation) => validation.status === 'VALIDADA',
   ).length;
-  const qrValidationCount = validations.filter(
+  const qrValidationCount = selectedEvent?.qrValidated ?? validations.filter(
     (validation) => validation.status === 'VALIDADA' && validation.method === 'QR',
   ).length;
-  const manualValidationCount = validations.filter(
+  const manualValidationCount = selectedEvent?.manualValidated ?? validations.filter(
     (validation) => validation.status === 'VALIDADA' && validation.method === 'MANUAL',
   ).length;
   const registeredCount = selectedEvent?.registered ?? 0;
-  const pendingAccessCount = Math.max(registeredCount - validValidationCount, 0);
+  const pendingAccessCount = selectedEvent?.pendingAccess ?? Math.max(registeredCount - validValidationCount, 0);
   const aforoMaximo = selectedEvent?.aforoMaximo ?? null;
   const hasCapacityControl = aforoMaximo !== null && aforoMaximo !== undefined;
   const availableCapacity = hasCapacityControl
     ? Math.max(aforoMaximo - validValidationCount, 0)
     : null;
+  const manualRegistrationRequiresAdditionalData = Boolean(manualRegistrationIdentity && !manualRegistrationIdentity.registeredPlatform);
+  const isManualRegistrationPlatformNeighbor = Boolean(manualRegistrationIdentity?.registeredPlatform);
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => setNow(new Date()), 60_000);
+
+    return () => window.clearInterval(timerId);
+  }, []);
+  useEffect(() => {
+    if (operativeEvents.length === 0) {
+      setSelectedEventId(null);
+      return;
+    }
+
+    if (!selectedEventId || !operativeEvents.some((event) => event.id === selectedEventId)) {
+      setSelectedEventId(activeOperativeEvent?.id ?? operativeEvents[0].id);
+    }
+  }, [activeOperativeEvent?.id, operativeEvents, selectedEventId]);
+  useEffect(() => {
+    setValidations(Array.isArray(selectedEvent?.recentValidations) ? selectedEvent.recentValidations : []);
+  }, [selectedEvent?.id, selectedEvent?.recentValidations]);
+
+  useEffect(() => {
+    if (!isCameraScannerActive || !videoRef.current || !cameraStreamRef.current) {
+      return undefined;
+    }
+
+    videoRef.current.srcObject = cameraStreamRef.current;
+    videoRef.current.play().catch(() => undefined);
+    cameraScanIntervalRef.current = window.setInterval(() => {
+      captureCameraFrame().catch(() => undefined);
+    }, 1400);
+
+    return () => {
+      if (cameraScanIntervalRef.current) {
+        window.clearInterval(cameraScanIntervalRef.current);
+        cameraScanIntervalRef.current = null;
+      }
+    };
+    // La captura usa refs mutables para evitar reiniciar el intervalo en cada render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCameraScannerActive, selectedEvent?.id]);
+
+  useEffect(() => () => {
+    stopCameraScanner();
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -431,18 +540,196 @@ function OperativoDashboard({ onLogout, user }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function simulateQrScan() {
-    if (!hasAuthorizedEvent) {
+  async function startCameraScanner() {
+    if (!hasAuthorizedEvent || !isOperativeWindowAvailable) {
       setValidationFeedback(buildValidationFeedback('CLOSED', { source: 'scanner' }));
       return;
     }
 
-    const feedback = getMockValidationResult('QR-SM-0091', selectedEvent);
-    setValidationFeedback(feedback);
-    setScannerStatus(feedback.tone === 'success' ? 'success' : 'idle');
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setValidationFeedback({
+        ...buildValidationFeedback('NOT_FOUND', { source: 'scanner' }),
+        message: 'El navegador no permite usar la camara para escanear el QR.',
+      });
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: 'environment' } },
+      });
+      cameraStreamRef.current = stream;
+      setIsCameraScannerActive(true);
+      setScannerStatus('scanning');
+      setValidationFeedback(null);
+    } catch {
+      setValidationFeedback({
+        ...buildValidationFeedback('NOT_FOUND', { source: 'scanner' }),
+        message: 'No se pudo acceder a la camara del dispositivo.',
+      });
+      setScannerStatus('idle');
+    }
+  }
+
+  function stopCameraScanner() {
+    if (cameraScanIntervalRef.current) {
+      window.clearInterval(cameraScanIntervalRef.current);
+      cameraScanIntervalRef.current = null;
+    }
+
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+    }
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    setIsCameraScannerActive(false);
+    qrValidationInFlightRef.current = false;
+  }
+
+  async function validateQrImageFile(file, source = 'scanner', { silentNoQr = false } = {}) {
+    if (!hasAuthorizedEvent || !selectedEvent?.id || !isOperativeWindowAvailable) {
+      setValidationFeedback(buildValidationFeedback('CLOSED', { source }));
+      return;
+    }
+
+    if (qrValidationInFlightRef.current) {
+      return;
+    }
+
+    qrValidationInFlightRef.current = true;
+    setIsQrValidationLoading(true);
+
+    try {
+      const result = await validarQrOperativoImagen(selectedEvent.id, file);
+      const feedback = {
+        title: result.title,
+        message: result.message,
+        tone: result.tone,
+        citizenName: result.citizenName,
+        code: result.code,
+        source,
+      };
+      setValidationFeedback(feedback);
+      setScannerStatus(result.status === 'SUCCESS' ? 'success' : 'idle');
+
+      if (result.status === 'SUCCESS') {
+        stopCameraScanner();
+        setOperativeEventsReloadKey((currentKey) => currentKey + 1);
+      }
+    } catch (error) {
+      const message = getApiErrorMessage(error, 'No se pudo validar el QR.');
+      if (silentNoQr && message.toLowerCase().includes('qr')) {
+        return;
+      }
+
+      setValidationFeedback({
+        ...buildValidationFeedback('NOT_FOUND', { source }),
+        message,
+      });
+      setScannerStatus('idle');
+    } finally {
+      qrValidationInFlightRef.current = false;
+      setIsQrValidationLoading(false);
+    }
+  }
+
+  async function captureCameraFrame() {
+    if (!isCameraScannerActive || qrValidationInFlightRef.current || !videoRef.current || !canvasRef.current) {
+      return;
+    }
+
+    const video = videoRef.current;
+    if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.videoWidth === 0) {
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageFile = await canvasToPngFile(canvas);
+    await validateQrImageFile(imageFile, 'scanner', { silentNoQr: true });
+  }
+
+  async function handleQrImageUpload(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      const pngFile = await imageFileToPngBlob(file);
+      await validateQrImageFile(pngFile, 'scanner');
+    } catch (error) {
+      setValidationFeedback({
+        ...buildValidationFeedback('NOT_FOUND', { source: 'scanner' }),
+        message: error.message || 'No se pudo procesar la imagen del QR.',
+      });
+      setScannerStatus('idle');
+    }
+  }
+
+  async function lookupManualRegistrationDni(dni) {
+    const normalizedDni = String(dni ?? '').replace(/\D/g, '').slice(0, 8);
+
+    if (!/^\d{8}$/.test(normalizedDni)) {
+      setManualRegistrationIdentity(null);
+      setManualRegistrationIdentityMessage('Ingresa un DNI válido de 8 dígitos.');
+      return;
+    }
+
+    setIsSearchingManualRegistrationDni(true);
+    resetManualRegistrationIdentity();
+
+    try {
+      const identity = await consultarIdentidadInscripcionManualOperativo(normalizedDni);
+      const fullName = identity?.fullName ?? '';
+
+      if (!fullName) {
+        setManualRegistrationIdentityMessage('No se encontraron datos para el DNI ingresado.');
+        return;
+      }
+
+      setManualRegistrationIdentity({
+        dni: normalizedDni,
+        existingNeighbor: Boolean(identity.existingNeighbor),
+        fullName,
+        lastNames: identity.lastNames ?? '',
+        names: identity.names ?? '',
+        registeredPlatform: Boolean(identity.registeredPlatform),
+      });
+      setManualRegistrationIdentityMessage(
+        identity.registeredPlatform
+          ? `Cuenta vecinal verificada: ${fullName}`
+          : `Identidad verificada: ${fullName}`,
+      );
+    } catch (error) {
+      setManualRegistrationIdentity(null);
+      setManualRegistrationIdentityMessage(getApiErrorMessage(error, 'No se pudo consultar el DNI.'));
+    } finally {
+      setIsSearchingManualRegistrationDni(false);
+    }
+  }
+
+  function resetManualRegistrationIdentity() {
+    setManualRegistrationIdentity(null);
+    setManualRegistrationIdentityMessage('');
+    resetManualRegistrationContactOptions();
+  }
+
+  function resetManualRegistrationContactOptions() {
+    setManualRegistrationContactOptions({ email: false, phone: false });
   }
 
   function resetScanner() {
+    stopCameraScanner();
     setScannerStatus('idle');
     setValidationFeedback(null);
   }
@@ -450,7 +737,7 @@ function OperativoDashboard({ onLogout, user }) {
   function validateManualAttendance(event) {
     event.preventDefault();
 
-    if (!hasAuthorizedEvent) {
+    if (!hasAuthorizedEvent || !isOperativeWindowAvailable) {
       setValidationFeedback(buildValidationFeedback('CLOSED', { source: 'manual' }));
       return;
     }
@@ -458,8 +745,14 @@ function OperativoDashboard({ onLogout, user }) {
     const formData = new FormData(event.currentTarget);
     const missingFields = [];
 
-    if (!formData.get('manualCode')?.trim()) {
+    const manualIdentifier = formData.get('manualCode')?.trim() ?? '';
+
+    if (!manualIdentifier) {
       missingFields.push('DNI o código de inscripción');
+    }
+
+    if (/^\d+$/.test(manualIdentifier) && manualIdentifier.length !== 8) {
+      missingFields.push('DNI de 8 dígitos o código de inscripción completo');
     }
 
     if (!formData.get('manualReason')) {
@@ -474,21 +767,17 @@ function OperativoDashboard({ onLogout, user }) {
       return;
     }
 
-    const feedback = {
-      ...getMockValidationResult(formData.get('manualCode'), selectedEvent),
-      source: 'manual',
-    };
-    setValidationFeedback(feedback);
-
-    if (feedback.tone === 'success') {
-      setPendingOperativeAction('manual-validation');
-    }
+    setPendingOperativePayload({
+      identifier: manualIdentifier,
+      reason: formData.get('manualReason'),
+    });
+    setPendingOperativeAction('manual-validation');
   }
 
   function validateManualRegistration(event) {
     event.preventDefault();
 
-    if (!hasAuthorizedEvent) {
+    if (!hasAuthorizedEvent || !isOperativeWindowAvailable) {
       setValidationFeedback(buildValidationFeedback('CLOSED', { source: 'manual' }));
       return;
     }
@@ -496,16 +785,30 @@ function OperativoDashboard({ onLogout, user }) {
     const formData = new FormData(event.currentTarget);
     const requiredFields = [
       ['manualDni', 'DNI'],
-      ['manualNames', 'Nombres'],
-      ['manualLastNames', 'Apellidos'],
-      ['manualPhone', 'Celular'],
-      ['manualEmail', 'Correo'],
     ];
     const missingFields = requiredFields
       .filter(([field]) => !formData.get(field)?.trim())
       .map(([, label]) => label);
+    const hasPhone = Boolean(formData.get('manualHasPhone'));
+    const hasEmail = Boolean(formData.get('manualHasEmail'));
+    const manualPhone = formData.get('manualPhone')?.trim() ?? '';
+    const manualEmail = formData.get('manualEmail')?.trim() ?? '';
 
-    if (!formData.get('manualDataConsent')) {
+    const requiresAdditionalManualData = !manualRegistrationIdentity?.registeredPlatform;
+
+    if (requiresAdditionalManualData && hasPhone && !manualPhone) {
+      missingFields.push('Celular');
+    }
+
+    if (requiresAdditionalManualData && hasEmail && !manualEmail) {
+      missingFields.push('Correo');
+    }
+
+    if (!manualRegistrationIdentity || manualRegistrationIdentity.dni !== formData.get('manualDni')?.trim()) {
+      missingFields.push('Buscar y validar DNI');
+    }
+
+    if (requiresAdditionalManualData && !formData.get('manualDataConsent')) {
       missingFields.push('Aceptacion de tratamiento de datos');
     }
 
@@ -517,44 +820,114 @@ function OperativoDashboard({ onLogout, user }) {
       return;
     }
 
-    setValidationFeedback(buildValidationFeedback('SUCCESS', {
-      citizenName: `${formData.get('manualNames')} ${formData.get('manualLastNames')}`,
-      code: formData.get('manualDni'),
-      source: 'manual',
-    }));
+    setPendingOperativePayload({
+      aceptaTratamientoDatos: requiresAdditionalManualData ? Boolean(formData.get('manualDataConsent')) : null,
+      dni: formData.get('manualDni')?.trim(),
+      email: requiresAdditionalManualData && hasEmail ? manualEmail : null,
+      lastNames: manualRegistrationIdentity.lastNames,
+      names: manualRegistrationIdentity.names,
+      phone: requiresAdditionalManualData && hasPhone ? manualPhone : null,
+    });
     setPendingOperativeAction('manual-registration');
   }
 
-  function confirmAnnulment({ reason, detail }) {
-    if (!pendingAnnulment) {
+  async function confirmOperativeAction() {
+    if (!pendingOperativeAction || !pendingOperativePayload || !selectedEvent?.id) {
+      setPendingOperativeAction(null);
+      setPendingOperativePayload(null);
       return;
     }
 
-    const annulledAt = new Date().toLocaleString('es-PE', {
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      month: 'short',
-    });
+    if (!isOperativeWindowAvailable) {
+      setValidationFeedback(buildValidationFeedback('CLOSED', { source: 'manual' }));
+      setPendingOperativeAction(null);
+      setPendingOperativePayload(null);
+      return;
+    }
 
-    setValidations((currentValidations) =>
-      currentValidations.map((validation) =>
-        validation.code === pendingAnnulment.code
-          ? {
-            ...validation,
-            annulledAt,
-            annulmentReason: reason === 'Otro' ? detail : reason,
-            status: 'ANULADA',
-          }
-          : validation,
-      ),
-    );
-    setValidationFeedback(buildValidationFeedback('ANNULLED', {
-      code: pendingAnnulment.code,
-      citizenName: pendingAnnulment.person,
-      source: 'manual',
-    }));
-    setPendingAnnulment(null);
+    setIsManualActionLoading(true);
+
+    try {
+      const result = pendingOperativeAction === 'manual-registration'
+        ? await registrarInscripcionManualOperativo(selectedEvent.id, pendingOperativePayload)
+        : await validarAsistenciaManualOperativo(selectedEvent.id, pendingOperativePayload);
+
+      setValidationFeedback({
+        title: result.title,
+        message: result.message,
+        tone: result.tone,
+        citizenName: result.citizenName,
+        code: result.code,
+        source: 'manual',
+      });
+
+      if (result.status === 'SUCCESS') {
+        setOperativeEventsReloadKey((currentKey) => currentKey + 1);
+        if (pendingOperativeAction === 'manual-registration') {
+          setIsManualRegistrationOpen(false);
+          resetManualRegistrationIdentity();
+          resetManualRegistrationContactOptions();
+        }
+      }
+    } catch (error) {
+      setValidationFeedback({
+        ...buildValidationFeedback('NOT_FOUND', { source: 'manual' }),
+        message: getApiErrorMessage(error, 'No se pudo completar la validacion manual.'),
+      });
+    } finally {
+      setIsManualActionLoading(false);
+      setPendingOperativeAction(null);
+      setPendingOperativePayload(null);
+    }
+  }
+  async function confirmAnnulment({ reason, detail }) {
+    if (!pendingAnnulment || !selectedEvent?.id) {
+      setPendingAnnulment(null);
+      return;
+    }
+
+    if (!isOperativeWindowAvailable) {
+      setValidationFeedback(buildValidationFeedback('CLOSED', { source: 'manual' }));
+      setPendingAnnulment(null);
+      return;
+    }
+
+    setIsAnnulmentLoading(true);
+
+    try {
+      const result = await anularAsistenciaOperativo(selectedEvent.id, pendingAnnulment.id, {
+        detail,
+        reason,
+      });
+      const updatedValidation = result.validation ?? {
+        ...pendingAnnulment,
+        annulmentReason: reason === 'Otro' ? detail : reason,
+        status: 'ANULADA',
+      };
+
+      setValidations((currentValidations) =>
+        currentValidations.map((validation) =>
+          validation.id === pendingAnnulment.id ? updatedValidation : validation,
+        ),
+      );
+      setValidationFeedback({
+        title: result.title,
+        message: result.message,
+        tone: result.tone,
+        citizenName: result.citizenName,
+        code: result.code,
+        source: 'manual',
+      });
+      setOperativeEventsReloadKey((currentKey) => currentKey + 1);
+    } catch (error) {
+      setValidationFeedback({
+        ...buildValidationFeedback('NOT_FOUND', { source: 'manual' }),
+        message: getApiErrorMessage(error, 'No se pudo anular la asistencia.'),
+      });
+    } finally {
+      setIsAnnulmentLoading(false);
+      setPendingAnnulment(null);
+    }
   }
 
   return (
@@ -762,17 +1135,48 @@ function OperativoDashboard({ onLogout, user }) {
                 <span className="section-kicker">Validación QR</span>
                 <h2>Escaneo de ingreso</h2>
                 <div className="operative-scanner-box">
-                  <div className={scannerStatus === 'success' ? 'scanner-frame success' : 'scanner-frame'}>
-                    <span>{scannerStatus === 'success' ? 'QR validado' : 'Listo para escanear'}</span>
+                  <div className={`scanner-frame${scannerStatus === 'success' ? ' success' : ''}${isCameraScannerActive ? ' is-camera-active' : ''}`}>
+                    {isCameraScannerActive ? (
+                      <video ref={videoRef} muted playsInline />
+                    ) : (
+                      <span>{scannerStatus === 'success' ? 'QR validado' : 'Listo para escanear'}</span>
+                    )}
                   </div>
+                  <canvas ref={canvasRef} className="scanner-capture-canvas" aria-hidden="true" />
+                  <input
+                    ref={fileInputRef}
+                    accept="image/jpeg,image/png,image/webp"
+                    className="scanner-file-input"
+                    type="file"
+                    onChange={handleQrImageUpload}
+                  />
                   <div className="operative-scanner-actions">
-                    <button className="admin-primary-action" type="button" onClick={simulateQrScan}>
-                      Escanear QR
+                    <button
+                      className="admin-primary-action"
+                      type="button"
+                      disabled={isQrValidationLoading || !isOperativeWindowAvailable}
+                      onClick={isCameraScannerActive ? stopCameraScanner : startCameraScanner}
+                    >
+                      {isCameraScannerActive ? 'Detener camara' : 'Escanear QR'}
+                    </button>
+                    <button
+                      className="admin-secondary-action"
+                      type="button"
+                      disabled={isQrValidationLoading || !isOperativeWindowAvailable}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      Subir imagen
                     </button>
                     <button className="admin-secondary-action" type="button" onClick={resetScanner}>
                       Reiniciar
                     </button>
                   </div>
+                  {!isOperativeWindowAvailable && (
+                    <small className="scanner-status-text">La ventana operativa aún no está activa para este evento.</small>
+                  )}
+                  {isQrValidationLoading && (
+                    <small className="scanner-status-text">Validando QR...</small>
+                  )}
                   {validationFeedback?.source === 'scanner' && (
                     <ValidationFeedbackCard feedback={validationFeedback} />
                   )}
@@ -801,6 +1205,7 @@ function OperativoDashboard({ onLogout, user }) {
               </label>
               <button
                 className="admin-primary-action"
+                disabled={!isOperativeWindowAvailable}
                 type="submit"
               >
                 Validar asistencia
@@ -830,46 +1235,149 @@ function OperativoDashboard({ onLogout, user }) {
                 <button
                   className="admin-secondary-action manual-registration-toggle"
                   type="button"
+                  disabled={!isOperativeWindowAvailable}
                   onClick={() => setIsManualRegistrationOpen(true)}
                 >
                   Desplegar formulario
                 </button>
               ) : (
                 <form className="manual-registration-form" onSubmit={validateManualRegistration}>
-                  <label>
+                  <label className="manual-registration-dni-field">
                     DNI
-                    <input maxLength="8" name="manualDni" placeholder="Ingrese DNI" />
+                    <span className="manual-registration-dni-control">
+                      <input
+                        inputMode="numeric"
+                        maxLength="8"
+                        name="manualDni"
+                        placeholder="Ingrese DNI"
+                        onChange={(event) => {
+                          const normalizedDni = event.target.value.replace(/\D/g, '').slice(0, 8);
+                          event.target.value = normalizedDni;
+                          resetManualRegistrationIdentity();
+                        }}
+                      />
+                      <button
+                        className="admin-secondary-action"
+                        disabled={isSearchingManualRegistrationDni}
+                        type="button"
+                        onClick={(event) => {
+                          const form = event.currentTarget.closest('form');
+                          lookupManualRegistrationDni(form?.elements.manualDni?.value);
+                        }}
+                      >
+                        {isSearchingManualRegistrationDni ? 'Buscando...' : 'Buscar'}
+                      </button>
+                    </span>
+                    {manualRegistrationIdentityMessage && (
+                      <small className={manualRegistrationIdentity ? 'identity-verified-message' : 'identity-error-message'}>
+                        {manualRegistrationIdentityMessage}
+                      </small>
+                    )}
                   </label>
                   <label>
                     Nombres
-                    <input name="manualNames" placeholder="Nombres del ciudadano" />
+                    <input name="manualNames" placeholder="Nombres del ciudadano" readOnly value={manualRegistrationIdentity?.names ?? ''} />
                   </label>
                   <label>
                     Apellidos
-                    <input name="manualLastNames" placeholder="Apellidos del ciudadano" />
+                    <input name="manualLastNames" placeholder="Apellidos del ciudadano" readOnly value={manualRegistrationIdentity?.lastNames ?? ''} />
                   </label>
-                  <label>
-                    Celular
-                    <input name="manualPhone" placeholder="Número de contacto" />
-                  </label>
-                  <label>
-                    Correo
-                    <input name="manualEmail" placeholder="correo@dominio.com" type="email" />
-                  </label>
-                  <label className="manual-registration-check">
-                    <input name="manualDataConsent" type="checkbox" />
-                    Acepta tratamiento de datos para registrar su participación.
-                  </label>
+                  {isManualRegistrationPlatformNeighbor && (
+                    <section className="manual-registration-platform-notice">
+                      <strong>Cuenta vecinal encontrada</strong>
+                      <p>El ciudadano ya esta registrado en la plataforma. Se usaran sus datos existentes y solo se registrara la inscripcion con asistencia.</p>
+                    </section>
+                  )}
+
+                  {manualRegistrationRequiresAdditionalData && (
+                    <>
+                      <div className="manual-registration-contact-field">
+                        <label className="manual-registration-contact-toggle">
+                          <input
+                            checked={manualRegistrationContactOptions.phone}
+                            name="manualHasPhone"
+                            type="checkbox"
+                            onChange={(event) => {
+                              const checked = event.target.checked;
+                              setManualRegistrationContactOptions((currentOptions) => ({
+                                ...currentOptions,
+                                phone: checked,
+                              }));
+                              if (!checked) {
+                                const phoneInput = event.currentTarget.closest('.manual-registration-contact-field')
+                                  ?.querySelector('input[name="manualPhone"]');
+                                if (phoneInput) {
+                                  phoneInput.value = '';
+                                }
+                              }
+                            }}
+                          />
+                          Cuenta con celular
+                        </label>
+                        <label>
+                          Celular
+                          <input
+                            disabled={!manualRegistrationContactOptions.phone}
+                            inputMode="tel"
+                            name="manualPhone"
+                            placeholder="Numero de contacto"
+                          />
+                        </label>
+                      </div>
+                      <div className="manual-registration-contact-field">
+                        <label className="manual-registration-contact-toggle">
+                          <input
+                            checked={manualRegistrationContactOptions.email}
+                            name="manualHasEmail"
+                            type="checkbox"
+                            onChange={(event) => {
+                              const checked = event.target.checked;
+                              setManualRegistrationContactOptions((currentOptions) => ({
+                                ...currentOptions,
+                                email: checked,
+                              }));
+                              if (!checked) {
+                                const emailInput = event.currentTarget.closest('.manual-registration-contact-field')
+                                  ?.querySelector('input[name="manualEmail"]');
+                                if (emailInput) {
+                                  emailInput.value = '';
+                                }
+                              }
+                            }}
+                          />
+                          Cuenta con correo
+                        </label>
+                        <label>
+                          Correo
+                          <input
+                            disabled={!manualRegistrationContactOptions.email}
+                            name="manualEmail"
+                            placeholder="correo@dominio.com"
+                            type="email"
+                          />
+                        </label>
+                      </div>
+                      <label className="manual-registration-check">
+                        <input name="manualDataConsent" type="checkbox" />
+                        Acepta tratamiento de datos para registrar su participacion.
+                      </label>
+                    </>
+                  )}
                   <div className="manual-registration-actions">
                     <button
                       className="admin-secondary-action"
                       type="button"
-                      onClick={() => setIsManualRegistrationOpen(false)}
+                      onClick={() => {
+                        setIsManualRegistrationOpen(false);
+                        resetManualRegistrationIdentity();
+                        resetManualRegistrationContactOptions();
+                      }}
                     >
                       Ocultar formulario
                     </button>
                     <button
                       className="admin-primary-action"
+                      disabled={!isOperativeWindowAvailable}
                       type="submit"
                     >
                       Registrar inscripción y asistencia
@@ -898,7 +1406,7 @@ function OperativoDashboard({ onLogout, user }) {
               <span>Accion</span>
             </div>
             {validations.map((validation) => (
-              <div className="admin-table-row" key={validation.code}>
+              <div className="admin-table-row" key={validation.id ?? validation.code}>
                 <span>
                   <strong>{validation.person}</strong>
                   <small>{selectedEvent?.title}</small>
@@ -907,7 +1415,7 @@ function OperativoDashboard({ onLogout, user }) {
                 <span>{validation.origin}</span>
                 <span>{validation.method}</span>
                 <span>
-                  <mark>{validation.status}</mark>
+                  <mark className={validation.status === 'ANULADA' ? 'is-annulled' : undefined}>{validation.status}</mark>
                   {validation.annulmentReason && (
                     <small>
                       {validation.annulmentReason} · {validation.annulledAt}
@@ -920,6 +1428,7 @@ function OperativoDashboard({ onLogout, user }) {
                     <button
                       className="operative-annul-action"
                       type="button"
+                      disabled={!isOperativeWindowAvailable || !validation.id}
                       onClick={() => setPendingAnnulment(validation)}
                     >
                       Anular
@@ -937,8 +1446,12 @@ function OperativoDashboard({ onLogout, user }) {
           <OperativeActionModal
             action={pendingOperativeAction}
             eventTitle={selectedEvent?.title}
-            onCancel={() => setPendingOperativeAction(null)}
-            onConfirm={() => setPendingOperativeAction(null)}
+            isLoading={isManualActionLoading}
+            onCancel={() => {
+              setPendingOperativeAction(null);
+              setPendingOperativePayload(null);
+            }}
+            onConfirm={confirmOperativeAction}
           />
         )}
 
@@ -953,6 +1466,7 @@ function OperativoDashboard({ onLogout, user }) {
         {pendingAnnulment && (
           <AnnulValidationModal
             validation={pendingAnnulment}
+            isLoading={isAnnulmentLoading}
             onCancel={() => setPendingAnnulment(null)}
             onConfirm={confirmAnnulment}
           />
@@ -984,7 +1498,7 @@ function ValidationFeedbackCard({ feedback }) {
   );
 }
 
-function AnnulValidationModal({ validation, onCancel, onConfirm }) {
+function AnnulValidationModal({ validation, isLoading = false, onCancel, onConfirm }) {
   const [reason, setReason] = useState('');
   const [detail, setDetail] = useState('');
   const requiresDetail = reason === 'Otro';
@@ -1060,16 +1574,16 @@ function AnnulValidationModal({ validation, onCancel, onConfirm }) {
         )}
 
         <div className="modal-actions">
-          <button className="back-button" type="button" onClick={onCancel}>
+          <button className="back-button" type="button" disabled={isLoading} onClick={onCancel}>
             Cancelar
           </button>
           <button
             className="primary-button danger-action"
             type="button"
-            disabled={!canConfirm}
+            disabled={!canConfirm || isLoading}
             onClick={() => onConfirm({ detail: detail.trim(), reason })}
           >
-            Anular validación
+            {isLoading ? 'Anulando...' : 'Anular validación'}
           </button>
         </div>
       </section>
@@ -1104,7 +1618,7 @@ function OperativeValidationIssueModal({ fields, title, onClose }) {
   );
 }
 
-function OperativeActionModal({ action, eventTitle, onCancel, onConfirm }) {
+function OperativeActionModal({ action, eventTitle, isLoading = false, onCancel, onConfirm }) {
   const isManualRegistration = action === 'manual-registration';
   const title = isManualRegistration
     ? `¿Estás seguro de registrar una inscripción manual para "${eventTitle}"?`
@@ -1130,11 +1644,11 @@ function OperativeActionModal({ action, eventTitle, onCancel, onConfirm }) {
         <h2 id="operative-action-title">{title}</h2>
         <p>{description}</p>
         <div className="modal-actions">
-          <button className="back-button" type="button" onClick={onCancel}>
+          <button className="back-button" type="button" disabled={isLoading} onClick={onCancel}>
             Revisar datos
           </button>
-          <button className="primary-button" type="button" onClick={onConfirm}>
-            {confirmLabel}
+          <button className="primary-button" type="button" disabled={isLoading} onClick={onConfirm}>
+            {isLoading ? 'Procesando...' : confirmLabel}
           </button>
         </div>
       </section>

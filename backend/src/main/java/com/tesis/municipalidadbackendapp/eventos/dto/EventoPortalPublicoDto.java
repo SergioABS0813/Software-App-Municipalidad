@@ -7,6 +7,7 @@ import java.util.List;
 public record EventoPortalPublicoDto(
         Integer id,
         String titulo,
+        String estadoCodigo,
         String descripcionBreve,
         String descripcion,
         LocalDateTime fechaHoraInicio,

@@ -119,11 +119,18 @@ public class EventoService {
 
     @Transactional(readOnly = true)
     public EventoPortalPublicoDto obtenerProximoEventoPortalPublico() {
-        return eventoRepository.findNextPortalPublico(Instant.now(), PageRequest.of(0, 1))
+        Instant ahora = Instant.now();
+        PageRequest primero = PageRequest.of(0, 1);
+
+        Evento eventoDestacado = eventoRepository.findEventosEnCursoPortalPublico(ahora, primero)
                 .stream()
                 .findFirst()
-                .map(this::toPortalPublicoDto)
-                .orElse(null);
+                .orElseGet(() -> eventoRepository.findNextPortalPublico(ahora, primero)
+                        .stream()
+                        .findFirst()
+                        .orElse(null));
+
+        return eventoDestacado != null ? toPortalPublicoDto(eventoDestacado) : null;
     }
     public Page<EventoRevisionDirectivaResumenDto> obtenerEventosRevisionDirectiva(
             String estado,
@@ -143,7 +150,7 @@ public class EventoService {
 
     @Transactional(readOnly = true)
     public List<EventoReporteDirectivoDto> obtenerReportesDirectivosFinalizados() {
-        return eventoRepository.findAllReportesDirectivosFinalizados(List.of("FINALIZADO", "CERRADO")).stream()
+        return eventoRepository.findAllReportesDirectivosFinalizados(List.of("FINALIZADO")).stream()
                 .map(this::toReporteDirectivoDto)
                 .toList();
     }
@@ -301,6 +308,7 @@ public class EventoService {
         return new EventoPortalPublicoDto(
                 evento.getId(),
                 evento.getTitulo(),
+                evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : null,
                 evento.getDescripcionBreve(),
                 evento.getDescripcion(),
                 toLocalDateTime(evento.getFechaHoraInicio()),
@@ -444,7 +452,7 @@ public class EventoService {
                         rangoMesActual.fin()
                 )),
                 toIntegerCount(eventoRepository.countByEstadoCodigoInAndFechaActualizacionBetween(
-                        List.of("FINALIZADO", "CERRADO"),
+                        List.of("FINALIZADO"),
                         rangoMesActual.inicio(),
                         rangoMesActual.fin()
                 ))
@@ -1239,13 +1247,9 @@ public class EventoService {
             return "FINALIZADO";
         }
 
-        if (estadoEventoRepository.findByCodigo("CERRADO").isPresent()) {
-            return "CERRADO";
-        }
-
         throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
-                "No existe un estado FINALIZADO o CERRADO para cerrar el evento"
+                "No existe el estado FINALIZADO para finalizar el evento"
         );
     }
 

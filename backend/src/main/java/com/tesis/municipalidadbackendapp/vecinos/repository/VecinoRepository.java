@@ -70,6 +70,8 @@ public interface VecinoRepository extends JpaRepository<Vecino, Integer> {
 
     Optional<Vecino> findByEmailAndDni(String email, String dni);
 
+    Optional<Vecino> findByDni(String dni);
+
     Optional<Vecino> findByKeycloakId(String keycloakId);
 
     Optional<Vecino> findByEmailIgnoreCase(String email);

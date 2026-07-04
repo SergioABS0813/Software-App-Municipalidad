@@ -8,6 +8,16 @@ export async function recuperarContrasena(correo, dni){
     });
     return response.data;
 }
+
+export async function consultarIdentidadRegistroVecino(dni){
+    const response = await api.get(`auth/vecinos/registro/identidad/${dni}`);
+    return response.data;
+}
+
+export async function registrarVecinoPublico(payload){
+    const response = await api.post('auth/vecinos/registro', payload);
+    return response.data;
+}
 export async function obtenerEventosPublicados({ texto = '', categoriaId = '', page = 0, size = 6 } = {}){
     const response = await api.get('public/eventos', {
         params: {

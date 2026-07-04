@@ -2,7 +2,6 @@ package com.tesis.municipalidadbackendapp.auth.service;
 
 import com.tesis.municipalidadbackendapp.usuariosinternos.entity.Usuario;
 import com.tesis.municipalidadbackendapp.usuariosinternos.service.KeycloakAdminService;
-import com.tesis.municipalidadbackendapp.usuariosinternos.service.UsuarioNotificacionService;
 import com.tesis.municipalidadbackendapp.usuariosinternos.service.UsuarioService;
 import com.tesis.municipalidadbackendapp.vecinos.entity.Vecino;
 import com.tesis.municipalidadbackendapp.vecinos.service.VecinoService;

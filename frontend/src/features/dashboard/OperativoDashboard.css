@@ -120,6 +120,11 @@
   font-weight: 600;
 }
 
+
+.operative-shell .admin-table mark.is-annulled {
+  background: #fee2e2;
+  color: #b91c1c;
+}
 .operative-shell .admin-table-row > span:not(:first-child) {
   font-weight: 450;
 }
@@ -345,8 +350,35 @@
   color: #15803d;
 }
 
+.scanner-frame.is-camera-active {
+  background: #071a2c;
+  border-style: solid;
+  overflow: hidden;
+  padding: 0;
+}
+
+.scanner-frame video {
+  aspect-ratio: 16 / 9;
+  display: block;
+  min-height: 180px;
+  object-fit: cover;
+  width: 100%;
+}
+
+.scanner-capture-canvas,
+.scanner-file-input {
+  display: none;
+}
+
+.scanner-status-text {
+  color: var(--brand-primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
 .operative-scanner-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -575,6 +607,87 @@
   padding: 0 12px;
 }
 
+
+.manual-registration-dni-field {
+  grid-column: span 2;
+}
+
+.manual-registration-dni-control {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.manual-registration-dni-control .admin-secondary-action {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.manual-registration-form input[readonly] {
+  cursor: not-allowed;
+  opacity: 0.9;
+}
+
+.manual-registration-form .identity-verified-message,
+.manual-registration-form .identity-error-message {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.manual-registration-form .identity-verified-message {
+  color: #047857;
+}
+
+.manual-registration-form .identity-error-message {
+  color: #b91c1c;
+}
+
+
+.manual-registration-platform-notice {
+  background: #eff6ff;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 8px;
+  color: #1e3a8a;
+  display: grid;
+  gap: 5px;
+  grid-column: span 2;
+  padding: 12px 14px;
+}
+
+.manual-registration-platform-notice strong {
+  color: #12356f;
+  font-size: 0.86rem;
+}
+
+.manual-registration-platform-notice p {
+  color: #31547d;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  margin: 0;
+}
+.manual-registration-contact-field {
+  display: grid;
+  gap: 8px;
+}
+
+.manual-registration-contact-toggle {
+  align-items: center;
+  display: grid !important;
+  gap: 8px;
+  grid-template-columns: auto 1fr;
+  line-height: 1.35;
+}
+
+.manual-registration-contact-toggle input {
+  height: 17px;
+  min-height: 17px;
+  width: 17px;
+}
+
+.manual-registration-form input:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
 .manual-registration-check {
   align-items: center;
   display: grid !important;
@@ -723,9 +836,15 @@
     grid-template-columns: 1fr;
   }
 
+  .manual-registration-dni-field,
+  .manual-registration-platform-notice,
   .manual-registration-check,
   .manual-registration-actions {
     grid-column: auto;
+  }
+
+  .manual-registration-dni-control {
+    grid-template-columns: 1fr;
   }
 
   .manual-registration-actions {

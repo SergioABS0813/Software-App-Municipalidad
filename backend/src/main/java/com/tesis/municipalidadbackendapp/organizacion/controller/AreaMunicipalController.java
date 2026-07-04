@@ -1,7 +1,6 @@
 package com.tesis.municipalidadbackendapp.organizacion.controller;
 
 import com.tesis.municipalidadbackendapp.organizacion.dto.AreaMunicipalDto;
-import com.tesis.municipalidadbackendapp.organizacion.entity.AreaMunicipal;
 import com.tesis.municipalidadbackendapp.organizacion.service.AreaMunicipalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;

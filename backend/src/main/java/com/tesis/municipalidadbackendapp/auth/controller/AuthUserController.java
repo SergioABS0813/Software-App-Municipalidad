@@ -1,6 +1,7 @@
 package com.tesis.municipalidadbackendapp.auth.controller;
 
 import com.tesis.municipalidadbackendapp.auth.dto.AuthenticatedUserResponse;
+import com.tesis.municipalidadbackendapp.vecinos.dto.VecinoIdentidadRegistroResponse;
 import com.tesis.municipalidadbackendapp.vecinos.dto.VecinoRegistroRequest;
 import com.tesis.municipalidadbackendapp.vecinos.dto.VecinoRegistroResponse;
 import com.tesis.municipalidadbackendapp.vecinos.service.VecinoService;
@@ -8,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,6 +24,11 @@ import java.util.Map;
 public class AuthUserController {
 
     private final VecinoService vecinoService;
+
+    @GetMapping("vecinos/registro/identidad/{dni}")
+    public VecinoIdentidadRegistroResponse consultarIdentidadRegistroVecino(@PathVariable String dni) {
+        return vecinoService.consultarIdentidadRegistroVecino(dni);
+    }
 
     @PostMapping("vecinos/registro")
     public VecinoRegistroResponse registrarVecino(@RequestBody VecinoRegistroRequest request) {

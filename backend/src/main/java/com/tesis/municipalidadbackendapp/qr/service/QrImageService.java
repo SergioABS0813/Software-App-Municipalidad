@@ -1,10 +1,6 @@
 package com.tesis.municipalidadbackendapp.qr.service;
 
-import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
-import com.google.zxing.client.j2se.MatrixToImageWriter;
-import com.google.zxing.common.BitMatrix;
-import com.google.zxing.qrcode.QRCodeWriter;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 import com.google.zxing.qrcode.encoder.ByteMatrix;
 import com.google.zxing.qrcode.encoder.Encoder;
@@ -101,16 +97,12 @@ public class QrImageService {
                     int moduleX = offset + (x + quietZone) * moduleSize;
                     int moduleY = offset + (y + quietZone) * moduleSize;
 
-                    float radius = moduleSize * 0.35f;
-
-                    graphics.fill(new RoundRectangle2D.Float(
+                    graphics.fillRect(
                             moduleX,
                             moduleY,
                             moduleSize,
-                            moduleSize,
-                            radius,
-                            radius
-                    ));
+                            moduleSize
+                    );
                 }
             }
         }
@@ -127,8 +119,8 @@ public class QrImageService {
         int qrWidth = qrImage.getWidth();
         int qrHeight = qrImage.getHeight();
 
-        int maxLogoWidth = (int) (qrWidth * 0.22);
-        int maxLogoHeight = (int) (qrHeight * 0.22);
+        int maxLogoWidth = (int) (qrWidth * 0.20);
+        int maxLogoHeight = (int) (qrHeight * 0.20);
 
         int logoOriginalWidth = logoImage.getWidth();
         int logoOriginalHeight = logoImage.getHeight();
@@ -144,7 +136,7 @@ public class QrImageService {
         int logoX = (qrWidth - logoFinalWidth) / 2;
         int logoY = (qrHeight - logoFinalHeight) / 2;
 
-        int padding = (int) (qrWidth * 0.02);
+        int padding = (int) (qrWidth * 0.015);
 
         int fondoSize = Math.max(logoFinalWidth, logoFinalHeight) + padding * 2;
         int fondoX = (qrWidth - fondoSize) / 2;

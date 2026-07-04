@@ -26,6 +26,8 @@ import {
   obtenerPerfilVecino,
   actualizarPerfilVecino,
   subirComprobantePago,
+  consultarIdentidadRegistroVecino,
+  registrarVecinoPublico,
 } from '../../services/publicPortalService';
 import LoadingButton from '../../components/feedback/LoadingButton';
 
@@ -123,8 +125,40 @@ function getEventShortDescription(event) {
   return event.descripcion_breve || event.descripcion || event.summary || event.description || '';
 }
 
+function parsePublicLocalDateTime(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  const text = String(value).trim();
+  const localDateTimeMatch = text.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/,
+  );
+
+  if (localDateTimeMatch) {
+    const [, year, month, day, hour, minute, second = '0'] = localDateTimeMatch;
+    const date = new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+      Number(second),
+    );
+
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const date = new Date(text);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
 function formatPublicEventDate(value) {
-  const date = value ? new Date(value) : null;
+  const date = parsePublicLocalDateTime(value);
 
   if (!date || Number.isNaN(date.getTime())) {
     return 'Fecha por confirmar';
@@ -138,7 +172,7 @@ function formatPublicEventDate(value) {
 }
 
 function formatPublicEventTime(value) {
-  const date = value ? new Date(value) : null;
+  const date = parsePublicLocalDateTime(value);
 
   if (!date || Number.isNaN(date.getTime())) {
     return 'Hora por confirmar';
@@ -151,8 +185,8 @@ function formatPublicEventTime(value) {
 }
 
 function formatPublicEventDuration(startValue, endValue) {
-  const start = startValue ? new Date(startValue) : null;
-  const end = endValue ? new Date(endValue) : null;
+  const start = parsePublicLocalDateTime(startValue);
+  const end = parsePublicLocalDateTime(endValue);
 
   if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
     return 'Duracion por confirmar';
@@ -217,6 +251,7 @@ function mapPublicEventFromApi(event, index = 0) {
   return {
     id: event.id,
     title: event.titulo ?? 'Evento municipal',
+    state: event.estadoCodigo ?? event.state ?? 'PUBLICADO',
     category: event.categoriaNombre ?? 'Sin categoria',
     categoryId: event.categoriaId,
     date: formatPublicEventDate(event.fechaHoraInicio),
@@ -1966,8 +2001,7 @@ function VecinoRegisterPage({ onBack, onLogin }) {
   const [identityResult, setIdentityResult] = useState(null);
   const [identityMessage, setIdentityMessage] = useState('');
   const [isSearchingIdentity, setIsSearchingIdentity] = useState(false);
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
+  const [isSubmittingRegister, setIsSubmittingRegister] = useState(false);
 
   function updateField(field, value) {
     const nextValue = field === 'dni' ? value.replace(/\D/g, '').slice(0, 8) : value;
@@ -1994,22 +2028,26 @@ function VecinoRegisterPage({ onBack, onLogin }) {
 
     setFormError('');
     setIdentityMessage('');
+    setIdentityResult(null);
     setIsSearchingIdentity(true);
 
-    const identity = await buscarIdentidadPorDni(dni);
+    try {
+      const identity = await consultarIdentidadRegistroVecino(dni);
 
-    setIsSearchingIdentity(false);
-
-    if (!identity) {
+      setIdentityResult({
+        apellidos: '',
+        dni: identity.dni ?? dni,
+        nombreCompleto: identity.nombreCompleto ?? '',
+        nombres: identity.nombreCompleto ?? '',
+      });
+      setIdentityMessage('');
+    } catch (error) {
       setIdentityResult(null);
-      setIdentityMessage('No se encontraron datos para el DNI ingresado.');
-      return;
+      setIdentityMessage(getApiErrorMessage(error, 'No se encontraron datos para el DNI ingresado.'));
+    } finally {
+      setIsSearchingIdentity(false);
     }
-
-    setIdentityResult(identity);
-    setIdentityMessage('');
   }
-
   function validateRegisterForm() {
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -2040,18 +2078,7 @@ function VecinoRegisterPage({ onBack, onLogin }) {
     if (!formData.celular.trim()) {
       return 'Ingresa tu número de celular.';
     }
-
-    if (!formData.password) {
-      return 'Crea una contraseña.';
-    }
-
-    if (!formData.confirmPassword) {
-      return 'Confirma tu contraseña.';
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      return 'Las contraseñas deben coincidir.';
-    }
+
 
     if (!formData.acceptsDataUse) {
       return 'Debes aceptar el uso de tus datos para crear la cuenta.';
@@ -2060,7 +2087,7 @@ function VecinoRegisterPage({ onBack, onLogin }) {
     return '';
   }
 
-  function submitRegister(event) {
+  async function submitRegister(event) {
     event.preventDefault();
 
     const validationMessage = validateRegisterForm();
@@ -2071,21 +2098,25 @@ function VecinoRegisterPage({ onBack, onLogin }) {
     }
 
     const payload = {
-      dni: formData.dni.trim(),
-      nombres: identityResult.nombres,
-      apellidos: identityResult.apellidos,
-      nombreCompleto: identityResult.nombreCompleto,
-      fechaNacimiento: formData.fechaNacimiento,
-      correo: formData.correo.trim(),
+      aceptaTratamientoDatos: formData.acceptsDataUse,
       celular: formData.celular.trim(),
-      password: formData.password,
+      dni: formData.dni.trim(),
+      email: formData.correo.trim(),
+      fechaNacimiento: formData.fechaNacimiento,
+      nombreCompleto: identityResult.nombreCompleto,
     };
 
-    // TODO: conectar este payload con el endpoint de registro vecinal en Spring Boot.
-    void payload;
-    onLogin('¡Cuenta creada! Te enviamos un correo de confirmación. Revisa tu bandeja de entrada para activar tu cuenta e iniciar sesión.');
-  }
+    setIsSubmittingRegister(true);
 
+    try {
+      const response = await registrarVecinoPublico(payload);
+      onLogin(response?.mensaje || '¡Cuenta creada! Te enviamos un correo de confirmación. Revisa tu bandeja de entrada para activar tu cuenta e iniciar sesión.');
+    } catch (error) {
+      setFormError(getApiErrorMessage(error, 'No se pudo crear la cuenta vecinal.'));
+    } finally {
+      setIsSubmittingRegister(false);
+    }
+  }
   return (
     <section className="login-shell register-shell" aria-labelledby="register-title">
       <div className="login-form-side register-form-side">
@@ -2124,7 +2155,7 @@ function VecinoRegisterPage({ onBack, onLogin }) {
                   onChange={(event) => updateField('dni', event.target.value)}
                 />
                 <LoadingButton
-                  disabled={!/^\d{8}$/.test(formData.dni) || isSearchingIdentity}
+                  disabled={!/^\d{8}$/.test(formData.dni) || isSearchingIdentity || isSubmittingRegister}
                   loading={isSearchingIdentity}
                   loadingLabel="Buscando..."
                   type="button"
@@ -2172,55 +2203,7 @@ function VecinoRegisterPage({ onBack, onLogin }) {
                 value={formData.celular}
                 onChange={(event) => updateField('celular', event.target.value)}
               />
-            </label>
-            <label>
-              Contraseña
-              <span className="password-control">
-                <input
-                  autoComplete="new-password"
-                  placeholder="Cree una contraseña"
-                  type={isPasswordVisible ? 'text' : 'password'}
-                  value={formData.password}
-                  onChange={(event) => updateField('password', event.target.value)}
-                />
-                <button
-                  aria-label={
-                    isPasswordVisible ? 'Ocultar contraseña' : 'Mostrar contraseña'
-                  }
-                  className="password-toggle"
-                  type="button"
-                  onClick={() => setIsPasswordVisible((currentValue) => !currentValue)}
-                >
-                  {isPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
-                </button>
-              </span>
-            </label>
-            <label>
-              Confirmar contraseña
-              <span className="password-control">
-                <input
-                  autoComplete="new-password"
-                  placeholder="Repita su contraseña"
-                  type={isConfirmPasswordVisible ? 'text' : 'password'}
-                  value={formData.confirmPassword}
-                  onChange={(event) => updateField('confirmPassword', event.target.value)}
-                />
-                <button
-                  aria-label={
-                    isConfirmPasswordVisible
-                      ? 'Ocultar confirmación de contraseña'
-                      : 'Mostrar confirmación de contraseña'
-                  }
-                  className="password-toggle"
-                  type="button"
-                  onClick={() =>
-                    setIsConfirmPasswordVisible((currentValue) => !currentValue)
-                  }
-                >
-                  {isConfirmPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
-                </button>
-              </span>
-            </label>
+            </label>
           </div>
 
           <label className="data-consent-control">
@@ -2237,8 +2220,8 @@ function VecinoRegisterPage({ onBack, onLogin }) {
 
           {formError && <p className="login-error">{formError}</p>}
 
-          <button className="primary-button register-primary-button" type="submit">
-            Crear cuenta
+          <button className="primary-button register-primary-button" disabled={isSubmittingRegister} type="submit">
+            {isSubmittingRegister ? 'Creando cuenta...' : 'Crear cuenta'}
           </button>
 
           <p className="register-login-link">
@@ -2310,6 +2293,7 @@ function PortalHome({
 }) {
   const featuredCoverUrl = featuredEvent ? getEventCoverUrl(featuredEvent) : '';
   const hasFeaturedEvent = Boolean(featuredEvent);
+  const featuredKicker = featuredEvent?.state === 'EN_CURSO' ? 'Evento en curso' : 'Próximo evento';
   const currentPage = eventsPage?.number ?? 0;
   const totalPages = eventsPage?.totalPages ?? 0;
   const totalEvents = eventsPage?.totalElements ?? filteredEvents.length;
@@ -2339,12 +2323,12 @@ function PortalHome({
           </div>
           <div className="featured-content">
             <div className="featured-labels">
-              <span className="featured-kicker">Próximo evento</span>
+              <span className="featured-kicker">{featuredKicker}</span>
               <span className="featured-status">{featuredEvent.status}</span>
             </div>
             <h2>{featuredEvent.title}</h2>
             <p>{getEventShortDescription(featuredEvent)}</p>
-            <div className="featured-event-meta" aria-label="Datos rápidos del próximo evento">
+            <div className="featured-event-meta" aria-label={`Datos rápidos del ${featuredKicker.toLowerCase()}`}>
               <span>
                 <CalendarClockIcon />
                 {featuredEvent.date} · {featuredEvent.time}

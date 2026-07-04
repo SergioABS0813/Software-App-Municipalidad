@@ -233,6 +233,38 @@ export async function getEventosOperativoHoy(){
     return response.data;
 }
 
+export async function validarQrOperativoTexto(eventoId, qrContent){
+    const response = await api.post(`operativo/eventos/${eventoId}/validaciones/qr/texto`, { qrContent });
+    return response.data;
+}
+
+export async function validarQrOperativoImagen(eventoId, archivo){
+    const formData = new FormData();
+    formData.append("archivo", archivo);
+    const response = await api.post(`operativo/eventos/${eventoId}/validaciones/qr/imagen`, formData);
+    return response.data;
+}
+
+export async function validarAsistenciaManualOperativo(eventoId, payload){
+    const response = await api.post(`operativo/eventos/${eventoId}/validaciones/manual`, payload);
+    return response.data;
+}
+
+
+export async function anularAsistenciaOperativo(eventoId, asistenciaId, payload){
+    const response = await api.post(`operativo/eventos/${eventoId}/validaciones/${asistenciaId}/anular`, payload);
+    return response.data;
+}
+
+export async function consultarIdentidadInscripcionManualOperativo(dni){
+    const response = await api.get(`operativo/eventos/inscripciones/manual/identidad/${dni}`);
+    return response.data;
+}
+export async function registrarInscripcionManualOperativo(eventoId, payload){
+    const response = await api.post(`operativo/eventos/${eventoId}/inscripciones/manual`, payload);
+    return response.data;
+}
+
 export async function getReportesDirectivosFinalizados(){
     const response = await api.get("eventos/directivo/reportes");
     return response.data;

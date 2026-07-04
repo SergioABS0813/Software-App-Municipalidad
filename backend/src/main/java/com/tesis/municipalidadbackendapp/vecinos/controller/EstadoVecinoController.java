@@ -1,7 +1,6 @@
 package com.tesis.municipalidadbackendapp.vecinos.controller;
 
 import com.tesis.municipalidadbackendapp.vecinos.dto.EstadoVecinoDirectorioDto;
-import com.tesis.municipalidadbackendapp.vecinos.entity.EstadoVecino;
 import com.tesis.municipalidadbackendapp.vecinos.service.EstadoVecinoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;

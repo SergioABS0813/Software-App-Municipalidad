@@ -1,80 +1,120 @@
 import { useEffect, useState } from 'react';
 
-const eventMonthIndex = {
-  abr: 3,
-  ago: 7,
-  dic: 11,
-  ene: 0,
-  feb: 1,
-  jul: 6,
-  jun: 5,
-  mar: 2,
-  may: 4,
-  nov: 10,
-  oct: 9,
-  sep: 8,
-};
+// const eventMonthIndex = {
+//   abr: 3,
+//   ago: 7,
+//   dic: 11,
+//   ene: 0,
+//   feb: 1,
+//   jul: 6,
+//   jun: 5,
+//   mar: 2,
+//   may: 4,
+//   nov: 10,
+//   oct: 9,
+//   sep: 8,
+// };
 
-function parseEventDateTime(event) {
-  const dateMatch = event.date?.match(/(\d{1,2})\s+([a-záéíóúñ]{3})/i);
-
-  if (!dateMatch) {
+function parseEventDate(value) {
+  if (!value) {
     return null;
   }
 
-  const day = Number(dateMatch[1]);
-  const monthKey = dateMatch[2]
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
-  const month = eventMonthIndex[monthKey];
+  const date = new Date(value);
 
-  if (!Number.isFinite(day) || month === undefined) {
-    return null;
-  }
-
-  const timeMatch = event.time?.match(/(\d{1,2})(?::(\d{2}))?\s*(a\.m\.|p\.m\.)?/i);
-  let hours = timeMatch ? Number(timeMatch[1]) : 0;
-  const minutes = timeMatch?.[2] ? Number(timeMatch[2]) : 0;
-  const meridiem = timeMatch?.[3]?.toLowerCase();
-
-  if (meridiem === 'p.m.' && hours < 12) {
-    hours += 12;
-  }
-
-  if (meridiem === 'a.m.' && hours === 12) {
-    hours = 0;
-  }
-
-  const currentYear = new Date().getFullYear();
-  const eventDate = new Date(currentYear, month, day, hours, minutes);
-
-  if (Number.isNaN(eventDate.getTime())) {
-    return null;
-  }
-
-  return eventDate;
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function parseEventDurationMinutes(duration) {
-  const hoursMatch = duration?.match(/(\d+(?:[.,]\d+)?)\s*hora/i);
-  const minutesMatch = duration?.match(/(\d+)\s*min/i);
-  const hours = hoursMatch ? Number(hoursMatch[1].replace(',', '.')) : 0;
-  const minutes = minutesMatch ? Number(minutesMatch[1]) : 0;
-  const totalMinutes = hours * 60 + minutes;
-
-  return totalMinutes > 0 ? totalMinutes : null;
+function getEventControlRange(event) {
+  return {
+    end: parseEventDate(event.eventEndAt ?? event.operativeEndAt ?? event.endAt),
+    start: parseEventDate(event.eventStartAt ?? event.operativeStartAt ?? event.startAt),
+  };
 }
 
-function formatEventClock(date) {
-  const hours24 = date.getHours();
-  const minutes = date.getMinutes();
-  const period = hours24 >= 12 ? 'p.m.' : 'a.m.';
-  const hours12 = hours24 % 12 || 12;
+function formatEventTimeRange(event) {
+  const { end, start } = getEventControlRange(event);
 
-  return `${hours12}:${String(minutes).padStart(2, '0')} ${period}`;
+  if (!start || !end) {
+    return event.time ?? 'Horario por confirmar';
+  }
+
+  return `${start.toLocaleTimeString('es-PE', {
+    hour: 'numeric',
+    minute: '2-digit',
+  })} - ${end.toLocaleTimeString('es-PE', {
+    hour: 'numeric',
+    minute: '2-digit',
+  })}`;
 }
 
+// function parseEventDateTime(event) {
+//   const dateMatch = event.date?.match(/(\d{1,2})\s+([a-záéíóúñ]{3})/i);
+
+//   if (!dateMatch) {
+//     return null;
+//   }
+
+//   const day = Number(dateMatch[1]);
+//   const monthKey = dateMatch[2]
+//     .normalize('NFD')
+//     .replace(/[\u0300-\u036f]/g, '')
+//     .toLowerCase();
+//   const month = eventMonthIndex[monthKey];
+
+//   if (!Number.isFinite(day) || month === undefined) {
+//     return null;
+//   }
+
+//   const timeMatch = event.time?.match(/(\d{1,2})(?::(\d{2}))?\s*(a\.m\.|p\.m\.)?/i);
+//   let hours = timeMatch ? Number(timeMatch[1]) : 0;
+//   const minutes = timeMatch?.[2] ? Number(timeMatch[2]) : 0;
+//   const meridiem = timeMatch?.[3]?.toLowerCase();
+
+//   if (meridiem === 'p.m.' && hours < 12) {
+//     hours += 12;
+//   }
+
+//   if (meridiem === 'a.m.' && hours === 12) {
+//     hours = 0;
+//   }
+
+//   const currentYear = new Date().getFullYear();
+//   const eventDate = new Date(currentYear, month, day, hours, minutes);
+
+//   if (Number.isNaN(eventDate.getTime())) {
+//     return null;
+//   }
+
+//   return eventDate;
+// }
+
+// function parseEventDurationMinutes(duration) {
+//   const hoursMatch = duration?.match(/(\d+(?:[.,]\d+)?)\s*hora/i);
+//   const minutesMatch = duration?.match(/(\d+)\s*min/i);
+//   const hours = hoursMatch ? Number(hoursMatch[1].replace(',', '.')) : 0;
+//   const minutes = minutesMatch ? Number(minutesMatch[1]) : 0;
+//   const totalMinutes = hours * 60 + minutes;
+
+//   return totalMinutes > 0 ? totalMinutes : null;
+// }
+
+// function formatEventClock(date) {
+//   const hours24 = date.getHours();
+//   const minutes = date.getMinutes();
+//   const period = hours24 >= 12 ? 'p.m.' : 'a.m.';
+//   const hours12 = hours24 % 12 || 12;
+
+//   return `${hours12}:${String(minutes).padStart(2, '0')} ${period}`;
+// }
+
+function isFinalizedEvent(event) {
+  const state = String(event?.state ?? event?.status ?? event?.estado ?? event?.estadoCodigo ?? '')
+    .trim()
+    .toUpperCase();
+
+  return state === 'FINALIZADO';
+}
 function getEventMapsUrl(event) {
   const locationQuery = [event.address, event.venue].filter(Boolean).join(', ');
 
@@ -85,18 +125,18 @@ function getEventMapsUrl(event) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationQuery)}`;
 }
 
-function getEventScheduleLabel(event) {
-  const startDate = parseEventDateTime(event);
-  const durationMinutes = parseEventDurationMinutes(event.duration);
+// function getEventScheduleLabel(event) {
+//   const startDate = parseEventDateTime(event);
+//   const durationMinutes = parseEventDurationMinutes(event.duration);
 
-  if (!startDate || !durationMinutes) {
-    return `${event.date} · ${event.time}`;
-  }
+//   if (!startDate || !durationMinutes) {
+//     return `${event.date} · ${event.time}`;
+//   }
 
-  const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
+//   const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
 
-  return `${event.date} · ${formatEventClock(startDate)} - ${formatEventClock(endDate)}`;
-}
+//   return `${event.date} · ${formatEventClock(startDate)} - ${formatEventClock(endDate)}`;
+// }
 
 function getAvailabilityState(spots) {
   const availableSpots = Number(spots) || 0;
@@ -150,9 +190,6 @@ function formatPaymentAmount(value) {
     currency: 'PEN',
     style: 'currency',
   }).format(amount);
-}
-function getEventShortDescription(event) {
-  return event.descripcion_breve || event.descripcion || event.summary || event.description || '';
 }
 
 function getEventFullDescription(event) {
@@ -408,7 +445,7 @@ export default function PublicEventDetail({
   onSubmit,
 }) {
   const mapsUrl = getEventMapsUrl(event);
-  const scheduleLabel = getEventScheduleLabel(event);
+  const scheduleLabel = formatEventTimeRange(event);
   const availabilityState = getAvailabilityState(event.spots);
   const isRegistrationConfirmed = registrationStatus === 'CONFIRMADA';
   const isPendingPayment = registrationStatus === 'PENDIENTE_PAGO';
@@ -420,7 +457,8 @@ export default function PublicEventDetail({
   const paymentFileInputId = `payment-receipt-${event.id}`;
   const isPaymentFormDisabled = isUploadingPaymentReceipt || isPaymentUnderReview;
   const isRegistrationCancelled = registrationStatus === 'CANCELADA';
-  const shouldShowPaymentForm = requiresRegistration && event.requiresPayment && (isPendingPayment || isPaymentObserved);
+  const isEventFinalized = isFinalizedEvent(event);
+  const shouldShowPaymentForm = !isEventFinalized && requiresRegistration && event.requiresPayment && (isPendingPayment || isPaymentObserved);
   const usesCustomReservationActionLabel = reservationActionLabel !== 'Reservar un lugar';
   const reservationSubmitLabel = usesCustomReservationActionLabel
     ? reservationActionLabel
@@ -428,7 +466,7 @@ export default function PublicEventDetail({
       ? 'Preinscribirme'
       : reservationActionLabel;
   const [isRegistrationDetailOpen, setIsRegistrationDetailOpen] = useState(false);
-  const defaultReservationActionDisabled = !requiresRegistration || isLoadingRegistrationStatus || isCancellingRegistration || shouldShowPaymentForm || isRegistrationCancelled || (!isRegistrationConfirmed && !availabilityState.isAvailable);
+  const defaultReservationActionDisabled = !requiresRegistration || isEventFinalized || isLoadingRegistrationStatus || isCancellingRegistration || shouldShowPaymentForm || isRegistrationCancelled || (!isRegistrationConfirmed && !availabilityState.isAvailable);
   const isReservationActionDisabled = reservationActionDisabled ?? defaultReservationActionDisabled;
   const requirementItems = getOrderedTextItems(event.requisitos_evento ?? event.requirements);
   const agendaItems = getOrderedTextItems(event.agenda_evento ?? event.agenda);
@@ -595,26 +633,33 @@ export default function PublicEventDetail({
           )}
 
           {requiresRegistration ? (
-            <form className="reservation-action" onSubmit={onSubmit}>
-              {isRegistrationConfirmed ? (
-                <button
-                  className="primary-button reservation-button"
-                  disabled={isReservationActionDisabled}
-                  type="button"
-                  onClick={() => setIsRegistrationDetailOpen((currentValue) => !currentValue)}
-                >
-                  {isRegistrationDetailOpen ? 'Ocultar inscripcion' : 'Ver inscripcion'}
-                </button>
-              ) : (
-                <button
-                  className={["primary-button", "reservation-button", reservationActionClassName].filter(Boolean).join(" ")}
-                  disabled={isReservationActionDisabled}
-                  type="submit"
-                >
-                  {isLoadingRegistrationStatus ? reservationActionLoadingLabel : reservationSubmitLabel}
-                </button>
-              )}
-            </form>
+            isEventFinalized && !isRegistrationConfirmed ? (
+              <section className="payment-status-panel" aria-label="Evento finalizado">
+                <strong>Evento finalizado</strong>
+                <p>Las inscripciones ya no estan disponibles para este evento.</p>
+              </section>
+            ) : (
+              <form className="reservation-action" onSubmit={onSubmit}>
+                {isRegistrationConfirmed ? (
+                  <button
+                    className="primary-button reservation-button"
+                    disabled={isLoadingRegistrationStatus || isCancellingRegistration}
+                    type="button"
+                    onClick={() => setIsRegistrationDetailOpen((currentValue) => !currentValue)}
+                  >
+                    {isRegistrationDetailOpen ? 'Ocultar inscripcion' : 'Ver inscripcion'}
+                  </button>
+                ) : (
+                  <button
+                    className={["primary-button", "reservation-button", reservationActionClassName].filter(Boolean).join(" ")}
+                    disabled={isReservationActionDisabled}
+                    type="submit"
+                  >
+                    {isLoadingRegistrationStatus ? reservationActionLoadingLabel : reservationSubmitLabel}
+                  </button>
+                )}
+              </form>
+            )
           ) : (
             <section className="payment-status-panel" aria-label="Ingreso libre">
               <strong>Ingreso libre</strong>

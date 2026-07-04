@@ -1,9 +1,11 @@
 package com.tesis.municipalidadbackendapp.eventos.repository;
 
 import com.tesis.municipalidadbackendapp.eventos.entity.Evento;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -13,6 +15,13 @@ import java.util.List;
 
 public interface EventoRepository extends JpaRepository<Evento, Integer> {
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select evento
+            from Evento evento
+            where evento.id = :id
+            """)
+    java.util.Optional<Evento> findByIdForUpdate(@Param("id") Integer id);
     @Query("""
             select evento
             from Evento evento
@@ -66,7 +75,7 @@ public interface EventoRepository extends JpaRepository<Evento, Integer> {
             left join fetch evento.categoria categoria
             left join fetch evento.ubicacion ubicacion
             left join fetch evento.areaMunicipal area
-            where estado.codigo = 'PUBLICADO'
+            where estado.codigo in ('PUBLICADO', 'EN_CURSO')
               and (:categoriaId is null or categoria.id = :categoriaId)
               and (:texto is null or :texto = ''
                 or lower(evento.titulo) like lower(concat('%', :texto, '%'))
@@ -81,7 +90,7 @@ public interface EventoRepository extends JpaRepository<Evento, Integer> {
             left join evento.estadoEvento estado
             left join evento.categoria categoria
             left join evento.ubicacion ubicacion
-            where estado.codigo = 'PUBLICADO'
+            where estado.codigo in ('PUBLICADO', 'EN_CURSO')
               and (:categoriaId is null or categoria.id = :categoriaId)
               and (:texto is null or :texto = ''
                 or lower(evento.titulo) like lower(concat('%', :texto, '%'))
@@ -110,6 +119,38 @@ public interface EventoRepository extends JpaRepository<Evento, Integer> {
     List<Evento> findNextPortalPublico(
             @Param("ahora") Instant ahora,
             Pageable pageable
+    );
+    @Query("""
+            select evento
+            from Evento evento
+            left join fetch evento.estadoEvento estado
+            left join fetch evento.categoria categoria
+            left join fetch evento.ubicacion ubicacion
+            left join fetch evento.areaMunicipal area
+            where estado.codigo = 'EN_CURSO'
+              and evento.fechaHoraInicio <= :ahora
+              and evento.fechaHoraFin > :ahora
+            order by evento.fechaHoraInicio asc, evento.id asc
+            """)
+    List<Evento> findEventosEnCursoPortalPublico(
+            @Param("ahora") Instant ahora,
+            Pageable pageable
+    );
+
+    @Query("""
+            select evento
+            from Evento evento
+            left join fetch evento.estadoEvento estado
+            left join fetch evento.ubicacion ubicacion
+            where estado.codigo in ('PUBLICADO', 'EN_CURSO')
+              and evento.fechaHoraInicio >= :inicio
+              and evento.fechaHoraInicio < :fin
+              and evento.recordatorioUnaHoraEnviadoEn is null
+            order by evento.fechaHoraInicio asc, evento.id asc
+            """)
+    List<Evento> findEventosParaRecordatorioUnaHora(
+            @Param("inicio") Instant inicio,
+            @Param("fin") Instant fin
     );
     @Query("""
             select count(evento)
@@ -141,4 +182,13 @@ public interface EventoRepository extends JpaRepository<Evento, Integer> {
 
     Long countByCategoriaId(Integer categoriaId);
 
+    @Query("""
+            select evento
+            from Evento evento
+            left join fetch evento.estadoEvento estado
+            where estado.codigo = 'PUBLICADO'
+              and evento.fechaHoraInicio <= :ahora
+              and evento.fechaHoraFin > :ahora
+            """)
+    List<Evento> findEventosPublicadosParaMarcarEnCurso(@Param("ahora") Instant ahora);
 }

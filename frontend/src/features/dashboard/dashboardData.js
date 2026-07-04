@@ -131,7 +131,6 @@ const eventOperationalData = [
 const eventStateLabels = {
   BORRADOR: 'Borrador',
   CANCELADO: 'Cancelado',
-  CERRADO: 'Cerrado',
   EN_CURSO: 'En curso',
   PARA_REVISION: 'Para revisión',
   FINALIZADO: 'Finalizado',

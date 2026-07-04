@@ -44,7 +44,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/consulta_dni/**").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/api/auth/forgot-password").permitAll()
-                        .requestMatchers("/api/auth/vecinos/registro").permitAll()
+                        .requestMatchers("/api/auth/vecinos/registro", "/api/auth/vecinos/registro/identidad/**").permitAll()
                         .requestMatchers("/api/valoraciones/validar").permitAll()
                         .requestMatchers("/api/valoraciones/responder").permitAll()
                         .requestMatchers("/api/eventos/*/recursos").permitAll()

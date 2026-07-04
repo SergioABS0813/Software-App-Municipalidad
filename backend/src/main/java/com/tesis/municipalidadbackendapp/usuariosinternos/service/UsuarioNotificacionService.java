@@ -1,5 +1,8 @@
 package com.tesis.municipalidadbackendapp.usuariosinternos.service;
 
+import com.tesis.municipalidadbackendapp.eventos.entity.Evento;
+import com.tesis.municipalidadbackendapp.usuariosinternos.entity.Usuario;
+
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
@@ -12,10 +15,16 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class UsuarioNotificacionService {
+    private static final ZoneId LIMA_ZONE = ZoneId.of("America/Lima");
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(LIMA_ZONE);
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
 
     @Value("${app.mail.from:}")
@@ -54,6 +63,45 @@ public class UsuarioNotificacionService {
         );
     }
 
+
+    public void enviarRecordatorioEventoUnaHora(Usuario operativo, Evento evento) {
+        if (operativo == null || evento == null || !StringUtils.hasText(operativo.getEmail())) {
+            return;
+        }
+
+        String fechaEvento = formatDateTime(evento.getFechaHoraInicio());
+        String ubicacion = evento.getUbicacion() != null && StringUtils.hasText(evento.getUbicacion().getNombre())
+                ? evento.getUbicacion().getNombre()
+                : "Por confirmar";
+        String direccion = evento.getUbicacion() != null && StringUtils.hasText(evento.getUbicacion().getDireccion())
+                ? evento.getUbicacion().getDireccion()
+                : "Por confirmar";
+
+        enviarCorreoHtml(
+                operativo.getEmail(),
+                "Recordatorio operativo: evento inicia en 1 hora - " + evento.getTitulo(),
+                construirPlantillaHtml(
+                        "Evento asignado inicia en 1 hora",
+                        """
+                        <h1 style="margin:0 0 16px;font-size:18px;line-height:1.3;font-weight:700;color:#0f172a;">Evento asignado inicia en 1 hora</h1>
+                        <p style="margin:0 0 14px;">Hola <strong>%s</strong>,</p>
+                        <p style="margin:0 0 14px;">Te recordamos que tienes asignado el control del evento <strong>%s</strong>, que inicia aproximadamente en 1 hora.</p>
+                        <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%%;margin:18px 0;border-collapse:collapse;font-size:14px;background:#ffffff;">
+                          <tr><td style="padding:8px 0;color:#526b85;width:145px;">Fecha y hora</td><td style="padding:8px 0;color:#0f172a;">%s</td></tr>
+                          <tr><td style="padding:8px 0;color:#526b85;">Lugar</td><td style="padding:8px 0;color:#0f172a;">%s</td></tr>
+                          <tr><td style="padding:8px 0;color:#526b85;">Direccion</td><td style="padding:8px 0;color:#0f172a;">%s</td></tr>
+                        </table>
+                        <p style="margin:0;">Ingresa al panel operativo para validar asistencia mediante QR o busqueda manual cuando corresponda.</p>
+                        """.formatted(
+                                escapeHtml(operativo.getNombre()),
+                                escapeHtml(evento.getTitulo()),
+                                escapeHtml(fechaEvento),
+                                escapeHtml(ubicacion),
+                                escapeHtml(direccion)
+                        )
+                )
+        );
+    }
     private void enviarCorreoHtml(String email, String subject, String html) {
         if (!mailEnabled) {
             log.info("Notificacion de cambio de correo omitida porque app.mail.enabled=false. email={}", email);
@@ -83,6 +131,13 @@ public class UsuarioNotificacionService {
         }
     }
 
+    private String formatDateTime(Instant instant) {
+        if (instant == null) {
+            return "Por confirmar";
+        }
+
+        return DATE_TIME_FORMATTER.format(instant);
+    }
     private String construirPlantillaHtml(String titulo, String contenido) {
         return """
                 <!doctype html>

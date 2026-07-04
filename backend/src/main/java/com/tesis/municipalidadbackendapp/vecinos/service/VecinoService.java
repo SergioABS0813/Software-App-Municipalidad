@@ -1,5 +1,7 @@
 package com.tesis.municipalidadbackendapp.vecinos.service;
 
+import com.tesis.municipalidadbackendapp.apiDni.dto.BackendResponseDto;
+import com.tesis.municipalidadbackendapp.apiDni.service.ApiDniService;
 import com.tesis.municipalidadbackendapp.asistencias.entity.Asistencia;
 import com.tesis.municipalidadbackendapp.asistencias.repository.AsistenciaRepository;
 import com.tesis.municipalidadbackendapp.inscripciones.entity.Inscripcion;
@@ -12,6 +14,7 @@ import com.tesis.municipalidadbackendapp.vecinos.dto.EstadoVecinoDirectorioDto;
 import com.tesis.municipalidadbackendapp.vecinos.dto.VecinoContactoUpdateRequest;
 import com.tesis.municipalidadbackendapp.vecinos.dto.VecinoCuentaVecinalDto;
 import com.tesis.municipalidadbackendapp.vecinos.dto.VecinoDetalleDto;
+import com.tesis.municipalidadbackendapp.vecinos.dto.VecinoIdentidadRegistroResponse;
 import com.tesis.municipalidadbackendapp.vecinos.dto.VecinoDirectorioDto;
 import com.tesis.municipalidadbackendapp.vecinos.dto.VecinoInscripcionDto;
 import com.tesis.municipalidadbackendapp.vecinos.dto.VecinoPerfilDto;
@@ -66,6 +69,7 @@ public class VecinoService {
     private final InscripcionRepository inscripcionRepository;
     private final AsistenciaRepository asistenciaRepository;
     private final KeycloakAdminService keycloakAdminService;
+    private final ApiDniService apiDniService;
     private final VecinoNotificacionService vecinoNotificacionService;
     private final UsuarioNotificacionService usuarioNotificacionService;
 
@@ -136,6 +140,18 @@ public class VecinoService {
         return mapToPerfilDto(guardado);
     }
 
+
+    public VecinoIdentidadRegistroResponse consultarIdentidadRegistroVecino(String dni) {
+        String dniNormalizado = normalizarDni(dni);
+        validarDniDisponible(dniNormalizado);
+
+        BackendResponseDto respuesta = apiDniService.obtenerNombrePorDni(dniNormalizado);
+        if (respuesta == null || !respuesta.success() || !StringUtils.hasText(respuesta.data())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No se encontraron datos para el DNI ingresado.");
+        }
+
+        return new VecinoIdentidadRegistroResponse(dniNormalizado, respuesta.data().trim());
+    }
     @Transactional
     public VecinoRegistroResponse registrarVecinoPublico(VecinoRegistroRequest request) {
         DatosRegistroVecino datos = validarRegistroVecino(request);
@@ -582,16 +598,20 @@ public class VecinoService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No existe el estado de vecino " + nombre + "."));
     }
 
-    private void validarDatosDuplicados(DatosRegistroVecino datos) {
-        if (vecinoRepository.existsByDni(datos.dni())) {
-            log.warn("Registro publico rechazado: DNI ya registrado como vecino. dni={}", datos.dni());
+
+    private void validarDniDisponible(String dni) {
+        if (vecinoRepository.existsByDni(dni)) {
+            log.warn("Consulta de identidad rechazada: DNI ya registrado como vecino. dni={}", dni);
             throw new ResponseStatusException(HttpStatus.CONFLICT, "El DNI ya esta registrado.");
         }
 
-        if (usuarioRepository.existsByDni(datos.dni())) {
-            log.warn("Registro publico rechazado: DNI ya registrado como vecino. dni={}", datos.dni());
+        if (usuarioRepository.existsByDni(dni)) {
+            log.warn("Consulta de identidad rechazada: DNI ya registrado como usuario interno. dni={}", dni);
             throw new ResponseStatusException(HttpStatus.CONFLICT, "El DNI ya esta registrado como usuario interno.");
         }
+    }
+    private void validarDatosDuplicados(DatosRegistroVecino datos) {
+        validarDniDisponible(datos.dni());
 
         if (vecinoRepository.existsByEmailIgnoreCase(datos.email())) {
             log.warn("Registro publico rechazado: correo ya registrado como vecino. email={}", datos.email());

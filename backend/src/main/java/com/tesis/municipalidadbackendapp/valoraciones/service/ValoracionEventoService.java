@@ -176,10 +176,10 @@ public class ValoracionEventoService {
     private void validarEventoFinalizado(Evento evento) {
         String estadoCodigo = evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : "";
 
-        if (!"FINALIZADO".equals(estadoCodigo) && !"CERRADO".equals(estadoCodigo)) {
+        if (!"FINALIZADO".equals(estadoCodigo)) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "Solo se pueden generar valoraciones para eventos FINALIZADO o CERRADO"
+                    "Solo se pueden generar valoraciones para eventos FINALIZADO"
             );
         }
     }

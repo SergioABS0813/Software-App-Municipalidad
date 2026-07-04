@@ -1,6 +1,7 @@
 package com.tesis.municipalidadbackendapp.eventos.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record EventoOperativoHoyDto(
         Integer id,
@@ -13,9 +14,23 @@ public record EventoOperativoHoyDto(
         String time,
         String venue,
         String state,
+        Boolean ventanaOperativaActiva,
         Integer aforoMaximo,
         Integer registered,
         Integer totalValidated,
         Integer qrValidated,
-        Integer manualValidated
-) {}
+        Integer manualValidated,
+        List<ValidacionRecienteDto> recentValidations
+) {
+    public record ValidacionRecienteDto(
+            Integer id,
+            String code,
+            String method,
+            String origin,
+            String person,
+            String status,
+            String time,
+            String annulmentReason,
+            String annulledAt
+    ) {}
+}
