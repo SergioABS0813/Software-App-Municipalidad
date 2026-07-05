@@ -1,5 +1,7 @@
 package com.tesis.municipalidadbackendapp.notificaciones.service;
 
+import static com.tesis.municipalidadbackendapp.common.FechaHoraUtils.ahoraLima;
+
 import com.tesis.municipalidadbackendapp.bitacora.entity.BitacoraAccion;
 import com.tesis.municipalidadbackendapp.common.UsuarioAutenticadoService;
 import com.tesis.municipalidadbackendapp.eventos.entity.Evento;
@@ -31,7 +33,7 @@ public class NotificacionService {
 
     public NotificacionesPanelDto obtenerPanelNotificaciones(boolean soloNoLeidas) {
         Integer usuarioDestinoId = resolverUsuarioDestinoId();
-        Instant ahora = Instant.now();
+        Instant ahora = ahoraLima();
         List<Notificacion> notificaciones = soloNoLeidas
                 ? notificacionRepository.findNoLeidasVigentesByUsuarioDestinoIdOrderByFechaCreacionDesc(usuarioDestinoId, ahora)
                 : notificacionRepository.findVigentesByUsuarioDestinoIdOrderByFechaCreacionDesc(usuarioDestinoId, ahora);
@@ -57,14 +59,14 @@ public class NotificacionService {
         }
 
         notificacion.setLeida((byte) 1);
-        notificacion.setFechaLectura(Instant.now());
+        notificacion.setFechaLectura(ahoraLima());
         notificacionRepository.save(notificacion);
     }
 
     public void notificarEventoObservadoAdministradores(Evento evento, Usuario directivo, BitacoraAccion bitacoraAccion) {
         notificarAdministradores(
                 "Evento observado",
-                "%s observó \"%s\".".formatted(nombreUsuario(directivo), tituloEvento(evento)),
+                "%s observÃ³ \"%s\".".formatted(nombreUsuario(directivo), tituloEvento(evento)),
                 "EVENTO_OBSERVADO",
                 "/admin/eventos/%d/editar".formatted(evento.getId()),
                 directivo,
@@ -178,8 +180,8 @@ public class NotificacionService {
 
     public void notificarEventoIniciaMananaAdministradores(Evento evento, Usuario sistema, BitacoraAccion bitacoraAccion) {
         notificarAdministradores(
-                "Evento inicia mañana",
-                "\"%s\" inicia mañana a las %s.".formatted(tituloEvento(evento), horaInicio(evento)),
+                "Evento inicia maÃ±ana",
+                "\"%s\" inicia maÃ±ana a las %s.".formatted(tituloEvento(evento), horaInicio(evento)),
                 "EVENTO_INICIA_MANANA",
                 "/admin/eventos/%d/detalle".formatted(evento.getId()),
                 sistema,
@@ -190,7 +192,7 @@ public class NotificacionService {
     public void notificarUsuarioCreadoAdministradores(Usuario usuarioCreado, Usuario administrador, BitacoraAccion bitacoraAccion) {
         notificarAdministradores(
                 "Nuevo usuario registrado",
-                "Se registró el usuario interno %s.".formatted(nombreUsuario(usuarioCreado)),
+                "Se registrÃ³ el usuario interno %s.".formatted(nombreUsuario(usuarioCreado)),
                 "USUARIO_CREADO",
                 "/admin/usuarios-internos/%d/detalle".formatted(usuarioCreado.getId()),
                 administrador,
@@ -298,7 +300,7 @@ public class NotificacionService {
                 return;
             }
 
-            Instant fechaCreacion = Instant.now();
+            Instant fechaCreacion = ahoraLima();
             Notificacion notificacion = new Notificacion();
             notificacion.setTitulo(titulo);
             notificacion.setMensaje(mensaje);
@@ -342,3 +344,4 @@ public class NotificacionService {
         return LocalDateTime.ofInstant(evento.getFechaHoraInicio(), ZONA_LIMA).format(FORMATO_HORA);
     }
 }
+

@@ -1,5 +1,7 @@
 package com.tesis.municipalidadbackendapp.eventos.service;
 
+import static com.tesis.municipalidadbackendapp.common.FechaHoraUtils.ahoraLima;
+
 import com.tesis.municipalidadbackendapp.apiDni.dto.BackendResponseDto;
 import com.tesis.municipalidadbackendapp.apiDni.service.ApiDniService;
 import com.tesis.municipalidadbackendapp.bitacora.service.BitacoraAccionService;
@@ -147,7 +149,7 @@ public class EventoOperativoService {
                 crearAsignacion(evento, operativo, asignadoPor, request);
             } else if (existente.getActivo() == null || existente.getActivo() == 0) {
                 existente.setActivo((byte) 1);
-                existente.setFechaAsignacion(Instant.now());
+                existente.setFechaAsignacion(ahoraLima());
                 existente.setAsignadoPor(asignadoPor);
                 eventoOperativoRepository.save(existente);
                 registrarBitacora("ASIGNAR_OPERATIVO_EVENTO", evento, operativo, asignadoPor, request);
@@ -189,7 +191,7 @@ public class EventoOperativoService {
         Instant inicio = inicioDia.atZone(ZONA_LIMA).toInstant();
         Instant fin = inicioDia.plusDays(1).atZone(ZONA_LIMA).toInstant();
 
-        Instant ahora = Instant.now();
+        Instant ahora = ahoraLima();
 
         return eventoOperativoRepository.findEventosAsignadosDelDia(
                         usuario,
@@ -233,7 +235,7 @@ public class EventoOperativoService {
             return respuestaQr("DUPLICATE", "QR no activo", "Este codigo QR ya no se encuentra activo para validar ingreso.", "warning", nombreVecino(inscripcion), inscripcion.getCodigoInscripcion(), null);
         }
 
-        if (codigoQr.getFechaExpiracion() != null && codigoQr.getFechaExpiracion().isBefore(Instant.now())) {
+        if (codigoQr.getFechaExpiracion() != null && codigoQr.getFechaExpiracion().isBefore(ahoraLima())) {
             return respuestaQr("CLOSED", "QR expirado", "El codigo QR expiro porque el evento ya finalizo.", "error", nombreVecino(inscripcion), inscripcion.getCodigoInscripcion(), null);
         }
 
@@ -250,7 +252,7 @@ public class EventoOperativoService {
             return respuestaQr("FULL", "Sin cupos", "El evento no tiene cupos disponibles.", "warning", nombreVecino(inscripcion), inscripcion.getCodigoInscripcion(), null);
         }
 
-        Instant ahora = Instant.now();
+        Instant ahora = ahoraLima();
         Asistencia asistencia = asistenciaExistente.orElseGet(Asistencia::new);
         asistencia.setInscripcion(inscripcion);
         asistencia.setEstado("VALIDADA");
@@ -306,7 +308,7 @@ public class EventoOperativoService {
             );
         }
 
-        Instant ahora = Instant.now();
+        Instant ahora = ahoraLima();
         asistencia.setEstado("ANULADA");
         asistencia.setMotivo(motivo);
         asistencia.setFechaHoraValidacion(ahora.toString());
@@ -454,7 +456,7 @@ public class EventoOperativoService {
         asistencia.setInscripcion(inscripcion);
         asistencia.setEstado("VALIDADA");
         asistencia.setMetodoValidacion("MANUAL");
-        asistencia.setFechaHoraValidacion(Instant.now().toString());
+        asistencia.setFechaHoraValidacion(ahoraLima().toString());
         asistencia.setValidadoPorUsuario(usuario);
         asistencia.setMotivo(motivo);
         Asistencia guardada = asistenciaRepository.save(asistencia);
@@ -469,9 +471,9 @@ public class EventoOperativoService {
         vecino.setNombre(nombreCompleto(nombres, apellidos));
         vecino.setCelular(celular);
         vecino.setEmail(email);
-        vecino.setFechaCreado(Instant.now());
+        vecino.setFechaCreado(ahoraLima());
         vecino.setAceptaTratamientoDatos((byte) 1);
-        vecino.setFechaAceptacionDatos(Instant.now());
+        vecino.setFechaAceptacionDatos(ahoraLima());
         vecino.setEstadoVecino(obtenerEstadoVecinoActivo());
         return vecinoRepository.save(vecino);
     }
@@ -493,7 +495,7 @@ public class EventoOperativoService {
 
         if (vecino.getAceptaTratamientoDatos() == null || vecino.getAceptaTratamientoDatos() == 0) {
             vecino.setAceptaTratamientoDatos((byte) 1);
-            vecino.setFechaAceptacionDatos(Instant.now());
+            vecino.setFechaAceptacionDatos(ahoraLima());
         }
         if (vecino.getEstadoVecino() == null) {
             vecino.setEstadoVecino(obtenerEstadoVecinoActivo());
@@ -503,7 +505,7 @@ public class EventoOperativoService {
 
     private Inscripcion crearInscripcionManual(Evento evento, Vecino vecino) {
         validarCuposInscripcionManual(evento);
-        Instant ahora = Instant.now();
+        Instant ahora = ahoraLima();
         Inscripcion inscripcion = new Inscripcion();
         inscripcion.setEvento(evento);
         inscripcion.setVecino(vecino);
@@ -520,7 +522,7 @@ public class EventoOperativoService {
         }
 
         validarCuposInscripcionManual(evento);
-        Instant ahora = Instant.now();
+        Instant ahora = ahoraLima();
         inscripcion.setFechaInscripcion(ahora);
         inscripcion.setOrigenInscripcion("MANUAL_OPERATIVO");
         inscripcion.setCodigoInscripcion(generarCodigoInscripcionManual(evento, vecino, ahora));
@@ -617,7 +619,7 @@ public class EventoOperativoService {
     }
 
     private void validarVentanaOperativa(Evento evento) {
-        if (!ventanaOperativaActiva(evento, Instant.now())) {
+        if (!ventanaOperativaActiva(evento, ahoraLima())) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "La ventana operativa solo esta activa desde 1 hora antes del inicio hasta 30 minutos despues del fin del evento"
@@ -668,7 +670,7 @@ public class EventoOperativoService {
         EventoOperativo asignacion = new EventoOperativo();
         asignacion.setEvento(evento);
         asignacion.setUsuario(operativo);
-        asignacion.setFechaAsignacion(Instant.now());
+        asignacion.setFechaAsignacion(ahoraLima());
         asignacion.setAsignadoPor(asignadoPor);
         asignacion.setActivo((byte) 1);
         eventoOperativoRepository.save(asignacion);
@@ -751,7 +753,7 @@ public class EventoOperativoService {
                 inicio != null && fin != null ? HORA_FORMATTER.format(inicio) + " - " + HORA_FORMATTER.format(fin) : "",
                 evento.getUbicacion() != null ? evento.getUbicacion().getNombre() : "Ubicacion pendiente",
                 evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : "",
-                ventanaOperativaActiva(evento, Instant.now()),
+                ventanaOperativaActiva(evento, ahoraLima()),
                 evento.getAforoMaximo(),
                 registradas,
                 (int) totalValidadas,
@@ -823,3 +825,4 @@ public class EventoOperativoService {
         );
     }
 }
+

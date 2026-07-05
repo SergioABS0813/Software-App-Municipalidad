@@ -191,4 +191,22 @@ public interface EventoRepository extends JpaRepository<Evento, Integer> {
               and evento.fechaHoraFin > :ahora
             """)
     List<Evento> findEventosPublicadosParaMarcarEnCurso(@Param("ahora") Instant ahora);
+    @Query("""
+            select evento
+            from Evento evento
+            left join fetch evento.estadoEvento estado
+            where estado.codigo in ('PUBLICADO', 'EN_CURSO')
+              and evento.fechaHoraFin is not null
+              and evento.fechaHoraFin <= :ahora
+            """)
+    List<Evento> findEventosParaMarcarFinalizado(@Param("ahora") Instant ahora);
+    @Query("""
+            select evento
+            from Evento evento
+            left join fetch evento.estadoEvento estado
+            where estado.codigo = 'FINALIZADO'
+              and evento.encuestaSatisfaccionHabilitado = 1
+            order by evento.fechaHoraFin asc, evento.id asc
+            """)
+    List<Evento> findEventosFinalizadosConEncuestaSatisfaccionHabilitada();
 }

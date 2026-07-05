@@ -141,6 +141,33 @@
   gap: 16px;
 }
 
+.rating-return-button {
+  align-items: center;
+  background: var(--brand-primary);
+  border: 1px solid var(--brand-primary);
+  border-radius: 8px;
+  color: #ffffff;
+  display: inline-flex;
+  font-weight: 850;
+  justify-content: center;
+  justify-self: center;
+  min-height: 46px;
+  padding: 0 20px;
+  text-decoration: none;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.rating-return-button:hover {
+  background: #084aa6;
+  border-color: #084aa6;
+  box-shadow: 0 14px 28px rgba(10, 86, 194, 0.2);
+  transform: translateY(-1px);
+}
+
 .rating-status-icon {
   align-items: center;
   border-radius: 999px;

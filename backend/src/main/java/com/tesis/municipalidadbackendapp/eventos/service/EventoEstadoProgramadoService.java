@@ -1,5 +1,7 @@
 package com.tesis.municipalidadbackendapp.eventos.service;
 
+import static com.tesis.municipalidadbackendapp.common.FechaHoraUtils.ahoraLima;
+
 import com.tesis.municipalidadbackendapp.eventos.entity.EstadoEvento;
 import com.tesis.municipalidadbackendapp.eventos.entity.Evento;
 import com.tesis.municipalidadbackendapp.eventos.repository.EstadoEventoRepository;
@@ -30,10 +32,28 @@ public class EventoEstadoProgramadoService {
             return;
         }
 
-        Instant ahora = Instant.now();
+        Instant ahora = ahoraLima();
         List<Evento> eventos = eventoRepository.findEventosPublicadosParaMarcarEnCurso(ahora);
         for (Evento evento : eventos) {
             evento.setEstadoEvento(estadoEnCurso);
+            evento.setTiempoActualizado(ahora);
+            evento.setEventoActualizadoEn(ahora);
+        }
+    }
+    @Scheduled(fixedDelayString = "${app.eventos.estados.finalizado.fixed-delay-ms:60000}")
+    @Transactional
+    public void marcarEventosFinalizados() {
+        EstadoEvento estadoFinalizado = estadoEventoRepository.findByCodigo("FINALIZADO")
+                .orElse(null);
+        if (estadoFinalizado == null) {
+            log.warn("No se encontro estado FINALIZADO; no se actualizaron eventos finalizados.");
+            return;
+        }
+
+        Instant ahora = ahoraLima();
+        List<Evento> eventos = eventoRepository.findEventosParaMarcarFinalizado(ahora);
+        for (Evento evento : eventos) {
+            evento.setEstadoEvento(estadoFinalizado);
             evento.setTiempoActualizado(ahora);
             evento.setEventoActualizadoEn(ahora);
         }

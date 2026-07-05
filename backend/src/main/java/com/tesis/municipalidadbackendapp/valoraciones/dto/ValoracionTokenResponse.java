@@ -4,8 +4,11 @@ import java.time.LocalDateTime;
 
 public record ValoracionTokenResponse(
         Integer eventoId,
-        String tituloEvento,
-        LocalDateTime fechaEvento,
-        String estado
+        String eventoTitulo,
+        LocalDateTime fechaHoraInicio,
+        LocalDateTime fechaHoraFin,
+        String estadoValoracion,
+        boolean yaRespondida,
+        boolean expirada
 ) {
 }

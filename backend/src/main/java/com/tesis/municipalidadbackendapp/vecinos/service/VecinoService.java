@@ -1,5 +1,7 @@
 package com.tesis.municipalidadbackendapp.vecinos.service;
 
+import static com.tesis.municipalidadbackendapp.common.FechaHoraUtils.ahoraLima;
+
 import com.tesis.municipalidadbackendapp.apiDni.dto.BackendResponseDto;
 import com.tesis.municipalidadbackendapp.apiDni.service.ApiDniService;
 import com.tesis.municipalidadbackendapp.asistencias.entity.Asistencia;
@@ -119,7 +121,7 @@ public class VecinoService {
         vecino.setAceptaTratamientoDatos((byte) (aceptaTratamientoDatos ? 1 : 0));
 
         if (aceptaTratamientoDatos && vecino.getFechaAceptacionDatos() == null) {
-            vecino.setFechaAceptacionDatos(Instant.now());
+            vecino.setFechaAceptacionDatos(ahoraLima());
         }
 
         Vecino guardado = vecinoRepository.save(vecino);
@@ -168,7 +170,7 @@ public class VecinoService {
         );
 
         try {
-            Instant ahora = Instant.now();
+            Instant ahora = ahoraLima();
             Vecino vecino = new Vecino();
             vecino.setKeycloakId(keycloakId);
             vecino.setNombre(datos.nombreCompleto());
@@ -384,7 +386,7 @@ public class VecinoService {
 
     private Vecino obtenerVecinoDetalle(Integer id) {
         return vecinoRepository.findDetalleById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No se encontró la cuenta vecinal."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No se encontrÃ³ la cuenta vecinal."));
     }
 
     private Vecino obtenerVecinoAutenticado(String keycloakId, String email) {
@@ -421,7 +423,7 @@ public class VecinoService {
         }
 
         if (!EMAIL_PATTERN.matcher(correoNormalizado).matches()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ingrese un correo electrónico válido.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ingrese un correo electrÃ³nico vÃ¡lido.");
         }
 
         if (vecinoRepository.existsByEmailIgnoreCaseAndIdNot(correoNormalizado, vecinoId)) {
@@ -443,7 +445,7 @@ public class VecinoService {
         }
 
         if (!CELULAR_PATTERN.matcher(celularNormalizado).matches()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ingrese un celular válido.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ingrese un celular vÃ¡lido.");
         }
 
         return celularNormalizado;
@@ -493,7 +495,7 @@ public class VecinoService {
         String estadoNormalizado = estado.trim().toUpperCase();
 
         if (!ESTADOS_CUENTA_VECINAL.contains(estadoNormalizado)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de cuenta vecinal no válido.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de cuenta vecinal no vÃ¡lido.");
         }
 
         return estadoNormalizado;
@@ -640,3 +642,4 @@ public class VecinoService {
     ) {
     }
 }
+

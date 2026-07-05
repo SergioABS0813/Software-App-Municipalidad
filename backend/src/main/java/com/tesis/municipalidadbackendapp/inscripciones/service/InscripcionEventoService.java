@@ -1,5 +1,7 @@
 package com.tesis.municipalidadbackendapp.inscripciones.service;
 
+import static com.tesis.municipalidadbackendapp.common.FechaHoraUtils.ahoraLima;
+
 import com.tesis.municipalidadbackendapp.eventos.entity.Evento;
 import com.tesis.municipalidadbackendapp.eventos.repository.EventoRepository;
 import com.tesis.municipalidadbackendapp.inscripciones.dto.InscripcionEventoResponse;
@@ -88,7 +90,7 @@ public class InscripcionEventoService {
         }
 
         inscripcion.setEstadoInscripcion(EstadoInscripcion.CANCELADA);
-        inscripcion.setFechaCancelacion(Instant.now());
+        inscripcion.setFechaCancelacion(ahoraLima());
         codigoQrService.revocarQrsActivosPorInscripcion(inscripcion.getId());
 
         return toResponse(inscripcion);
@@ -137,7 +139,7 @@ public class InscripcionEventoService {
     private InscripcionEventoResponse reactivarInscripcion(Inscripcion inscripcion, Evento evento, Vecino vecino) {
         validarCuposDisponibles(evento);
 
-        Instant ahora = Instant.now();
+        Instant ahora = ahoraLima();
         inscripcion.setFechaInscripcion(ahora);
         inscripcion.setOrigenInscripcion("PORTAL_PUBLICO");
         inscripcion.setCodigoInscripcion(generarCodigoInscripcion(evento, vecino, ahora));

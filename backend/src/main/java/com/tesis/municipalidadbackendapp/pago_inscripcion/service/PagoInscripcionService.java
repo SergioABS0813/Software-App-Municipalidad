@@ -1,5 +1,7 @@
 package com.tesis.municipalidadbackendapp.pago_inscripcion.service;
 
+import static com.tesis.municipalidadbackendapp.common.FechaHoraUtils.ahoraLima;
+
 import com.tesis.municipalidadbackendapp.bitacora.service.BitacoraAccionService;
 import com.tesis.municipalidadbackendapp.common.UsuarioAutenticadoService;
 import com.tesis.municipalidadbackendapp.eventos.entity.Evento;
@@ -86,7 +88,7 @@ public class PagoInscripcionService {
                 .orElseGet(() -> {
                     PagoInscripcion nuevo = new PagoInscripcion();
                     nuevo.setInscripcion(inscripcion);
-                    nuevo.setFechaRegistro(Instant.now());
+                    nuevo.setFechaRegistro(ahoraLima());
                     return nuevo;
                 });
         if (ESTADO_EN_REVISION.equalsIgnoreCase(pago.getEstadoPago())) {
@@ -108,7 +110,7 @@ public class PagoInscripcionService {
         pago.setValidadoPorUsuario(null);
         pago.setFechaValidacion(null);
         if (pago.getFechaRegistro() == null) {
-            pago.setFechaRegistro(Instant.now());
+            pago.setFechaRegistro(ahoraLima());
         }
 
         inscripcion.setEstadoInscripcion(EstadoInscripcion.PENDIENTE_PAGO);
@@ -169,7 +171,7 @@ public class PagoInscripcionService {
         pago.setEstadoPago(ESTADO_OBSERVADO);
         pago.setObservacion(observacionNormalizada);
         pago.setValidadoPorUsuario(admin);
-        pago.setFechaValidacion(Instant.now());
+        pago.setFechaValidacion(ahoraLima());
         inscripcion.setEstadoInscripcion(EstadoInscripcion.PAGO_OBSERVADO);
 
         vecinoNotificacionService.enviarCorreoPagoObservado(inscripcion, observacionNormalizada);
@@ -200,13 +202,13 @@ public class PagoInscripcionService {
 
         pago.setEstadoPago(ESTADO_VALIDADO);
         pago.setValidadoPorUsuario(admin);
-        pago.setFechaValidacion(Instant.now());
+        pago.setFechaValidacion(ahoraLima());
 
         if (!hayCupoDisponibleParaConfirmar(inscripcion.getEvento())) {
             inscripcion.setEstadoInscripcion(EstadoInscripcion.CANCELADA);
             inscripcion.setMotivoCancelacion("AFORO_COMPLETO");
             inscripcion.setObservacionCancelacion("El aforo disponible se completo antes de validar el pago.");
-            inscripcion.setFechaCancelacion(Instant.now());
+            inscripcion.setFechaCancelacion(ahoraLima());
             vecinoNotificacionService.enviarCorreoInscripcionCanceladaPorAforo(inscripcion, whatsappReclamos);
             bitacoraAccionService.guardarAccion(
                     "CANCELAR_INSCRIPCION_AFORO_COMPLETO",

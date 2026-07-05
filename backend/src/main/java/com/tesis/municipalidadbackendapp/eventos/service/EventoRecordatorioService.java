@@ -1,5 +1,7 @@
 package com.tesis.municipalidadbackendapp.eventos.service;
 
+import static com.tesis.municipalidadbackendapp.common.FechaHoraUtils.ahoraLima;
+
 import com.tesis.municipalidadbackendapp.eventos.entity.Evento;
 import com.tesis.municipalidadbackendapp.eventos.entity.EventoOperativo;
 import com.tesis.municipalidadbackendapp.eventos.repository.EventoOperativoRepository;
@@ -37,7 +39,7 @@ public class EventoRecordatorioService {
     @Scheduled(fixedDelayString = "${app.eventos.recordatorios.una-hora.fixed-delay-ms:300000}")
     @Transactional
     public void enviarRecordatoriosUnaHoraAntes() {
-        Instant ahora = Instant.now();
+        Instant ahora = ahoraLima();
         Instant inicioVentana = ahora.plus(ANTICIPACION_RECORDATORIO).minus(MARGEN_BUSQUEDA);
         Instant finVentana = ahora.plus(ANTICIPACION_RECORDATORIO).plus(MARGEN_BUSQUEDA);
         List<Evento> eventos = eventoRepository.findEventosParaRecordatorioUnaHora(inicioVentana, finVentana);

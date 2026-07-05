@@ -1,5 +1,7 @@
 package com.tesis.municipalidadbackendapp.eventos.service;
 
+import static com.tesis.municipalidadbackendapp.common.FechaHoraUtils.ahoraLima;
+
 import com.tesis.municipalidadbackendapp.asistencias.entity.Asistencia;
 import com.tesis.municipalidadbackendapp.asistencias.repository.AsistenciaRepository;
 import com.tesis.municipalidadbackendapp.common.UsuarioAutenticadoService;
@@ -119,7 +121,7 @@ public class EventoService {
 
     @Transactional(readOnly = true)
     public EventoPortalPublicoDto obtenerProximoEventoPortalPublico() {
-        Instant ahora = Instant.now();
+        Instant ahora = ahoraLima();
         PageRequest primero = PageRequest.of(0, 1);
 
         Evento eventoDestacado = eventoRepository.findEventosEnCursoPortalPublico(ahora, primero)
@@ -178,7 +180,7 @@ public class EventoService {
                 ? Math.round((totalQr * 100f) / totalAsistentes)
                 : null;
         List<ValoracionEvento> valoracionesRespondidas = valoracionEventoRepository.findByEventoId(evento.getId()).stream()
-                .filter(valoracion -> "RESPONDIDO".equalsIgnoreCase(valoracion.getEstado()))
+                .filter(valoracion -> ("RESPONDIDA".equalsIgnoreCase(valoracion.getEstado()) || "RESPONDIDO".equalsIgnoreCase(valoracion.getEstado())))
                 .filter(valoracion -> valoracion.getPuntuacion() != null)
                 .toList();
         int totalValoraciones = valoracionesRespondidas.size();
@@ -421,7 +423,7 @@ public class EventoService {
     }
 
     public Integer obtenerNumeroEventosActivosDesdeHoy() {
-        Instant ahora = Instant.now();
+        Instant ahora = ahoraLima();
         return eventoRepository.countByEstadoEvento_CodigoAndFechaHoraFinGreaterThanEqual(
                 "PUBLICADO",
                 ahora
@@ -472,7 +474,7 @@ public class EventoService {
                 ? "PARA_REVISION"
                 : "BORRADOR";
         EstadoEvento estadoEvento = obtenerEstadoEvento(estadoCodigo);
-        Instant ahora = Instant.now();
+        Instant ahora = ahoraLima();
 
         Evento evento = new Evento();
         evento.setTitulo(normalizarTexto(request.titulo(), 100));
@@ -576,7 +578,7 @@ public class EventoService {
         validarEnvioRevisionConOperativos(request, usuario, evento, httpServletRequest);
         String estadoCodigo = obtenerEstadoActualizacion(evento, request);
         EstadoEvento estadoEvento = obtenerEstadoEvento(estadoCodigo);
-        Instant ahora = Instant.now();
+        Instant ahora = ahoraLima();
 
         evento.setTitulo(normalizarTexto(request.titulo(), 100));
         evento.setDescripcionBreve(normalizarTexto(request.descripcionBreve(), 45));
@@ -651,7 +653,7 @@ public class EventoService {
         String estadoAnterior = evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : "";
         String estadoFinal = obtenerCodigoEstadoFinalEvento();
         EstadoEvento estadoEvento = obtenerEstadoEvento(estadoFinal);
-        Instant ahora = Instant.now();
+        Instant ahora = ahoraLima();
 
         evento.setEstadoEvento(estadoEvento);
         evento.setTiempoActualizado(ahora);
@@ -691,7 +693,7 @@ public class EventoService {
         validarEstadoDecisionDirectiva(estadoAnterior);
 
         EstadoEvento estadoPublicado = obtenerEstadoEvento("PUBLICADO");
-        Instant ahora = Instant.now();
+        Instant ahora = ahoraLima();
         evento.setEstadoEvento(estadoPublicado);
         evento.setTiempoActualizado(ahora);
         evento.setEventoActualizadoEn(ahora);
@@ -730,7 +732,7 @@ public class EventoService {
         validarEstadoDecisionDirectiva(estadoAnterior);
 
         EstadoEvento estadoObservado = obtenerEstadoEvento("OBSERVADO");
-        Instant ahora = Instant.now();
+        Instant ahora = ahoraLima();
         evento.setEstadoEvento(estadoObservado);
         evento.setTiempoActualizado(ahora);
         evento.setEventoActualizadoEn(ahora);
@@ -814,7 +816,7 @@ public class EventoService {
         );
 
         EstadoEvento estadoCancelado = obtenerEstadoEvento("CANCELADO");
-        Instant ahora = Instant.now();
+        Instant ahora = ahoraLima();
         evento.setEstadoEvento(estadoCancelado);
         evento.setMotivoCancelacion(motivoNormalizado);
         evento.setFechaCancelacion(ahora);
@@ -879,7 +881,7 @@ public class EventoService {
 
         //Parte 1:Datos generales (1/6)
         if (tieneDatosGeneralesCompletos(evento)) completos++;
-        //Parte 2:Programación o Aforo (2/6)
+        //Parte 2:ProgramaciÃƒÂ³n o Aforo (2/6)
         if (tieneProgramacionValida(evento)) completos++;
         //Parte 3:Agenda (3/6)
         boolean tieneAgenda = agendaEventoRepository.findByEvento(evento).size() != 0;
@@ -887,7 +889,7 @@ public class EventoService {
         //Parte 4: Requisitos (4/6)
         boolean tieneRequisitos = requisitoEventoRepository.findByEvento(evento).size() != 0;
         if (tieneRequisitos) completos++;
-        //Parte 5: Ubicación (5/6)
+        //Parte 5: UbicaciÃƒÂ³n (5/6)
         if (evento.getUbicacion() != null) completos++;
         //Parte 6: Recursos Adjuntos (6/6)
         if (tienePortada(evento)) completos++;
@@ -1234,7 +1236,7 @@ public class EventoService {
     }
 
     private String valorDetalle(String valor) {
-        return hasText(valor) ? valor.trim() : "Sin título";
+        return hasText(valor) ? valor.trim() : "Sin tÃƒÂ­tulo";
     }
 
     private EstadoEvento obtenerEstadoEvento(String codigo) {
@@ -1317,7 +1319,7 @@ public class EventoService {
                     recursoEvento.setNombreOriginal(normalizarTexto(recurso.nombreOriginal(), 255));
                     recursoEvento.setMimeType(normalizarTexto(recurso.mimeType(), 100));
                     recursoEvento.setSizeBytes(recurso.sizeBytes());
-                    recursoEvento.setFechaSubida(Instant.now());
+                    recursoEvento.setFechaSubida(ahoraLima());
                     recursoEventoRepository.save(recursoEvento);
                 });
     }
@@ -1494,12 +1496,12 @@ public class EventoService {
         if(numeroObservacionesPendientes>0){
             alertas.add(new EventoPanelAdministrativoDto.AlertaFichaEventoPanelAdministrativoDto(
                     "OBSERVACION_DIRECTIVO",
-                    numeroObservacionesPendientes == 1 ? "1 observación del directivo": numeroObservacionesPendientes + "observaciones del directivo."));
+                    numeroObservacionesPendientes == 1 ? "1 observaciÃƒÂ³n del directivo": numeroObservacionesPendientes + "observaciones del directivo."));
 
         }
     }
 
-    private boolean esObservacionPendiente(ObservacionEvento observacion) { //Los únicos estados que tiene observación son: ATENDIDA y PENDIENTE
+    private boolean esObservacionPendiente(ObservacionEvento observacion) { //Los ÃƒÂºnicos estados que tiene observaciÃƒÂ³n son: ATENDIDA y PENDIENTE
         if (observacion == null) {
             return false;
         }
@@ -1524,9 +1526,9 @@ public class EventoService {
         if (!hasText(evento.getTitulo()) || !hasText(evento.getDescripcion()) || evento.getAreaMunicipal() == null || !hasText(evento.getDescripcionBreve()) || evento.getCategoria() == null){
             agregarAlertaCampoPendiente(alertas, "Completar datos generales del evento");
         }
-        //Parte 2:Programación (2/6)
+        //Parte 2:ProgramaciÃƒÂ³n (2/6)
         if (!tieneProgramacionValida(evento)){
-            agregarAlertaCampoPendiente(alertas, "Completar programación del evento");
+            agregarAlertaCampoPendiente(alertas, "Completar programaciÃƒÂ³n del evento");
 
         }
         //Parte 3:Agenda (3/6)
@@ -1539,9 +1541,9 @@ public class EventoService {
         if (!tieneRequisitos) {
             agregarAlertaCampoPendiente(alertas, "Definir requisitos del evento");
         }
-        //Parte 5: Ubicación (5/6)
+        //Parte 5: UbicaciÃƒÂ³n (5/6)
         if (evento.getUbicacion() == null){
-            agregarAlertaCampoPendiente(alertas, "Agregar ubicación del evento");
+            agregarAlertaCampoPendiente(alertas, "Agregar ubicaciÃƒÂ³n del evento");
         }
         //Parte 6: Recursos Adjuntos (6/6)
         if (!tienePortada(evento)){
@@ -1565,3 +1567,4 @@ public class EventoService {
 
 
 }
+

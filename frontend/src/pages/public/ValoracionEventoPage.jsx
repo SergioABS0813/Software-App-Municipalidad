@@ -3,86 +3,120 @@ import municipalLogo from '../../assets/images/municipalidad-logo.png';
 import StarRating from '../../components/public/StarRating';
 import {
   enviarValoracion,
-  validarTokenValoracion,
+  obtenerValoracion,
 } from '../../services/valoracionesService';
 import './ValoracionEventoPage.css';
 import LoadingButton from '../../components/feedback/LoadingButton';
 
 const statusContent = {
+  RESPONDIDA: {
+    icon: '✓',
+    title: 'Esta valoración ya fue registrada',
+    text: 'Gracias por participar.',
+    tone: 'success',
+  },
   RESPONDIDO: {
     icon: '✓',
-    title: 'Valoración registrada',
-    text: 'Este evento ya fue valorado anteriormente.',
+    title: 'Esta valoración ya fue registrada',
+    text: 'Gracias por participar.',
     tone: 'success',
+  },
+  EXPIRADA: {
+    icon: '!',
+    title: 'Este enlace de valoración ya expiró',
+    text: 'El periodo disponible para calificar este evento ha finalizado.',
+    tone: 'warning',
   },
   EXPIRADO: {
     icon: '!',
-    title: 'Enlace expirado',
-    text: 'El periodo para valorar este evento ha finalizado.',
+    title: 'Este enlace de valoración ya expiró',
+    text: 'El periodo disponible para calificar este evento ha finalizado.',
     tone: 'warning',
+  },
+  INVALIDA: {
+    icon: '!',
+    title: 'No se encontró la valoración solicitada',
+    text: 'Verifica el enlace recibido o vuelve al portal ciudadano.',
+    tone: 'error',
   },
   INVALIDO: {
     icon: '!',
-    title: 'Enlace no válido',
-    text: 'No pudimos validar este enlace de valoración.',
+    title: 'No se encontró la valoración solicitada',
+    text: 'Verifica el enlace recibido o vuelve al portal ciudadano.',
     tone: 'error',
   },
 };
 
-function formatEventDate(value) {
-  if (!value) {
+function formatEventDate(startValue, endValue) {
+  if (!startValue) {
     return 'Fecha por confirmar';
   }
 
-  const date = new Date(value);
+  const startDate = new Date(startValue);
+  const endDate = endValue ? new Date(endValue) : null;
 
-  if (Number.isNaN(date.getTime())) {
+  if (Number.isNaN(startDate.getTime())) {
     return 'Fecha por confirmar';
   }
 
-  return new Intl.DateTimeFormat('es-PE', {
+  const dateLabel = new Intl.DateTimeFormat('es-PE', {
     dateStyle: 'full',
     timeStyle: 'short',
-  }).format(date);
+  }).format(startDate);
+
+  if (!endDate || Number.isNaN(endDate.getTime())) {
+    return dateLabel;
+  }
+
+  const endTime = new Intl.DateTimeFormat('es-PE', {
+    timeStyle: 'short',
+  }).format(endDate);
+
+  return `${dateLabel} - ${endTime}`;
 }
 
 function getTokenFromUrl() {
+  const pathMatch = window.location.pathname.match(/^\/satisfaccion\/([^/]+)$/);
+  if (pathMatch?.[1]) {
+    return decodeURIComponent(pathMatch[1]).trim();
+  }
+
   return new URLSearchParams(window.location.search).get('token')?.trim() ?? '';
 }
 
-function ValoracionEventoPage() {
+function ValoracionEventoPage({ view }) {
   const token = useMemo(getTokenFromUrl, []);
   const [eventData, setEventData] = useState(null);
-  const [pageState, setPageState] = useState(token ? 'loading' : 'invalid-link');
+  const [pageState, setPageState] = useState(view === 'thanks' ? 'thanks' : token ? 'loading' : 'INVALIDA');
   const [rating, setRating] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!token) {
-      return;
+    if (view === 'thanks' || !token) {
+      return undefined;
     }
 
     let isMounted = true;
 
-    validarTokenValoracion(token)
+    obtenerValoracion(token)
       .then((data) => {
         if (!isMounted) {
           return;
         }
 
         setEventData(data);
-        setPageState(data?.estado || 'INVALIDO');
+        setPageState(data?.estadoValoracion || 'INVALIDA');
       })
-      .catch(() => {
+      .catch((error) => {
         if (isMounted) {
-          setPageState('connection-error');
+          setPageState(error.response?.status === 404 ? 'INVALIDA' : 'connection-error');
         }
       });
 
     return () => {
       isMounted = false;
     };
-  }, [token]);
+  }, [token, view]);
 
   async function submitRating() {
     if (isSubmitting || rating < 1 || rating > 5) {
@@ -92,22 +126,22 @@ function ValoracionEventoPage() {
     try {
       setIsSubmitting(true);
       const response = await enviarValoracion({ token, puntuacion: rating });
-      const responseStatus = response?.estado;
+      const responseStatus = response?.estadoValoracion;
+
+      if (responseStatus === 'RESPONDIDA' || responseStatus === 'RESPONDIDO') {
+        window.location.assign('/satisfaccion/gracias');
+        return;
+      }
 
       if (responseStatus && responseStatus !== 'PENDIENTE') {
         setPageState(responseStatus);
         return;
       }
 
-      setPageState('success');
+      window.location.assign('/satisfaccion/gracias');
     } catch (error) {
-      const responseStatus = error.response?.data?.estado;
-
-      if (responseStatus) {
-        setPageState(responseStatus);
-      } else {
-        setPageState('submit-error');
-      }
+      const responseStatus = error.response?.data?.estadoValoracion;
+      setPageState(responseStatus || 'submit-error');
     } finally {
       setIsSubmitting(false);
     }
@@ -128,13 +162,6 @@ function ValoracionEventoPage() {
       <section className="rating-shell" aria-live="polite">
         {pageState === 'loading' ? (
           <RatingSkeleton />
-        ) : pageState === 'invalid-link' ? (
-          <StatusCard
-            icon="!"
-            text="El enlace de valoración no es válido."
-            title="Enlace no válido"
-            tone="error"
-          />
         ) : pageState === 'connection-error' ? (
           <StatusCard
             icon="!"
@@ -149,22 +176,22 @@ function ValoracionEventoPage() {
             title="No se envió la valoración"
             tone="error"
           />
-        ) : pageState === 'success' ? (
+        ) : pageState === 'thanks' ? (
           <StatusCard
             icon="✓"
-            text="Tu respuesta fue registrada correctamente."
-            title="¡Gracias por tu valoración!"
+            text="Tu valoración ha sido registrada correctamente. Tu opinión nos ayuda a mejorar los próximos eventos municipales."
+            title="Gracias por participar"
             tone="success"
           />
         ) : pageState === 'PENDIENTE' ? (
           <article className="rating-card">
             <span className="section-kicker">Valoración de evento</span>
-            <h1>Valora tu experiencia</h1>
+            <h1>Califica tu experiencia</h1>
             <p>Tu opinión ayuda a mejorar los próximos eventos municipales.</p>
 
             <div className="rating-event-summary">
-              <strong>{eventData?.tituloEvento ?? 'Evento municipal'}</strong>
-              <time>{formatEventDate(eventData?.fechaEvento)}</time>
+              <strong>{eventData?.eventoTitulo ?? 'Evento municipal'}</strong>
+              <time>{formatEventDate(eventData?.fechaHoraInicio, eventData?.fechaHoraFin)}</time>
             </div>
 
             <StarRating disabled={isSubmitting} value={rating} onChange={setRating} />
@@ -177,11 +204,11 @@ function ValoracionEventoPage() {
               type="button"
               onClick={submitRating}
             >
-              {isSubmitting ? 'Enviando...' : 'Enviar valoración'}
+              Enviar valoración
             </LoadingButton>
           </article>
         ) : (
-          <StatusCard {...(statusContent[pageState] ?? statusContent.INVALIDO)} />
+          <StatusCard {...(statusContent[pageState] ?? statusContent.INVALIDA)} />
         )}
       </section>
     </main>
@@ -213,6 +240,9 @@ function StatusCard({ icon, text, title, tone }) {
       </span>
       <h1>{title}</h1>
       <p>{text}</p>
+      <a className="rating-return-button" href="/eventos">
+        Volver al portal ciudadano
+      </a>
     </article>
   );
 }

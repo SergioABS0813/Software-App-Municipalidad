@@ -1,5 +1,7 @@
 package com.tesis.municipalidadbackendapp.valoraciones.service;
 
+import static com.tesis.municipalidadbackendapp.common.FechaHoraUtils.ahoraLima;
+
 import com.tesis.municipalidadbackendapp.bitacora.service.BitacoraAccionService;
 import com.tesis.municipalidadbackendapp.eventos.entity.Evento;
 import com.tesis.municipalidadbackendapp.eventos.repository.EventoRepository;
@@ -15,6 +17,7 @@ import com.tesis.municipalidadbackendapp.vecinos.service.VecinoNotificacionServi
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,9 +37,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ValoracionEventoService {
     private static final String ESTADO_PENDIENTE = "PENDIENTE";
-    private static final String ESTADO_RESPONDIDO = "RESPONDIDO";
-    private static final String ESTADO_EXPIRADO = "EXPIRADO";
-    private static final String ESTADO_INVALIDO = "INVALIDO";
+    private static final String ESTADO_RESPONDIDA = "RESPONDIDA";
+    private static final String ESTADO_RESPONDIDO_LEGACY = "RESPONDIDO";
+    private static final String ESTADO_EXPIRADA = "EXPIRADA";
+    private static final String ESTADO_INVALIDA = "INVALIDA";
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
 
     private final EventoRepository eventoRepository;
@@ -45,6 +49,9 @@ public class ValoracionEventoService {
     private final VecinoNotificacionService vecinoNotificacionService;
     private final BitacoraAccionService bitacoraAccionService;
     private final SecureRandom secureRandom = new SecureRandom();
+
+    @Value("${app.valoraciones.expiracion-dias:7}")
+    private int expiracionDias;
 
     @Transactional
     public ValoracionGeneracionResponse generarValoracionesParaEventoFinalizado(
@@ -57,14 +64,40 @@ public class ValoracionEventoService {
 
         validarEventoFinalizado(evento);
 
-        List<Inscripcion> inscripcionesElegibles = inscripcionRepository.findElegiblesParaValoracion(eventoId);
+        if (!encuestaSatisfaccionHabilitada(evento)) {
+            return new ValoracionGeneracionResponse(eventoId, 0, 0);
+        }
+
+        ValoracionGeneracionResponse response = generarValoracionesParaEvento(evento);
+
+        if (usuario != null && request != null && response.valoracionesGeneradas() > 0) {
+            bitacoraAccionService.guardarAccion(
+                    "GENERACION_VALORACIONES_EVENTO",
+                    "EVENTO",
+                    evento.getId(),
+                    "Se generaron " + response.valoracionesGeneradas() + " valoraciones para el evento \"" + valorDetalle(evento.getTitulo()) + "\"",
+                    usuario,
+                    request
+            );
+        }
+
+        return response;
+    }
+
+    @Transactional
+    public ValoracionGeneracionResponse generarValoracionesParaEvento(Evento evento) {
+        if (evento == null || evento.getId() == null) {
+            return new ValoracionGeneracionResponse(null, 0, 0);
+        }
+
+        List<Inscripcion> inscripcionesElegibles = inscripcionRepository.findElegiblesParaValoracion(evento.getId());
         Instant ahora = ahoraLima();
-        Instant fechaExpiracion = ahora.plusSeconds(7L * 24L * 60L * 60L);
+        Instant fechaExpiracion = ahora.plusSeconds(Math.max(1, expiracionDias) * 24L * 60L * 60L);
         int generadas = 0;
-        int correosIntentados = 0;
+        int correosEnviados = 0;
 
         for (Inscripcion inscripcion : inscripcionesElegibles) {
-            if (valoracionEventoRepository.existsByInscripcionId(inscripcion.getId())) {
+            if (inscripcion == null || inscripcion.getId() == null || valoracionEventoRepository.existsByInscripcionId(inscripcion.getId())) {
                 continue;
             }
 
@@ -81,40 +114,27 @@ public class ValoracionEventoService {
                 valoracionEventoRepository.saveAndFlush(valoracion);
                 generadas++;
             } catch (DataIntegrityViolationException exception) {
-                log.info(
-                        "Valoracion ya existente para inscripcion. inscripcionId={}",
-                        inscripcion.getId()
-                );
+                log.info("Valoracion ya existente para inscripcion. inscripcionId={}", inscripcion.getId());
                 continue;
             }
 
-            correosIntentados++;
-            enviarCorreoValoracion(inscripcion.getVecino(), evento, valoracion.getToken());
+            if (enviarCorreoValoracion(inscripcion.getVecino(), evento, valoracion.getToken())) {
+                correosEnviados++;
+            }
         }
 
-        if (usuario != null && request != null) {
-            bitacoraAccionService.guardarAccion(
-                    "GENERACION_VALORACIONES_EVENTO",
-                    "EVENTO",
-                    evento.getId(),
-                    "Se generaron " + generadas + " valoraciones para el evento \"" + valorDetalle(evento.getTitulo()) + "\"",
-                    usuario,
-                    request
-            );
-        }
-
-        return new ValoracionGeneracionResponse(eventoId, generadas, correosIntentados);
+        return new ValoracionGeneracionResponse(evento.getId(), generadas, correosEnviados);
     }
 
     @Transactional
-    public ValoracionTokenResponse validarToken(String token) {
+    public ValoracionTokenResponse obtenerValoracionPorToken(String token) {
         if (!StringUtils.hasText(token)) {
-            return new ValoracionTokenResponse(null, null, null, ESTADO_INVALIDO);
+            return respuestaInvalida();
         }
 
         return valoracionEventoRepository.findByToken(token)
                 .map(this::resolverEstadoToken)
-                .orElseGet(() -> new ValoracionTokenResponse(null, null, null, ESTADO_INVALIDO));
+                .orElseGet(this::respuestaInvalida);
     }
 
     @Transactional
@@ -128,49 +148,60 @@ public class ValoracionEventoService {
         }
 
         ValoracionEvento valoracion = valoracionEventoRepository.findByToken(token)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No pudimos validar este enlace de valoracion"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No se encontro la valoracion solicitada"));
 
-        if (ESTADO_RESPONDIDO.equals(valoracion.getEstado())) {
-            return toTokenResponse(valoracion, ESTADO_RESPONDIDO);
+        if (estaRespondida(valoracion)) {
+            return toTokenResponse(valoracion, ESTADO_RESPONDIDA, true, false);
         }
 
         if (estaExpirada(valoracion)) {
-            valoracion.setEstado(ESTADO_EXPIRADO);
+            valoracion.setEstado(ESTADO_EXPIRADA);
             valoracionEventoRepository.save(valoracion);
-            return toTokenResponse(valoracion, ESTADO_EXPIRADO);
+            return toTokenResponse(valoracion, ESTADO_EXPIRADA, false, true);
+        }
+
+        if (!ESTADO_PENDIENTE.equalsIgnoreCase(valoracion.getEstado())) {
+            return resolverEstadoToken(valoracion);
         }
 
         valoracion.setPuntuacion(puntuacion.byteValue());
-        valoracion.setEstado(ESTADO_RESPONDIDO);
+        valoracion.setEstado(ESTADO_RESPONDIDA);
         valoracion.setFechaRespuesta(ahoraLima());
         ValoracionEvento valoracionGuardada = valoracionEventoRepository.save(valoracion);
 
-        return toTokenResponse(valoracionGuardada, ESTADO_RESPONDIDO);
+        return toTokenResponse(valoracionGuardada, ESTADO_RESPONDIDA, true, false);
     }
 
     private ValoracionTokenResponse resolverEstadoToken(ValoracionEvento valoracion) {
-        if (ESTADO_RESPONDIDO.equals(valoracion.getEstado())) {
-            return toTokenResponse(valoracion, ESTADO_RESPONDIDO);
+        if (estaRespondida(valoracion)) {
+            return toTokenResponse(valoracion, ESTADO_RESPONDIDA, true, false);
         }
 
         if (estaExpirada(valoracion)) {
-            valoracion.setEstado(ESTADO_EXPIRADO);
+            valoracion.setEstado(ESTADO_EXPIRADA);
             valoracionEventoRepository.save(valoracion);
-            return toTokenResponse(valoracion, ESTADO_EXPIRADO);
+            return toTokenResponse(valoracion, ESTADO_EXPIRADA, false, true);
         }
 
-        return toTokenResponse(valoracion, valoracion.getEstado());
+        return toTokenResponse(valoracion, ESTADO_PENDIENTE, false, false);
     }
 
-    private ValoracionTokenResponse toTokenResponse(ValoracionEvento valoracion, String estado) {
+    private ValoracionTokenResponse toTokenResponse(ValoracionEvento valoracion, String estado, boolean yaRespondida, boolean expirada) {
         Evento evento = valoracion.getEvento();
 
         return new ValoracionTokenResponse(
-                evento.getId(),
-                evento.getTitulo(),
-                toLocalDateTime(evento.getFechaHoraInicio()),
-                estado
+                evento != null ? evento.getId() : null,
+                evento != null ? evento.getTitulo() : null,
+                evento != null ? toLocalDateTime(evento.getFechaHoraInicio()) : null,
+                evento != null ? toLocalDateTime(evento.getFechaHoraFin()) : null,
+                estado,
+                yaRespondida,
+                expirada
         );
+    }
+
+    private ValoracionTokenResponse respuestaInvalida() {
+        return new ValoracionTokenResponse(null, null, null, null, ESTADO_INVALIDA, false, false);
     }
 
     private void validarEventoFinalizado(Evento evento) {
@@ -184,7 +215,17 @@ public class ValoracionEventoService {
         }
     }
 
-    private void enviarCorreoValoracion(Vecino vecino, Evento evento, String token) {
+    private boolean encuestaSatisfaccionHabilitada(Evento evento) {
+        return evento != null
+                && evento.getEncuestaSatisfaccionHabilitado() != null
+                && evento.getEncuestaSatisfaccionHabilitado() == 1;
+    }
+
+    private boolean enviarCorreoValoracion(Vecino vecino, Evento evento, String token) {
+        if (vecino == null || !StringUtils.hasText(vecino.getEmail())) {
+            return false;
+        }
+
         try {
             vecinoNotificacionService.enviarCorreoValoracionEvento(
                     vecino.getEmail(),
@@ -192,6 +233,7 @@ public class ValoracionEventoService {
                     evento.getTitulo(),
                     token
             );
+            return true;
         } catch (RuntimeException exception) {
             log.warn(
                     "No se pudo enviar correo de valoracion. eventoId={} vecinoId={}",
@@ -199,6 +241,7 @@ public class ValoracionEventoService {
                     vecino.getId(),
                     exception
             );
+            return false;
         }
     }
 
@@ -214,13 +257,16 @@ public class ValoracionEventoService {
         return token;
     }
 
+    private boolean estaRespondida(ValoracionEvento valoracion) {
+        return valoracion != null
+                && (ESTADO_RESPONDIDA.equalsIgnoreCase(valoracion.getEstado())
+                || ESTADO_RESPONDIDO_LEGACY.equalsIgnoreCase(valoracion.getEstado())
+                || valoracion.getFechaRespuesta() != null);
+    }
+
     private boolean estaExpirada(ValoracionEvento valoracion) {
         return valoracion.getFechaExpiracion() != null
                 && valoracion.getFechaExpiracion().isBefore(ahoraLima());
-    }
-
-    private Instant ahoraLima() {
-        return LocalDateTime.now(ZONA_LIMA).atZone(ZONA_LIMA).toInstant();
     }
 
     private LocalDateTime toLocalDateTime(Instant instant) {

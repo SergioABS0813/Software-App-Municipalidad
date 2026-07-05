@@ -23,13 +23,26 @@ public class ValoracionEventoController {
     private final ValoracionEventoService valoracionEventoService;
     private final UsuarioAutenticadoService usuarioAutenticadoService;
 
+    @GetMapping("{token}")
+    public ValoracionTokenResponse obtenerValoracion(@PathVariable String token) {
+        return valoracionEventoService.obtenerValoracionPorToken(token);
+    }
+
+    @PostMapping("{token}/responder")
+    public ValoracionTokenResponse responderValoracion(
+            @PathVariable String token,
+            @RequestBody ValoracionRespuestaRequest request
+    ) {
+        return valoracionEventoService.responderValoracion(token, request.puntuacion());
+    }
+
     @GetMapping("validar")
     public ValoracionTokenResponse validarToken(@RequestParam String token) {
-        return valoracionEventoService.validarToken(token);
+        return valoracionEventoService.obtenerValoracionPorToken(token);
     }
 
     @PostMapping("responder")
-    public ValoracionTokenResponse responderValoracion(@RequestBody ValoracionRespuestaRequest request) {
+    public ValoracionTokenResponse responderValoracionCompatibilidad(@RequestBody ValoracionRespuestaRequest request) {
         return valoracionEventoService.responderValoracion(request.token(), request.puntuacion());
     }
 

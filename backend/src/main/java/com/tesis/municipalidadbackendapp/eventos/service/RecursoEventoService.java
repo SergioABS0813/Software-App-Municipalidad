@@ -1,5 +1,7 @@
 package com.tesis.municipalidadbackendapp.eventos.service;
 
+import static com.tesis.municipalidadbackendapp.common.FechaHoraUtils.ahoraLima;
+
 import com.tesis.municipalidadbackendapp.bitacora.service.BitacoraAccionService;
 import com.tesis.municipalidadbackendapp.eventos.dto.RecursoEventoDto;
 import com.tesis.municipalidadbackendapp.eventos.dto.RecursoUploadResponse;
@@ -47,7 +49,7 @@ public class RecursoEventoService {
         recurso.setNombreOriginal(uploadedObject.nombreOriginal());
         recurso.setMimeType(uploadedObject.mimeType());
         recurso.setSizeBytes(uploadedObject.sizeBytes());
-        recurso.setFechaSubida(Instant.now());
+        recurso.setFechaSubida(ahoraLima());
 
         RecursoEvento recursoGuardado = recursoEventoRepository.save(recurso);
         bitacoraAccionService.guardarAccion(
@@ -141,3 +143,4 @@ public class RecursoEventoService {
         );
     }
 }
+

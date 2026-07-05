@@ -2,7 +2,13 @@ import PublicPortal from '../features/public-portal/PublicPortal';
 import ValoracionEventoPage from '../pages/public/ValoracionEventoPage';
 
 function App() {
-  if (window.location.pathname === '/valorar-evento') {
+  const { pathname } = window.location;
+
+  if (pathname === '/satisfaccion/gracias') {
+    return <ValoracionEventoPage view="thanks" />;
+  }
+
+  if (pathname.startsWith('/satisfaccion/') || pathname === '/valorar-evento') {
     return <ValoracionEventoPage />;
   }
 

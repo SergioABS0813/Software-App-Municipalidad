@@ -21,7 +21,7 @@ public interface ValoracionEventoRepository extends JpaRepository<ValoracionEven
             select avg(valoracion.puntuacion)
             from ValoracionEvento valoracion
             where valoracion.evento.id = :eventoId
-              and valoracion.estado = 'RESPONDIDO'
+              and valoracion.estado in ('RESPONDIDA', 'RESPONDIDO')
               and valoracion.puntuacion is not null
             """)
     Double promedioPuntuacionPorEvento(@Param("eventoId") Integer eventoId);

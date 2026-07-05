@@ -40,7 +40,7 @@ public class VecinoNotificacionService {
     @Value("${app.mail.enabled:false}")
     private boolean mailEnabled;
 
-    @Value("${app.frontend.base-url:http://localhost:5173}")
+    @Value("${app.frontend-url:${app.frontend.base-url:http://localhost:5173}}")
     private String frontendBaseUrl;
 
     public void notificarCambioContacto(
@@ -59,14 +59,14 @@ public class VecinoNotificacionService {
 
         enviarCorreoHtml(
                 emailDestino,
-                "Actualización de datos de contacto",
+                "ActualizaciÃ³n de datos de contacto",
                 construirPlantillaHtml(
                         "Datos de contacto actualizados",
                         """
                         <p>Hola <strong>%s</strong>,</p>
-                        <p>Te informamos que un administrador de la Municipalidad de San Miguel actualizó datos sensibles de tu cuenta vecinal.</p>
+                        <p>Te informamos que un administrador de la Municipalidad de San Miguel actualizÃ³ datos sensibles de tu cuenta vecinal.</p>
                         %s
-                        <p>Si no reconoces esta actualización, comunícate con la Municipalidad de San Miguel para revisar el caso.</p>
+                        <p>Si no reconoces esta actualizaciÃ³n, comunÃ­cate con la Municipalidad de San Miguel para revisar el caso.</p>
                         """.formatted(escapeHtml(nombre), detalleCambio)
                 )
         );
@@ -438,18 +438,18 @@ public class VecinoNotificacionService {
 
         enviarCorreoHtml(
                 emailDestino,
-                "Ayúdanos a mejorar: puntúa el evento al que asististe",
+                "Califica tu experiencia en el evento municipal",
                 construirPlantillaHtml(
-                        "Valora tu experiencia",
+                        "Califica tu experiencia",
                         """
                         <p>Hola <strong>%s</strong>,</p>
-                        <p>Gracias por asistir al evento <strong>%s</strong>. Tu opinión nos ayuda a mejorar las próximas actividades municipales.</p>
+                        <p>Gracias por participar en el evento <strong>%s</strong>.<br><br>Tu opinion nos ayuda a mejorar las proximas actividades de la Municipalidad de San Miguel.</p>
                         <p style="margin:28px 0;text-align:center;">
                           <a href="%s" style="display:inline-block;background:#0a56c2;color:#ffffff;text-decoration:none;font-weight:800;border-radius:8px;padding:14px 24px;">
-                            Puntúa el evento
+                            Calificar evento
                           </a>
                         </p>
-                        <p style="color:#2f5276;">La valoración solo toma unos segundos.</p>
+                        <p style="color:#2f5276;">Este enlace estara disponible por 7 dias.</p>
                         """.formatted(
                                 escapeHtml(StringUtils.hasText(nombre) ? nombre : "vecino"),
                                 escapeHtml(tituloEvento),
@@ -509,7 +509,7 @@ public class VecinoNotificacionService {
                 ? frontendBaseUrl.stripTrailing()
                 : "http://localhost:5173";
 
-        return baseUrl + "/valorar-evento?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
+        return baseUrl + "/satisfaccion/" + URLEncoder.encode(token, StandardCharsets.UTF_8);
     }
 
     private String construirDetalleCambio(String correoActual, String celularActual, boolean cambioCorreo, boolean cambioCelular) {
@@ -612,7 +612,7 @@ public class VecinoNotificacionService {
                                 <div style="font-size:24px;line-height:1.2;font-weight:800;letter-spacing:.2px;">
                                   <span style="color:#084c8d;">Municipalidad</span> de San Miguel
                                 </div>
-                                <div style="margin-top:5px;font-size:18px;font-weight:700;">Sistema de Gestión de Eventos</div>
+                                <div style="margin-top:5px;font-size:18px;font-weight:700;">Sistema de GestiÃ³n de Eventos</div>
                               </td>
                             </tr>
                             <tr>
@@ -623,7 +623,7 @@ public class VecinoNotificacionService {
                             </tr>
                             <tr>
                               <td style="background:#f8fbfd;border-top:1px solid #e2edf5;padding:17px 32px;color:#2f5276;font-size:12.5px;line-height:1.5;">
-                                Este mensaje fue generado automáticamente. Si no solicitaste esta operación, puedes comunicarte con la Municipalidad de San Miguel.
+                                Este mensaje fue generado automÃ¡ticamente. Si no solicitaste esta operaciÃ³n, puedes comunicarte con la Municipalidad de San Miguel.
                               </td>
                             </tr>
                           </table>
