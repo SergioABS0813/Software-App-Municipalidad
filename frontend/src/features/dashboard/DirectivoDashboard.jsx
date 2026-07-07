@@ -61,6 +61,38 @@ function formatDirectiveNotificationTime(value) {
   }).format(date);
 }
 
+function ReportSatisfactionStars({ compact = false, report }) {
+  if (!report?.encuestaSatisfaccionHabilitada) {
+    return <span className="report-satisfaction-muted">No aplica</span>;
+  }
+
+  const average = Number(report.puntuacionPromedio ?? 0);
+  const totalRatings = Number(report.totalValoraciones ?? 0);
+
+  if (!totalRatings || !Number.isFinite(average) || average <= 0) {
+    return <span className="report-satisfaction-muted">Sin valoraciones</span>;
+  }
+
+  const roundedAverage = Math.max(0, Math.min(5, Math.round(average)));
+
+  return (
+    <span
+      aria-label={`Satisfaccion promedio: ${average.toFixed(1)} de 5, ${totalRatings} valoraciones`}
+      className={`report-satisfaction-rating${compact ? ' is-compact' : ''}`}
+    >
+      <span className="report-stars" aria-hidden="true">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <span className={star <= roundedAverage ? 'is-active' : ''} key={star}>
+            {'\u2605'}
+          </span>
+        ))}
+      </span>
+      <strong>{average.toFixed(1)} / 5</strong>
+      {!compact && <small>{totalRatings} {totalRatings === 1 ? 'valoracion' : 'valoraciones'}</small>}
+    </span>
+  );
+}
+
 function mapDirectiveNotificationFromApi(notification) {
   return {
     id: notification.id,
@@ -1902,6 +1934,7 @@ function ReportsDashboardView({ error = '', isLoading = false, notificationMenu,
             <span>Evento</span>
             <span>Inscritos</span>
             <span>Asistentes</span>
+            <span>Satisfaccion</span>
             <span>Fecha de cierre</span>
             <span>Reporte</span>
           </div>
@@ -1915,6 +1948,9 @@ function ReportsDashboardView({ error = '', isLoading = false, notificationMenu,
               <span className="report-attendance-cell">
                 <strong>{report.requiereControlAsistencia ? report.totalAttendance : 'No aplica'}</strong>
                 <small>{report.requiereControlAsistencia && report.turnoutRate !== null ? `${report.turnoutRate}%` : 'Sin control'}</small>
+              </span>
+              <span className="report-satisfaction-cell">
+                <ReportSatisfactionStars report={report} />
               </span>
               <span>{report.completedAt}</span>
               <span>
@@ -1936,6 +1972,7 @@ function ReportsDashboardView({ error = '', isLoading = false, notificationMenu,
           {filteredReports.length === 0 && (
             <div className="admin-table-row">
               <span>No hay eventos finalizados para los filtros seleccionados.</span>
+              <span />
               <span />
               <span />
               <span />
@@ -2285,6 +2322,16 @@ function EventReportView({ report, onActiveSectionChange, onBack, onCancelEvent 
           </article>
         ))}
       </section>
+
+      {report.encuestaSatisfaccionHabilitada && (
+        <section className="admin-panel report-satisfaction-panel" aria-labelledby="report-satisfaction-title">
+          <div>
+            <span className="section-kicker">Encuesta de satisfaccion</span>
+            <h2 id="report-satisfaction-title">Promedio ciudadano</h2>
+          </div>
+          <ReportSatisfactionStars report={report} />
+        </section>
+      )}
 
       <section className="admin-panel executive-summary-card" aria-labelledby="executive-summary-title">
         <span className="section-kicker">Análisis</span>

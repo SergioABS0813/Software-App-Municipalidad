@@ -192,13 +192,15 @@ public class EventoOperativoService {
         Instant fin = inicioDia.plusDays(1).atZone(ZONA_LIMA).toInstant();
 
         Instant ahora = ahoraLima();
+        Instant limitePostFin = ahora.minusSeconds(1800);
 
         return eventoOperativoRepository.findEventosAsignadosDelDia(
                         usuario,
                         inicio,
                         fin,
                         ahora,
-                        List.of("PUBLICADO", "EN_CURSO")
+                        limitePostFin,
+                        List.of("PUBLICADO", "EN_CURSO", "FINALIZADO")
                 ).stream()
                 .map(this::toEventoOperativoHoyDto)
                 .toList();
@@ -216,11 +218,9 @@ public class EventoOperativoService {
             return respuestaQr("NOT_FOUND", "QR no reconocido", "El codigo QR no pertenece a una inscripcion valida.", "error", null, null, null);
         }
 
-        System.out.println("llegue 1");
 
         CodigoQr codigoQr = codigoQrRepository.findDetalleByToken(token)
                 .orElse(null);
-        System.out.println("llegue 2");
 
         if (codigoQr == null || codigoQr.getInscripcion() == null) {
             return respuestaQr("NOT_FOUND", "QR no encontrado", "No se encontro una inscripcion asociada al codigo QR.", "error", null, null, null);
@@ -235,7 +235,10 @@ public class EventoOperativoService {
             return respuestaQr("DUPLICATE", "QR no activo", "Este codigo QR ya no se encuentra activo para validar ingreso.", "warning", nombreVecino(inscripcion), inscripcion.getCodigoInscripcion(), null);
         }
 
-        if (codigoQr.getFechaExpiracion() != null && codigoQr.getFechaExpiracion().isBefore(ahoraLima())) {
+        Instant ahora = ahoraLima();
+        if (codigoQr.getFechaExpiracion() != null
+                && codigoQr.getFechaExpiracion().isBefore(ahora)
+                && !ventanaOperativaActiva(evento, ahora)) {
             return respuestaQr("CLOSED", "QR expirado", "El codigo QR expiro porque el evento ya finalizo.", "error", nombreVecino(inscripcion), inscripcion.getCodigoInscripcion(), null);
         }
 
@@ -252,7 +255,6 @@ public class EventoOperativoService {
             return respuestaQr("FULL", "Sin cupos", "El evento no tiene cupos disponibles.", "warning", nombreVecino(inscripcion), inscripcion.getCodigoInscripcion(), null);
         }
 
-        Instant ahora = ahoraLima();
         Asistencia asistencia = asistenciaExistente.orElseGet(Asistencia::new);
         asistencia.setInscripcion(inscripcion);
         asistencia.setEstado("VALIDADA");
@@ -261,11 +263,9 @@ public class EventoOperativoService {
         asistencia.setValidadoPorUsuario(usuario);
         asistencia.setMotivo(null);
         Asistencia guardada = asistenciaRepository.save(asistencia);
-        System.out.println("llegue 3");
 
         codigoQr.setUsadoEn(ahora);
         codigoQrRepository.save(codigoQr);
-        System.out.println("llegue 4");
 
         return respuestaQr("SUCCESS", "Validacion exitosa", "Asistencia validada correctamente.", "success", nombreVecino(inscripcion), inscripcion.getCodigoInscripcion(), toValidacionRecienteDto(guardada));
     }
@@ -423,15 +423,18 @@ public class EventoOperativoService {
                 .map(vecinoExistente -> completarDatosVecinoManual(vecinoExistente, nombres, apellidos, celular, email))
                 .orElseGet(() -> crearVecinoManual(dni, nombres, apellidos, celular, email));
 
+
         Inscripcion inscripcion = inscripcionRepository.findByEventoIdAndVecinoId(eventoId, vecino.getId())
                 .map(existente -> prepararInscripcionManualExistente(existente, evento, vecino))
                 .orElseGet(() -> crearInscripcionManual(evento, vecino));
+
 
         OperativoQrValidationResponseDto response = registrarAsistenciaManual(eventoId, inscripcion, usuario, "Inscripcion manual en puerta");
         if ("SUCCESS".equals(response.status())) {
             registrarBitacoraInscripcionManual(inscripcion, usuario, httpRequest);
             vecinoNotificacionService.enviarConstanciaInscripcionManualValidada(inscripcion);
         }
+
         return response;
     }
 
@@ -517,8 +520,17 @@ public class EventoOperativoService {
     }
 
     private Inscripcion prepararInscripcionManualExistente(Inscripcion inscripcion, Evento evento, Vecino vecino) {
-        if (inscripcion.getEstadoInscripcion() != EstadoInscripcion.CANCELADA) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "El ciudadano ya tiene una inscripcion activa para este evento");
+        EstadoInscripcion estado = inscripcion.getEstadoInscripcion();
+
+        if (estado == null || estado == EstadoInscripcion.CONFIRMADA) {
+            return inscripcion;
+        }
+
+        if (estado != EstadoInscripcion.CANCELADA) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "La inscripcion existente no esta confirmada para validar asistencia"
+            );
         }
 
         validarCuposInscripcionManual(evento);

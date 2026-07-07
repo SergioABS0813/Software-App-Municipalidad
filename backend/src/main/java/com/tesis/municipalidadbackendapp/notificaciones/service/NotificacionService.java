@@ -66,7 +66,7 @@ public class NotificacionService {
     public void notificarEventoObservadoAdministradores(Evento evento, Usuario directivo, BitacoraAccion bitacoraAccion) {
         notificarAdministradores(
                 "Evento observado",
-                "%s observÃ³ \"%s\".".formatted(nombreUsuario(directivo), tituloEvento(evento)),
+                "%s observ? \"%s\".".formatted(nombreUsuario(directivo), tituloEvento(evento)),
                 "EVENTO_OBSERVADO",
                 "/admin/eventos/%d/editar".formatted(evento.getId()),
                 directivo,
@@ -180,8 +180,8 @@ public class NotificacionService {
 
     public void notificarEventoIniciaMananaAdministradores(Evento evento, Usuario sistema, BitacoraAccion bitacoraAccion) {
         notificarAdministradores(
-                "Evento inicia maÃ±ana",
-                "\"%s\" inicia maÃ±ana a las %s.".formatted(tituloEvento(evento), horaInicio(evento)),
+                "Evento inicia ma?ana",
+                "\"%s\" inicia ma?ana a las %s.".formatted(tituloEvento(evento), horaInicio(evento)),
                 "EVENTO_INICIA_MANANA",
                 "/admin/eventos/%d/detalle".formatted(evento.getId()),
                 sistema,
@@ -192,7 +192,7 @@ public class NotificacionService {
     public void notificarUsuarioCreadoAdministradores(Usuario usuarioCreado, Usuario administrador, BitacoraAccion bitacoraAccion) {
         notificarAdministradores(
                 "Nuevo usuario registrado",
-                "Se registrÃ³ el usuario interno %s.".formatted(nombreUsuario(usuarioCreado)),
+                "Se registr? el usuario interno %s.".formatted(nombreUsuario(usuarioCreado)),
                 "USUARIO_CREADO",
                 "/admin/usuarios-internos/%d/detalle".formatted(usuarioCreado.getId()),
                 administrador,

@@ -46,8 +46,9 @@ public interface EventoOperativoRepository extends JpaRepository<EventoOperativo
             order by
               case
                 when evento.fechaHoraInicio <= :ahora and evento.fechaHoraFin >= :ahora then 0
-                when evento.fechaHoraInicio >= :ahora then 1
-                else 2
+                when evento.fechaHoraFin < :ahora and evento.fechaHoraFin >= :limitePostFin then 1
+                when evento.fechaHoraInicio >= :ahora then 2
+                else 3
               end,
               evento.fechaHoraInicio asc,
               evento.id asc
@@ -57,6 +58,7 @@ public interface EventoOperativoRepository extends JpaRepository<EventoOperativo
             @Param("inicio") Instant inicio,
             @Param("fin") Instant fin,
             @Param("ahora") Instant ahora,
+            @Param("limitePostFin") Instant limitePostFin,
             @Param("estados") Collection<String> estados
     );
 }

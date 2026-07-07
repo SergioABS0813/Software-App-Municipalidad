@@ -51,6 +51,7 @@ export default function ResetPassword(props: {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [formError, setFormError] = useState("");
     const [formSuccess, setFormSuccess] = useState("");
+    const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
     const [isNewPasswordVisible, setIsNewPasswordVisible] = useState(false);
     const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
     const backToEventsUrl = getBackToEventsUrl();
@@ -64,6 +65,10 @@ export default function ResetPassword(props: {
 
     async function verifyAccount(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
+
+        if (isRecoveringPassword) {
+            return;
+        }
 
         const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -82,6 +87,8 @@ export default function ResetPassword(props: {
             return;
         }
 
+        setIsRecoveringPassword(true);
+
         try{
             await recuperarContrasena(correo, dni);
             setFormError("");
@@ -90,6 +97,8 @@ export default function ResetPassword(props: {
             console.error(error);
             setFormSuccess("");
             setFormError("No se pudo procesar la solicitud. Inténtalo nuevamente.")
+        }finally{
+            setIsRecoveringPassword(false);
         }
     }
 
@@ -148,6 +157,7 @@ export default function ResetPassword(props: {
                             autoFocus
                             value={correo}
                             placeholder="Ingrese su correo electrónico"
+                            disabled={isRecoveringPassword}
                             onChange={event => {
                                 setCorreo(event.target.value);
                                 setFormError("");
@@ -166,12 +176,19 @@ export default function ResetPassword(props: {
                             maxLength={8}
                             placeholder="Ingrese su DNI"
                             value={dni}
+                            disabled={isRecoveringPassword}
                             onChange={event => updateDni(event.target.value)}
                         />
                     </label>
 
-                    <button className="kc-login-submit" type="submit">
-                        Verificar datos
+                    <button
+                        aria-busy={isRecoveringPassword}
+                        className="kc-login-submit kc-loading-submit"
+                        disabled={isRecoveringPassword}
+                        type="submit"
+                    >
+                        {isRecoveringPassword && <span className="kc-button-spinner" aria-hidden="true" />}
+                        <span>{isRecoveringPassword ? "Verificando..." : "Verificar datos"}</span>
                     </button>
 
                     {verifiedUser !== null && !formSuccess && (

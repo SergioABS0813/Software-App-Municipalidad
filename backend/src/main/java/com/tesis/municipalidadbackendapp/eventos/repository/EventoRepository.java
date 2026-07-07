@@ -127,10 +127,13 @@ public interface EventoRepository extends JpaRepository<Evento, Integer> {
             left join fetch evento.categoria categoria
             left join fetch evento.ubicacion ubicacion
             left join fetch evento.areaMunicipal area
-            where estado.codigo = 'EN_CURSO'
-              and evento.fechaHoraInicio <= :ahora
+            where evento.fechaHoraInicio <= :ahora
               and evento.fechaHoraFin > :ahora
-            order by evento.fechaHoraInicio asc, evento.id asc
+              and estado.codigo in ('PUBLICADO', 'EN_CURSO')
+            order by
+              case when estado.codigo = 'EN_CURSO' then 0 else 1 end,
+              evento.fechaHoraInicio asc,
+              evento.id asc
             """)
     List<Evento> findEventosEnCursoPortalPublico(
             @Param("ahora") Instant ahora,

@@ -15,6 +15,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -36,6 +37,9 @@ public class VecinoNotificacionService {
 
     @Value("${app.mail.from:}")
     private String from;
+
+    @Value("${app.mail.from-name}")
+    private String fromName;
 
     @Value("${app.mail.enabled:false}")
     private boolean mailEnabled;
@@ -59,14 +63,14 @@ public class VecinoNotificacionService {
 
         enviarCorreoHtml(
                 emailDestino,
-                "ActualizaciÃ³n de datos de contacto",
+                "Actualizaci?n de datos de contacto",
                 construirPlantillaHtml(
                         "Datos de contacto actualizados",
                         """
                         <p>Hola <strong>%s</strong>,</p>
-                        <p>Te informamos que un administrador de la Municipalidad de San Miguel actualizÃ³ datos sensibles de tu cuenta vecinal.</p>
+                        <p>Te informamos que un administrador de la Municipalidad de San Miguel actualiz? datos sensibles de tu cuenta vecinal.</p>
                         %s
-                        <p>Si no reconoces esta actualizaciÃ³n, comunÃ­cate con la Municipalidad de San Miguel para revisar el caso.</p>
+                        <p>Si no reconoces esta actualizaci?n, comun?cate con la Municipalidad de San Miguel para revisar el caso.</p>
                         """.formatted(escapeHtml(nombre), detalleCambio)
                 )
         );
@@ -572,7 +576,7 @@ public class VecinoNotificacionService {
                     ? new MimeMessageHelper(message, MimeMessageHelper.MULTIPART_MODE_RELATED, "UTF-8")
                     : new MimeMessageHelper(message, false, "UTF-8");
             if (StringUtils.hasText(from)) {
-                helper.setFrom(from);
+                helper.setFrom(from, fromName);
             }
             helper.setTo(email);
             helper.setSubject(subject);
@@ -590,6 +594,8 @@ public class VecinoNotificacionService {
             log.info("Notificacion vecinal enviada. email={}", email);
         } catch (MailException | MessagingException exception) {
             log.warn("No se pudo enviar notificacion vecinal. email={}", email, exception);
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -612,7 +618,7 @@ public class VecinoNotificacionService {
                                 <div style="font-size:24px;line-height:1.2;font-weight:800;letter-spacing:.2px;">
                                   <span style="color:#084c8d;">Municipalidad</span> de San Miguel
                                 </div>
-                                <div style="margin-top:5px;font-size:18px;font-weight:700;">Sistema de GestiÃ³n de Eventos</div>
+                                <div style="margin-top:5px;font-size:18px;font-weight:700;">Sistema de Gesti?n de Eventos</div>
                               </td>
                             </tr>
                             <tr>
@@ -623,7 +629,7 @@ public class VecinoNotificacionService {
                             </tr>
                             <tr>
                               <td style="background:#f8fbfd;border-top:1px solid #e2edf5;padding:17px 32px;color:#2f5276;font-size:12.5px;line-height:1.5;">
-                                Este mensaje fue generado automÃ¡ticamente. Si no solicitaste esta operaciÃ³n, puedes comunicarte con la Municipalidad de San Miguel.
+                                Este mensaje fue generado autom?ticamente. Si no solicitaste esta operaci?n, puedes comunicarte con la Municipalidad de San Miguel.
                               </td>
                             </tr>
                           </table>

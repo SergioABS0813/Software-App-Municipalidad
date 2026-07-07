@@ -361,7 +361,7 @@
 }
 
 .reports-main-table .admin-table-row {
-  grid-template-columns: minmax(280px, 1.4fr) 120px 120px 150px 100px;
+  grid-template-columns: minmax(280px, 1.4fr) 110px 120px 170px 150px 90px;
 }
 
 .report-attendance-cell {
@@ -385,6 +385,65 @@
   font-weight: 650;
   line-height: 1;
   padding: 4px 7px;
+}
+
+.report-satisfaction-cell {
+  min-width: 0;
+}
+
+.report-satisfaction-rating {
+  align-items: flex-start;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.report-satisfaction-rating.is-compact {
+  align-items: center;
+}
+
+.report-stars {
+  color: #c9d4df;
+  display: inline-flex;
+  font-size: 1rem;
+  gap: 1px;
+  line-height: 1;
+}
+
+.report-stars .is-active {
+  color: #f59e0b;
+}
+
+.report-satisfaction-rating strong {
+  color: var(--color-text-strong);
+  font-size: 0.86rem;
+  font-weight: 850;
+  line-height: 1.15;
+}
+
+.report-satisfaction-rating small,
+.report-satisfaction-muted {
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.report-satisfaction-panel {
+  align-items: center;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 18px;
+}
+
+.report-satisfaction-panel h2 {
+  margin: 0;
+}
+
+.report-satisfaction-panel .report-stars {
+  font-size: 1.28rem;
 }
 
 .executive-summary-card {
@@ -2172,7 +2231,7 @@
   }
 
   .reports-main-table .admin-table-row {
-    min-width: 760px;
+    min-width: 900px;
   }
 
   .directive-review-hero {
@@ -2246,7 +2305,7 @@
 
   .reports-main-table .admin-table-row,
   .directive-shell .admin-table-row {
-    min-width: 720px;
+    min-width: 900px;
   }
 
   .directive-facts {

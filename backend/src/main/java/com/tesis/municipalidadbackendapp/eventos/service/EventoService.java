@@ -289,6 +289,9 @@ public class EventoService {
                 evento.getEdadMax(),
                 requiereInscripcion(evento),
                 requiereControlAsistencia(evento),
+                evento.getMetaTipo(),
+                evento.getMetaValor(),
+                evento.getEncuestaSatisfaccionHabilitado() != null && evento.getEncuestaSatisfaccionHabilitado() == 1,
                 toLocalDateTime(evento.getEventoActualizadoEn() != null ? evento.getEventoActualizadoEn() : evento.getTiempoActualizado()),
                 evento.getMotivoCancelacion(),
                 toLocalDateTime(evento.getFechaCancelacion()),
@@ -881,7 +884,7 @@ public class EventoService {
 
         //Parte 1:Datos generales (1/6)
         if (tieneDatosGeneralesCompletos(evento)) completos++;
-        //Parte 2:ProgramaciÃƒÂ³n o Aforo (2/6)
+        //Parte 2:Programación o Aforo (2/6)
         if (tieneProgramacionValida(evento)) completos++;
         //Parte 3:Agenda (3/6)
         boolean tieneAgenda = agendaEventoRepository.findByEvento(evento).size() != 0;
@@ -889,7 +892,7 @@ public class EventoService {
         //Parte 4: Requisitos (4/6)
         boolean tieneRequisitos = requisitoEventoRepository.findByEvento(evento).size() != 0;
         if (tieneRequisitos) completos++;
-        //Parte 5: UbicaciÃƒÂ³n (5/6)
+        //Parte 5: Ubicación (5/6)
         if (evento.getUbicacion() != null) completos++;
         //Parte 6: Recursos Adjuntos (6/6)
         if (tienePortada(evento)) completos++;
@@ -1236,7 +1239,7 @@ public class EventoService {
     }
 
     private String valorDetalle(String valor) {
-        return hasText(valor) ? valor.trim() : "Sin tÃƒÂ­tulo";
+        return hasText(valor) ? valor.trim() : "Sin título";
     }
 
     private EstadoEvento obtenerEstadoEvento(String codigo) {
@@ -1496,12 +1499,12 @@ public class EventoService {
         if(numeroObservacionesPendientes>0){
             alertas.add(new EventoPanelAdministrativoDto.AlertaFichaEventoPanelAdministrativoDto(
                     "OBSERVACION_DIRECTIVO",
-                    numeroObservacionesPendientes == 1 ? "1 observaciÃƒÂ³n del directivo": numeroObservacionesPendientes + "observaciones del directivo."));
+                    numeroObservacionesPendientes == 1 ? "1 observación del directivo": numeroObservacionesPendientes + " observaciones del directivo."));
 
         }
     }
 
-    private boolean esObservacionPendiente(ObservacionEvento observacion) { //Los ÃƒÂºnicos estados que tiene observaciÃƒÂ³n son: ATENDIDA y PENDIENTE
+    private boolean esObservacionPendiente(ObservacionEvento observacion) { //Los únicos estados que tiene observación son: ATENDIDA y PENDIENTE
         if (observacion == null) {
             return false;
         }
@@ -1526,9 +1529,9 @@ public class EventoService {
         if (!hasText(evento.getTitulo()) || !hasText(evento.getDescripcion()) || evento.getAreaMunicipal() == null || !hasText(evento.getDescripcionBreve()) || evento.getCategoria() == null){
             agregarAlertaCampoPendiente(alertas, "Completar datos generales del evento");
         }
-        //Parte 2:ProgramaciÃƒÂ³n (2/6)
+        //Parte 2:Programación (2/6)
         if (!tieneProgramacionValida(evento)){
-            agregarAlertaCampoPendiente(alertas, "Completar programaciÃƒÂ³n del evento");
+            agregarAlertaCampoPendiente(alertas, "Completar programación del evento");
 
         }
         //Parte 3:Agenda (3/6)
@@ -1541,9 +1544,9 @@ public class EventoService {
         if (!tieneRequisitos) {
             agregarAlertaCampoPendiente(alertas, "Definir requisitos del evento");
         }
-        //Parte 5: UbicaciÃƒÂ³n (5/6)
+        //Parte 5: Ubicación (5/6)
         if (evento.getUbicacion() == null){
-            agregarAlertaCampoPendiente(alertas, "Agregar ubicaciÃƒÂ³n del evento");
+            agregarAlertaCampoPendiente(alertas, "Agregar ubicación del evento");
         }
         //Parte 6: Recursos Adjuntos (6/6)
         if (!tienePortada(evento)){

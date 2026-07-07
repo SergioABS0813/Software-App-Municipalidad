@@ -142,11 +142,19 @@ function getEventSelectionRank(event, now) {
     return 0;
   }
 
-  if (start && now <= start) {
-    return 1;
+  if (end) {
+    const operativeEnd = new Date(end.getTime() + 30 * 60 * 1000);
+
+    if (now > end && now <= operativeEnd) {
+      return 1;
+    }
   }
 
-  return 2;
+  if (start && now <= start) {
+    return 2;
+  }
+
+  return 3;
 }
 
 function compareOperativeEvents(firstEvent, secondEvent, now) {
@@ -317,15 +325,7 @@ function OperativoDashboard({ onLogout, user }) {
   const operativeEvents = useMemo(
     () =>
       operativeEventsData
-        .filter((event) => {
-          const operativeState = getOperativeState(event, now);
-
-          return (
-            isEventToday(event, now) &&
-            ['PUBLICADO', 'EN_CURSO'].includes(operativeState) &&
-            !['FINALIZADO', 'CANCELADO'].includes(event.state)
-          );
-        })
+        .filter((event) => isEventToday(event, now) && event.state !== 'CANCELADO')
         .sort((firstEvent, secondEvent) => compareOperativeEvents(firstEvent, secondEvent, now))
         .map((event) => buildOperativeEvent(event, now)),
     [now, operativeEventsData],

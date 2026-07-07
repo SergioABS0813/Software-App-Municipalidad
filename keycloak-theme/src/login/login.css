@@ -242,6 +242,42 @@ input {
     transform: translateY(-1px);
 }
 
+
+.kc-login-submit:disabled {
+    cursor: not-allowed;
+    opacity: 0.72;
+    transform: none;
+}
+
+.kc-login-submit:disabled:hover {
+    border-color: transparent;
+    box-shadow: none;
+    transform: none;
+}
+
+.kc-loading-submit {
+    align-items: center;
+    display: inline-flex;
+    gap: 9px;
+    justify-content: center;
+}
+
+.kc-button-spinner {
+    animation: kc-button-spin 0.75s linear infinite;
+    border: 2px solid rgba(255, 255, 255, 0.42);
+    border-radius: 50%;
+    border-top-color: #ffffff;
+    flex: 0 0 auto;
+    height: 16px;
+    width: 16px;
+}
+
+@keyframes kc-button-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .kc-login-register-link {
     color: var(--kc-text-muted);
     display: flex;
@@ -750,4 +786,8 @@ input {
     .kc-update-password-card {
         margin-top: 30px;
     }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .kc-button-spinner { animation: none; }
 }

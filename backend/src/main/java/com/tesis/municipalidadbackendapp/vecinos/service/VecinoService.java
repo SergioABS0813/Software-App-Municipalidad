@@ -386,7 +386,7 @@ public class VecinoService {
 
     private Vecino obtenerVecinoDetalle(Integer id) {
         return vecinoRepository.findDetalleById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No se encontrÃ³ la cuenta vecinal."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No se encontr? la cuenta vecinal."));
     }
 
     private Vecino obtenerVecinoAutenticado(String keycloakId, String email) {
@@ -423,7 +423,7 @@ public class VecinoService {
         }
 
         if (!EMAIL_PATTERN.matcher(correoNormalizado).matches()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ingrese un correo electrÃ³nico vÃ¡lido.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ingrese un correo electr?nico v?lido.");
         }
 
         if (vecinoRepository.existsByEmailIgnoreCaseAndIdNot(correoNormalizado, vecinoId)) {
@@ -445,7 +445,7 @@ public class VecinoService {
         }
 
         if (!CELULAR_PATTERN.matcher(celularNormalizado).matches()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ingrese un celular vÃ¡lido.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ingrese un celular v?lido.");
         }
 
         return celularNormalizado;
@@ -495,7 +495,7 @@ public class VecinoService {
         String estadoNormalizado = estado.trim().toUpperCase();
 
         if (!ESTADOS_CUENTA_VECINAL.contains(estadoNormalizado)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de cuenta vecinal no vÃ¡lido.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de cuenta vecinal no v?lido.");
         }
 
         return estadoNormalizado;
