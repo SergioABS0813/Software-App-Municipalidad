@@ -238,6 +238,14 @@ public class UsuarioService {
         usuario.setRol(rolNuevo);
         Usuario guardado = usuarioRepository.save(usuario);
 
+        if (cambioCorreo || cambioArea || cambioRol) {
+            usuarioNotificacionService.notificarActualizacionCuenta(
+                    emailNuevo,
+                    guardado.getNombre(),
+                    construirResumenCambiosCuenta(cambioCorreo, cambioArea, cambioRol)
+            );
+        }
+
         if (cambioCorreo) {
             usuarioNotificacionService.notificarCorreoAccesoSeleccionado(emailNuevo, guardado.getNombre());
             usuarioNotificacionService.notificarCorreoAnteriorReemplazado(emailAnterior, emailNuevo, guardado.getNombre());
@@ -365,6 +373,19 @@ public class UsuarioService {
         );
     }
 
+    private String construirResumenCambiosCuenta(boolean cambioCorreo, boolean cambioArea, boolean cambioRol) {
+        List<String> cambios = new java.util.ArrayList<>();
+        if (cambioCorreo) {
+            cambios.add("correo electrónico");
+        }
+        if (cambioArea) {
+            cambios.add("área municipal");
+        }
+        if (cambioRol) {
+            cambios.add("rol de acceso");
+        }
+        return String.join(", ", cambios);
+    }
     private void registrarActualizacionUsuario(
             Usuario usuario,
             Usuario usuarioAutenticado,

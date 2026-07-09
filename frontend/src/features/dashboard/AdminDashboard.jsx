@@ -15,6 +15,7 @@ import {
   eliminarEventoGestion,
   eliminarRecursoEvento,
   eliminarUbicacionConfiguracion,
+  enviarEnlaceRestablecimientoUsuario,
   getCuentaVecinalDetalle,
   getCuentasVecinales,
   getCategoriasConfiguracion,
@@ -5291,6 +5292,7 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
   const [usersError, setUsersError] = useState('');
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [isTogglingUserState, setIsTogglingUserState] = useState(false);
+  const [isSendingPasswordReset, setIsSendingPasswordReset] = useState(false);
   const [openedTargetUserId, setOpenedTargetUserId] = useState(null);
 
   useEffect(()=>{
@@ -5392,6 +5394,7 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
     setUserFormErrors({});
     setIdentityLookupNotice('');
     setPasswordResetNotice('');
+    setIsSendingPasswordReset(false);
     setUserModalMode('create');
   };
 
@@ -5399,6 +5402,7 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
     setUserFormErrors({});
     setIdentityLookupNotice('');
     setPasswordResetNotice('');
+    setIsSendingPasswordReset(false);
     setUserNotice('');
 
     try {
@@ -5585,6 +5589,7 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
           mode={userModalMode}
           isSaving={isSavingUser}
           isTogglingState={isTogglingUserState}
+          isSendingPasswordReset={isSendingPasswordReset}
           passwordResetNotice={passwordResetNotice}
           roles={roleCatalog}
           user={selectedUser}
@@ -5620,14 +5625,30 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
               setUserFormErrors((current) => ({ ...current, identityVerified: undefined }));
               setIdentityLookupNotice(`Nombre encontrado: ${response.data}`);
           }}
-          onSendResetPassword={() => {
-            if (!selectedUser) {
+          onSendResetPassword={async () => {
+            if (!selectedUser || isSendingPasswordReset) {
               return;
             }
 
-            requestPasswordResetLink(selectedUser);
-            registerUserAuditLog('SEND_PASSWORD_RESET_LINK', selectedUser.id, ['passwordReset']);
-            setPasswordResetNotice('Enlace de restablecimiento enviado al correo registrado.');
+            const correo = userFormData.correo.trim();
+            const dni = userFormData.dni.trim();
+
+            if (!correo || !dni) {
+              setPasswordResetNotice('No se pudo enviar el enlace: faltan correo o DNI del usuario.');
+              return;
+            }
+
+            setIsSendingPasswordReset(true);
+            setPasswordResetNotice('');
+            try {
+              await enviarEnlaceRestablecimientoUsuario({ correo, dni });
+              registerUserAuditLog('SEND_PASSWORD_RESET_LINK', selectedUser.id, ['passwordReset']);
+              setPasswordResetNotice('Enlace de restablecimiento enviado al correo registrado.');
+            } catch (error) {
+              setPasswordResetNotice(getApiErrorMessage(error, 'No se pudo enviar el enlace de restablecimiento.'));
+            } finally {
+              setIsSendingPasswordReset(false);
+            }
           }}
           onSave={saveUser}
           onToggleState={toggleUserState}
@@ -5719,12 +5740,6 @@ function registerUserAuditLog(action, userId, changedFields) {
   };
 }
 
-function requestPasswordResetLink(user) {
-  return {
-    recipient: user.correo,
-    status: 'sent',
-  };
-}
 
 function UserFormModal({
   errors,
@@ -5732,6 +5747,7 @@ function UserFormModal({
   identityNotice,
   isSaving = false,
   isTogglingState = false,
+  isSendingPasswordReset = false,
   mode,
   onClose,
   onFieldChange,
@@ -5858,9 +5874,9 @@ function UserFormModal({
                   </small>
                   {passwordResetNotice && <small className="user-reset-notice">{passwordResetNotice}</small>}
                 </span>
-                <button className="user-reset-action" type="button" onClick={onSendResetPassword}>
+                <button className="user-reset-action" type="button" disabled={isSendingPasswordReset} onClick={onSendResetPassword}>
                   <span aria-hidden="true">+</span>
-                  Enviar enlace de restablecimiento
+                  {isSendingPasswordReset ? 'Enviando enlace...' : 'Enviar enlace de restablecimiento'}
                 </button>
               </section>
             )}

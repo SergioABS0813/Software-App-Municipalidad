@@ -33,6 +33,11 @@ export async function actualizarEstadoUsuarioInterno(id, estado){
     return response.data;
 }
 
+export async function enviarEnlaceRestablecimientoUsuario({ correo, dni }){
+    const response = await api.post("auth/forgot-password", { correo, dni });
+    return response.data;
+}
+
 export async function getRolesUsuariosInternos(){
     const response = await api.get("rol/admin/find_all");
     return response.data

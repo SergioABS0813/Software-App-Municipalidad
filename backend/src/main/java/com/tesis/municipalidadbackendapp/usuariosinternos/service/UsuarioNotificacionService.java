@@ -67,6 +67,21 @@ public class UsuarioNotificacionService {
         );
     }
 
+    public void notificarActualizacionCuenta(String email, String nombre, String cambios) {
+        enviarCorreoHtml(
+                email,
+                "Actualización de cuenta institucional",
+                construirPlantillaHtml(
+                        "Cuenta institucional actualizada",
+                        """
+                        <p style="margin:0 0 14px;">Hola <strong>%s</strong>,</p>
+                        <p style="margin:0 0 14px;">Te informamos que se actualizaron los siguientes datos de tu cuenta institucional:</p>
+                        <p style="margin:0 0 0px; text-align:center"><strong>%s</strong></p>
+                        """.formatted(escapeHtml(nombre), escapeHtml(cambios))
+                )
+        );
+    }
+
 
     public void enviarRecordatorioEventoUnaHora(Usuario operativo, Evento evento) {
         if (operativo == null || evento == null || !StringUtils.hasText(operativo.getEmail())) {
