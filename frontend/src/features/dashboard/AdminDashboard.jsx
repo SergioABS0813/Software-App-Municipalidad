@@ -151,13 +151,16 @@ function formatNotificationTime(value) {
 }
 
 function mapAdminNotificationFromApi(notification) {
+  const leida = Boolean(notification.leida ?? notification.read ?? false);
+
   return {
     id: notification.id,
+    leida,
     message: notification.mensaje ?? notification.message ?? '',
     title: notification.titulo ?? notification.title ?? notification.tipo ?? '',
     time: formatNotificationTime(notification.fechaCreacion),
     type: notification.tipo ?? notification.type ?? '',
-    unread: !(notification.leida ?? notification.read ?? false),
+    unread: !leida,
     urlDestino: notification.urlDestino ?? notification.destinationUrl ?? '',
   };
 }
@@ -2124,7 +2127,7 @@ function AdminDashboard({ onLogout, user }) {
         setAdminNotificationItems(notifications);
         setAdminNotificationCounts({
           total: data.total ?? notifications.length,
-          unread: data.noLeidas ?? notifications.filter((notification) => notification.unread).length,
+          unread: data.noLeidas ?? notifications.filter((notification) => !notification.leida).length,
         });
       })
       .catch((error) => {
@@ -2470,17 +2473,17 @@ function AdminDashboard({ onLogout, user }) {
   }
 
   async function handleNotificationRead(notification) {
-    const wasUnread = Boolean(notification?.unread);
+    const wasUnread = notification?.leida === false;
 
-    if (notification?.urlDestino) {
+    if (notification?.id) {
       await marcarNotificacionComoLeida(notification.id);
     }
 
     setAdminNotificationItems((currentItems) =>
-      currentItems.map((notification) =>
-        notification.id === notification?.id
-          ? { ...notification, unread: false }
-          : notification,
+      currentItems.map((currentNotification) =>
+        currentNotification.id === notification?.id
+          ? { ...currentNotification, leida: true, unread: false }
+          : currentNotification,
       ),
     );
     if (wasUnread) {

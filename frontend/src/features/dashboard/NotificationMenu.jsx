@@ -23,18 +23,17 @@ export default function NotificationMenu({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState('all');
-  const [readNotificationIds, setReadNotificationIds] = useState([]);
   const [pendingReadIds, setPendingReadIds] = useState([]);
   const menuRef = useRef(null);
   const items = notifications.map((notification) => ({
     ...notification,
-    unread: notification.unread && !readNotificationIds.includes(notification.id),
+    leida: Boolean(notification.leida),
   }));
-  const resolvedUnreadCount = unreadCount ?? items.filter((notification) => notification.unread).length;
+  const resolvedUnreadCount = unreadCount ?? items.filter((notification) => !notification.leida).length;
   const resolvedTotalCount = totalCount ?? items.length;
   const visibleNotifications =
     filter === 'unread'
-      ? items.filter((notification) => notification.unread)
+      ? items.filter((notification) => !notification.leida)
       : items;
 
   useEffect(() => {
@@ -65,11 +64,6 @@ export default function NotificationMenu({
       return;
     }
 
-    setReadNotificationIds((currentIds) =>
-      currentIds.includes(notification.id)
-        ? currentIds
-        : [...currentIds, notification.id],
-    );
     setPendingReadIds((currentIds) => [...currentIds, notification.id]);
 
     try {
@@ -136,7 +130,7 @@ export default function NotificationMenu({
                 aria-label={`Abrir notificación: ${notification.title ?? notification.type}`}
                 aria-busy={pendingReadIds.includes(notification.id) || undefined}
                 aria-disabled={pendingReadIds.includes(notification.id) || undefined}
-                className={`notification-item ${notification.unread ? 'is-unread' : 'is-read'} ${pendingReadIds.includes(notification.id) ? 'is-pending' : ''}`}
+                className={`notification-item ${!notification.leida ? 'is-unread' : 'is-read'} ${pendingReadIds.includes(notification.id) ? 'is-pending' : ''}`}
                 key={notification.id}
                 role="button"
                 tabIndex={0}
@@ -160,7 +154,7 @@ export default function NotificationMenu({
                   </span>
                   <p>{notification.message}</p>
                 </div>
-                {notification.unread && (
+                {!notification.leida && (
                   <span aria-hidden="true" className="notification-unread-indicator" />
                 )}
               </article>

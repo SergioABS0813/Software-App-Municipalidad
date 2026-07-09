@@ -15,6 +15,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.io.UnsupportedEncodingException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -29,6 +30,9 @@ public class UsuarioNotificacionService {
 
     @Value("${app.mail.from:}")
     private String from;
+
+    @Value("${app.mail.from-name:}")
+    private String fromName;
 
     @Value("${app.mail.enabled:false}")
     private boolean mailEnabled;
@@ -118,7 +122,7 @@ public class UsuarioNotificacionService {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
             if (StringUtils.hasText(from)) {
-                helper.setFrom(from);
+                helper.setFrom(from, fromName);
             }
             helper.setTo(email);
             helper.setSubject(subject);
@@ -128,6 +132,8 @@ public class UsuarioNotificacionService {
             log.info("Notificacion de cambio de correo enviada. email={}", email);
         } catch (MailException | MessagingException exception) {
             log.warn("No se pudo enviar notificacion de cambio de correo. email={}", email, exception);
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
         }
     }
 

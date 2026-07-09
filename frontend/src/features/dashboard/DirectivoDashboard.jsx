@@ -94,13 +94,16 @@ function ReportSatisfactionStars({ compact = false, report }) {
 }
 
 function mapDirectiveNotificationFromApi(notification) {
+  const leida = Boolean(notification.leida ?? notification.read ?? false);
+
   return {
     id: notification.id,
+    leida,
     message: notification.mensaje ?? notification.message ?? '',
     title: notification.titulo ?? notification.title ?? notification.tipo ?? '',
     time: formatDirectiveNotificationTime(notification.fechaCreacion),
     type: notification.tipo ?? notification.type ?? '',
-    unread: !(notification.leida ?? notification.read ?? false),
+    unread: !leida,
     urlDestino: notification.urlDestino ?? notification.destinationUrl ?? '',
   };
 }
@@ -753,7 +756,7 @@ function DirectivoDashboard({ onLogout, user }) {
         setDirectiveNotificationItems(notifications);
         setDirectiveNotificationCounts({
           total: data.total ?? notifications.length,
-          unread: data.noLeidas ?? notifications.filter((notification) => notification.unread).length,
+          unread: data.noLeidas ?? notifications.filter((notification) => !notification.leida).length,
         });
       })
       .catch((error) => {
@@ -877,7 +880,7 @@ function DirectivoDashboard({ onLogout, user }) {
   }
 
   async function handleNotificationRead(notification) {
-    const wasUnread = Boolean(notification?.unread);
+    const wasUnread = notification?.leida === false;
 
     if (notification?.id) {
       await marcarNotificacionComoLeida(notification.id);
@@ -886,7 +889,7 @@ function DirectivoDashboard({ onLogout, user }) {
     setDirectiveNotificationItems((currentItems) =>
       currentItems.map((currentNotification) =>
         currentNotification.id === notification?.id
-          ? { ...currentNotification, unread: false }
+          ? { ...currentNotification, leida: true, unread: false }
           : currentNotification,
       ),
     );
