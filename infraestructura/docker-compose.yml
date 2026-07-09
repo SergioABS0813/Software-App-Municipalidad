@@ -1,63 +1,23 @@
 services:
-  frontend:
-    build:
-      context: ../frontend
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
-        VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL}
-    container_name: frontend-municipalidad
-    ports:
-      - "5173:80"
-    depends_on:
-      - backend
-      - keycloak
   backend:
     build: ../backend
     container_name: backend-municipalidad
     env_file:
-      - ../backend/.env
+      - ./.env
     ports:
-      - "8080:8080"
+      - "10.10.2.10:8080:8080"
     volumes:
       - ../credentials/storage-eventos-key.json:/app/credentials/storage-eventos-key.json:ro
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       - keycloak
   keycloak:
     image: quay.io/keycloak/keycloak:26.6.3 #imagen de keycloak
     container_name: keycloak
     command: start-dev
+    env_file:
+      - ./.env
     ports:
-      - "7000:8080"
+      - "10.10.2.10:7000:8080"
     volumes:
       - ./keycloak/keycloak.conf:/opt/keycloak/conf/keycloak.conf #Origen (PC) - DESTINO (Contenedor)
       - ../keycloak-theme/dist_keycloak:/opt/keycloak/providers #Themes generados por Keycloakify
-    environment:
-      - KC_DB_USERNAME=${KC_DB_USERNAME}
-      - KC_DB_PASSWORD=${KC_DB_PASSWORD}
-      - KC_BOOTSTRAP_ADMIN_USERNAME=${KC_BOOTSTRAP_ADMIN_USERNAME}
-      - KC_BOOTSTRAP_ADMIN_PASSWORD=${KC_BOOTSTRAP_ADMIN_PASSWORD}
-    depends_on:
-      - postgres-keycloak
-  postgres-keycloak:
-    image: postgres:17
-    container_name: postgres-keycloak
-    environment:
-      - POSTGRES_DB=keycloak
-      - POSTGRES_USER=${KC_DB_USERNAME}
-      - POSTGRES_PASSWORD=${KC_DB_PASSWORD}
-    volumes:
-      - postgres_keycloak_data:/var/lib/postgresql/data
-  backup:
-    build: ./backup-cron
-    container_name: backup-cron
-    env_file:
-      - ./.env
-    volumes:
-      - ../credentials/gcp-backup-key.json:/app/credentials/gcp-backup-key.json:ro
-    depends_on:
-      - postgres-keycloak
-
-volumes:
-  postgres_keycloak_data:

@@ -13,7 +13,7 @@ type Identity = {
 
 
 function getBackToEventsUrl() {
-    const fallbackEventsUrl = "http://localhost:5173/eventos";
+    const fallbackEventsUrl = "https://municipalidadsm.online/eventos";
 
     if (typeof window === "undefined") {
         return fallbackEventsUrl;
@@ -295,3 +295,4 @@ function EyeOffIcon() {
         </svg>
     );
 }
+

@@ -81,8 +81,8 @@ public class SecurityConfig {
         CorsConfiguration corsConfiguration = new CorsConfiguration();
 
         corsConfiguration.setAllowedOrigins(List.of(
-                "http://localhost:5173",
-                "http://localhost:7000"
+                "https://municipalidadsm.online",
+                "http://auth.municipalidadsm.online"
         ));
 
         corsConfiguration.setAllowedMethods(List.of("*"));

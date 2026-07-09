@@ -6,7 +6,7 @@ import municipalLogo from "../assets/municipalidad-logo.png";
 type LoginKcContext = Extract<KcContext, { pageId: "login.ftl" }>;
 
 function getBackToEventsUrl() {
-    const fallbackEventsUrl = "http://localhost:5173/eventos";
+    const fallbackEventsUrl = "https://municipalidadsm.online/eventos";
 
     if (typeof window === "undefined") {
         return fallbackEventsUrl;
@@ -171,3 +171,4 @@ function EyeOffIcon() {
         </svg>
     );
 }
+

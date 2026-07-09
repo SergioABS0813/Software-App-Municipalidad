@@ -1,3 +1,0 @@
-crontab -e
-
-0 2 * * * cd /opt/SoftwareAppTesis/infraestructura && docker compose run --rm backup >> /opt/SoftwareAppTesis/infraestructura/backup.log 2>&1
