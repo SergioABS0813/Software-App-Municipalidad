@@ -77,6 +77,7 @@ public class EventoController {
             @RequestBody EventoRegistroRequest request,
             HttpServletRequest httpServletRequest
     ) {
+        System.out.println("entro al controller");
         return eventoService.actualizarEvento(id, request, httpServletRequest);
     }
 
