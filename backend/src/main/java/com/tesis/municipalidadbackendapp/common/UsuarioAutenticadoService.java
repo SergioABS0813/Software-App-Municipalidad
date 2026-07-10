@@ -18,8 +18,9 @@ public class UsuarioAutenticadoService {
                 .getAuthentication()
                 .getPrincipal();
 
-        String keycloakId = jwt.getSubject();
-
-        return usuarioService.obtenerPorKeycloakId(keycloakId);
+        return usuarioService.obtenerPorKeycloakIdOEmail(
+                jwt.getSubject(),
+                jwt.getClaimAsString("email")
+        );
     }
 }

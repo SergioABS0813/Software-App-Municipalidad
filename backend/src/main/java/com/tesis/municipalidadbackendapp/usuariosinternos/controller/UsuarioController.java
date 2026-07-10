@@ -34,7 +34,7 @@ public class UsuarioController {
             HttpServletRequest httpServletRequest,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        Usuario usuarioautenticado = usuarioService.obtenerPorKeycloakId(jwt.getSubject());
+        Usuario usuarioautenticado = usuarioAutenticadoService.obtenerUsuarioAutenticado();
         return usuarioService.guardarUsuario(usuarioRequest, httpServletRequest, usuarioautenticado);
     }
 
@@ -47,8 +47,7 @@ public class UsuarioController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ){
-        String keycloakId = jwt.getSubject();
-        usuarioService.obtenerPorKeycloakId(keycloakId);
+        usuarioAutenticadoService.obtenerUsuarioAutenticado();
         return usuarioService.buscarUsuariosInternos(texto, rolId, page, size);
     }
 

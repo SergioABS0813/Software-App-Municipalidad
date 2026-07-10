@@ -290,7 +290,13 @@ public class UsuarioService {
 
     @Transactional
     public Usuario obtenerPorKeycloakId(String keycloakId) {
+        return obtenerPorKeycloakIdOEmail(keycloakId, null);
+    }
+
+    @Transactional
+    public Usuario obtenerPorKeycloakIdOEmail(String keycloakId, String email) {
         Usuario usuario = usuarioRepository.findByKeycloakId(keycloakId)
+                .or(() -> hasText(email) ? usuarioRepository.findByEmailIgnoreCase(email.trim()) : Optional.empty())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.FORBIDDEN,
                         "Usuario no registrado en el sistema"
@@ -420,5 +426,10 @@ public class UsuarioService {
                 usuarioAutenticado,
                 httpServletRequest
         );
+    }
+
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 }
