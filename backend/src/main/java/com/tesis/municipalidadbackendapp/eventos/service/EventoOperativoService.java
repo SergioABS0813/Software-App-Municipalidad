@@ -137,6 +137,7 @@ public class EventoOperativoService {
                 operativosIds == null ? List.of() : operativosIds.stream().filter(Objects::nonNull).toList()
         );
         List<EventoOperativo> asignacionesActuales = eventoOperativoRepository.findByEvento(evento);
+        validarOperativosAsignables(idsSolicitados);
 
         for (Integer usuarioId : idsSolicitados) {
             Usuario operativo = obtenerOperativoAsignable(usuarioId);
@@ -693,12 +694,28 @@ public class EventoOperativoService {
         Usuario usuario = usuarioRepository.findById(usuarioId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El usuario operativo seleccionado no existe"));
 
+        validarOperativoAsignable(usuario);
+        return usuario;
+    }
+
+    private void validarOperativosAsignables(Set<Integer> usuarioIds) {
+        for (Integer usuarioId : usuarioIds) {
+            obtenerOperativoAsignable(usuarioId);
+        }
+    }
+
+    private void validarOperativoAsignable(Usuario usuario) {
         if (usuario.getActivo() == null || usuario.getActivo() == 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No se puede asignar un usuario inactivo");
         }
 
-        validarRolOperativo(usuario);
-        return usuario;
+        if (!esRolOperativo(usuario)) {
+            String nombre = StringUtils.hasText(usuario.getNombre()) ? usuario.getNombre() : usuario.getEmail();
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "El usuario " + nombre + " ya no tiene rol OPERATIVO. Retíralo del evento antes de guardar."
+            );
+        }
     }
 
     private void validarRolOperativo(Usuario usuario) {
@@ -708,6 +725,10 @@ public class EventoOperativoService {
     }
 
     private boolean esRolOperativo(Usuario usuario) {
+        if (usuario == null || usuario.getRol() == null) {
+            return false;
+        }
+
         String codigo = usuario.getRol().getCodigo();
         String nombre = usuario.getRol().getNombre();
         return "OPERATIVO".equalsIgnoreCase(codigo) || "OPERATIVO".equalsIgnoreCase(nombre);
@@ -724,7 +745,8 @@ public class EventoOperativoService {
                         ? (usuario.getRol().getCodigo() != null && !usuario.getRol().getCodigo().isBlank()
                             ? usuario.getRol().getCodigo()
                             : usuario.getRol().getNombre())
-                        : ""
+                        : "",
+                esRolOperativo(usuario) && usuario.getActivo() != null && usuario.getActivo() == 1
         );
     }
 

@@ -568,12 +568,9 @@ public class EventoService {
             EventoRegistroRequest request,
             HttpServletRequest httpServletRequest
     ) {
-        System.out.println("entro al service");
         validarSolicitudEvento(request);
-        System.out.println("check: validarSolicitudEvento");
 
         Usuario usuario = usuarioAutenticadoService.obtenerUsuarioAutenticado();
-        System.out.println("check: obtenerUsuarioAutenticado");
 
         Evento evento = eventoRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evento no encontrado"));
@@ -583,7 +580,6 @@ public class EventoService {
         String estadoAnterior = evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : "";
         boolean requeriaControlAnterior = requiereControlAsistencia(evento);
         validarEnvioRevisionConOperativos(request, usuario, evento, httpServletRequest);
-        System.out.println("check: validarEnvioRevisionConOperativos");
         String estadoCodigo = obtenerEstadoActualizacion(evento, request);
         EstadoEvento estadoEvento = obtenerEstadoEvento(estadoCodigo);
         Instant ahora = ahoraLima();
@@ -598,7 +594,6 @@ public class EventoService {
         evento.setCostoReferencial(request.costoReferencial());
         boolean requiereInscripcion = requiereInscripcion(request);
         aplicarConfiguracionPago(evento, request);
-        System.out.println("check: aplicarConfiguracionPago");
         evento.setRequiereInscripcion(requiereInscripcion ? (byte) 1 : (byte) 0);
         evento.setEstadoEvento(estadoEvento);
         evento.setUbicacion(ubicacion);
@@ -620,16 +615,13 @@ public class EventoService {
             atenderObservacionesPendientes(eventoGuardado);
         }
         guardarAgenda(eventoGuardado, request.agenda());
-        System.out.println("check: guardarAgenda");
         guardarRequisitos(eventoGuardado, request.requisitos());
-        System.out.println("check: guardarRequisitos");
         eventoOperativoService.sincronizarOperativos(
                 eventoGuardado,
                 requiereControlAsistencia(request) ? request.operativosAsignadosIds() : List.of(),
                 usuario,
                 httpServletRequest
         );
-        System.out.println("check: sincronizarOperativos");
 
         if (requeriaControlAnterior != requiereControlAsistencia(eventoGuardado)) {
             bitacoraAccionService.guardarAccion(

@@ -175,7 +175,8 @@ public class UsuarioService {
                                 ? (usuario.getRol().getCodigo() != null && !usuario.getRol().getCodigo().isBlank()
                                     ? usuario.getRol().getCodigo()
                                     : usuario.getRol().getNombre())
-                                : ""
+                                : "",
+                        true
                 ))
                 .toList();
     }

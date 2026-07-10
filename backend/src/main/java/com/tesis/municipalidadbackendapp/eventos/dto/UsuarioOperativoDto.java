@@ -6,5 +6,6 @@ public record UsuarioOperativoDto(
         String apellidos,
         String dni,
         String email,
-        String rolNombre
+        String rolNombre,
+        Boolean asignable
 ) {}

@@ -3272,6 +3272,7 @@ function EventReviewStatusView({ event, onBack }) {
 }
 
 function OperativeAssignmentSection({
+  assignedOperatives = [],
   onSelectionChange,
   operatives = [],
   selectedIds = [],
@@ -3280,11 +3281,38 @@ function OperativeAssignmentSection({
   const [isOpen, setIsOpen] = useState(false);
   const comboboxRef = useRef(null);
   const selectedSet = new Set(selectedIds.map(String));
-  const selectedOperatives = operatives.filter((operative) =>
+  const mergedOperatives = useMemo(() => {
+    const byId = new Map();
+
+    operatives.forEach((operative) => {
+      const operativeId = operative.usuarioId ?? operative.id;
+      if (operativeId != null) {
+        byId.set(String(operativeId), { ...operative, asignable: operative.asignable ?? true });
+      }
+    });
+
+    assignedOperatives.forEach((operative) => {
+      const operativeId = operative.usuarioId ?? operative.id;
+      if (operativeId != null && !byId.has(String(operativeId))) {
+        byId.set(String(operativeId), operative);
+      }
+    });
+
+    return Array.from(byId.values());
+  }, [assignedOperatives, operatives]);
+  const selectedOperatives = mergedOperatives.filter((operative) =>
     selectedSet.has(String(operative.usuarioId ?? operative.id)),
   );
+  const invalidSelectedOperatives = selectedOperatives.filter((operative) => !isOperativeAssignable(operative));
   const normalizedSearch = normalizeSearchText(searchValue.trim());
-  const filteredOperatives = operatives.filter((operative) => {
+  const filteredOperatives = mergedOperatives.filter((operative) => {
+    const operativeId = operative.usuarioId ?? operative.id;
+    const isSelected = selectedSet.has(String(operativeId));
+
+    if (!isOperativeAssignable(operative) && !isSelected) {
+      return false;
+    }
+
     if (!normalizedSearch) {
       return true;
     }
@@ -3311,7 +3339,23 @@ function OperativeAssignmentSection({
     };
   }, []);
 
+  function isOperativeAssignable(operative) {
+    const role = String(operative?.rolNombre ?? operative?.rol ?? '').trim().toUpperCase();
+    return operative?.asignable !== false && role === 'OPERATIVO';
+  }
+
+  function removeOperative(operativeId) {
+    onSelectionChange?.(selectedIds.filter((id) => String(id) !== String(operativeId)));
+  }
+
   function toggleOperative(operativeId) {
+    const operative = mergedOperatives.find((item) => String(item.usuarioId ?? item.id) === String(operativeId));
+
+    if (operative && !isOperativeAssignable(operative)) {
+      removeOperative(operativeId);
+      return;
+    }
+
     const normalizedId = Number(operativeId);
     const nextSelectedIds = selectedSet.has(String(operativeId))
       ? selectedIds.filter((id) => String(id) !== String(operativeId))
@@ -3345,7 +3389,7 @@ function OperativeAssignmentSection({
         <h2>Personal operativo asignado</h2>
       </div>
 
-      {operatives.length === 0 ? (
+      {mergedOperatives.length === 0 ? (
         <p className="settings-inline-notice">
           No hay usuarios operativos activos disponibles para asignar.
         </p>
@@ -3377,11 +3421,20 @@ function OperativeAssignmentSection({
           />
           {selectedOperatives.length > 0 && (
             <div className="operative-assignment-selected">
-              {selectedOperatives.map((operative) => (
-                <span key={operative.usuarioId ?? operative.id}>
-                  {getOperativeName(operative)}
-                </span>
-              ))}
+              {selectedOperatives.map((operative) => {
+                const operativeId = operative.usuarioId ?? operative.id;
+                const isInvalid = !isOperativeAssignable(operative);
+
+                return (
+                  <span className={isInvalid ? 'is-invalid' : undefined} key={operativeId}>
+                    <strong>{getOperativeName(operative)}</strong>
+                    {isInvalid && <em>Ya no es operativo</em>}
+                    <button type="button" onClick={() => removeOperative(operativeId)}>
+                      Retirar
+                    </button>
+                  </span>
+                );
+              })}
             </div>
           )}
           {isOpen && (
@@ -3390,11 +3443,16 @@ function OperativeAssignmentSection({
                 filteredOperatives.map((operative) => {
                   const operativeId = operative.usuarioId ?? operative.id;
                   const isSelected = selectedSet.has(String(operativeId));
+                  const isInvalid = !isOperativeAssignable(operative);
 
                   return (
                     <label
                       aria-selected={isSelected}
-                      className={isSelected ? 'operative-assignment-option is-selected' : 'operative-assignment-option'}
+                      className={[
+                        'operative-assignment-option',
+                        isSelected ? 'is-selected' : '',
+                        isInvalid ? 'is-invalid' : '',
+                      ].filter(Boolean).join(' ')}
                       key={operativeId}
                       role="option"
                     >
@@ -3408,7 +3466,10 @@ function OperativeAssignmentSection({
                       />
                       <span>
                         <strong>{getOperativeName(operative)}</strong>
-                        <small>{operative.dni || 'Sin DNI'} · {operative.email || 'Sin correo'}</small>
+                        <small>
+                          {operative.dni || 'Sin DNI'} - {operative.email || 'Sin correo'}
+                          {isInvalid ? ' - Ya no tiene rol operativo' : ''}
+                        </small>
                       </span>
                     </label>
                   );
@@ -3423,13 +3484,18 @@ function OperativeAssignmentSection({
 
       {selectedSet.size === 0 && (
         <p className="operative-assignment-warning">
-          Este evento requiere control de asistencia. Asigna al menos un operativo para que pueda validar el ingreso de asistentes el día del evento.
+          Este evento requiere control de asistencia. Asigna al menos un operativo para que pueda validar el ingreso de asistentes el dia del evento.
+        </p>
+      )}
+
+      {invalidSelectedOperatives.length > 0 && (
+        <p className="operative-assignment-warning is-critical">
+          Hay personal asignado que ya no tiene rol OPERATIVO. Retiralo del evento antes de guardar cambios.
         </p>
       )}
     </article>
   );
 }
-
 function RegistrationRequirementField({ checked = true, onChange }) {
   return (
     <label className="form-switch-field span-2">
@@ -7978,6 +8044,27 @@ function NewEventView({
   );
 }
 
+function isOperativeAssignmentValid(operative) {
+  const role = String(operative?.rolNombre ?? operative?.rol ?? '').trim().toUpperCase();
+  return operative?.asignable !== false && role === 'OPERATIVO';
+}
+
+function getInvalidAssignedOperatives(assignedOperatives = [], selectedIds = []) {
+  const selectedSet = new Set(selectedIds.map(String));
+
+  return (Array.isArray(assignedOperatives) ? assignedOperatives : []).filter((operative) => {
+    const operativeId = operative?.usuarioId ?? operative?.id;
+    return operativeId != null
+      && selectedSet.has(String(operativeId))
+      && !isOperativeAssignmentValid(operative);
+  });
+}
+
+function getInvalidOperativeLabel(operative) {
+  return [operative?.nombres, operative?.apellidos].filter(Boolean).join(' ')
+    || operative?.email
+    || `Usuario ${operative?.usuarioId ?? operative?.id}`;
+}
 function EditEventView({
   areas = eventOrganizerAreas,
   categories = [],
@@ -8344,6 +8431,7 @@ function EditEventView({
 
           {requiresControl && (
             <OperativeAssignmentSection
+              assignedOperatives={event.operativosAsignados}
               operatives={operatives}
               selectedIds={selectedOperativeIds}
               onSelectionChange={(ids) => {

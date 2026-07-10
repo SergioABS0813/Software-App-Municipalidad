@@ -4874,16 +4874,53 @@
 }
 
 .operative-assignment-selected span {
+  align-items: center;
   background: #eef6ff;
   border: 1px solid rgba(10, 86, 194, 0.14);
   border-radius: 999px;
   color: #294766;
+  display: inline-flex;
+  flex-wrap: wrap;
   font-size: 0.78rem;
   font-weight: 720;
+  gap: 6px;
   line-height: 1.2;
   max-width: 100%;
   overflow-wrap: anywhere;
   padding: 5px 9px;
+}
+
+.operative-assignment-selected span.is-invalid {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #9f1239;
+}
+
+.operative-assignment-selected strong {
+  font: inherit;
+}
+
+.operative-assignment-selected em {
+  color: #be123c;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 760;
+}
+
+.operative-assignment-selected button {
+  background: #ffffff;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 820;
+  padding: 2px 7px;
+}
+
+.operative-assignment-selected button:hover {
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .operative-assignment-menu {
@@ -4911,6 +4948,11 @@
 .operative-assignment-menu .operative-assignment-option:hover,
 .operative-assignment-menu .operative-assignment-option.is-selected {
   background: var(--brand-soft);
+}
+
+.operative-assignment-menu .operative-assignment-option.is-invalid {
+  background: #fff1f2;
+  color: #9f1239;
 }
 
 .operative-assignment-menu .operative-assignment-option input {
@@ -4953,6 +4995,12 @@
   font-size: 13px;
   line-height: 1.45;
   font-weight: 500;
+}
+
+.operative-assignment-warning.is-critical {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #9f1239;
 }
 
 .operative-detail-panel {
