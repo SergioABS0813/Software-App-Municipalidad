@@ -488,9 +488,52 @@ function PublicPortal() {
   const [paymentError, setPaymentError] = useState('');
   const [paymentNotice, setPaymentNotice] = useState('');
   const [isUploadingPaymentReceipt, setIsUploadingPaymentReceipt] = useState(false);
+  const authStateRef = useRef(authState);
+  const authModeRef = useRef(authMode);
+
+  useEffect(() => {
+    authStateRef.current = authState;
+  }, [authState]);
+
+  useEffect(() => {
+    authModeRef.current = authMode;
+  }, [authMode]);
+
+  useEffect(() => {
+    function restorePortalFromAbortedLogin(event) {
+      const isRestoredFromBrowserCache = event.type === 'pageshow' && event.persisted;
+      const isHistoryNavigation = event.type === 'popstate';
+      const isAbortedLogin = authStateRef.current === 'redirecting' && authModeRef.current === 'login';
+      const isPlainLoginRoute = window.location.pathname === '/login' && !isKeycloakLoginCallback();
+
+      if ((!isRestoredFromBrowserCache && !isHistoryNavigation && !isPlainLoginRoute) || isKeycloakLoginCallback()) {
+        return;
+      }
+
+      if (!isAbortedLogin && !isPlainLoginRoute) {
+        return;
+      }
+
+      sessionStorage.removeItem('postLoginRedirect');
+      window.history.replaceState(null, '', eventsListPath);
+      setAuthError('');
+      setAuthMode('auth-check');
+      setAuthState('ready');
+      setCurrentView('portal');
+    }
+
+    window.addEventListener('pageshow', restorePortalFromAbortedLogin);
+    window.addEventListener('popstate', restorePortalFromAbortedLogin);
+
+    return () => {
+      window.removeEventListener('pageshow', restorePortalFromAbortedLogin);
+      window.removeEventListener('popstate', restorePortalFromAbortedLogin);
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
+
 
     initKeycloak()
       .then(async (authenticated) => {
@@ -1108,11 +1151,26 @@ function PublicPortal() {
   }
 
   async function openInstitutionalDashboard(user) {
-    if (user.role === 'VECINO') {
-      let citizenUser = saveCitizenSession(user);
+    let resolvedUser = user;
+
+    try {
+      const authenticatedSession = await confirmarSesionActual();
+      const resolvedRole = authenticatedSession?.rol || user.role;
+      resolvedUser = {
+        ...user,
+        email: authenticatedSession?.email ?? user.email,
+        correo: authenticatedSession?.email ?? user.correo,
+        role: resolvedRole,
+        rol: resolvedRole,
+      };
+    } catch (error) {
+      console.error('No se pudo confirmar la sesion autenticada desde backend.', error);
+    }
+
+    if (resolvedUser.role === 'VECINO') {
+      let citizenUser = saveCitizenSession(resolvedUser);
 
       try {
-        await confirmarSesionActual();
         const profile = await obtenerPerfilVecino();
         citizenUser = mapNeighborProfileToSession(profile);
       } catch (error) {
@@ -1142,7 +1200,7 @@ function PublicPortal() {
       return;
     }
 
-    setAuthenticatedUser(user);
+    setAuthenticatedUser(resolvedUser);
     clearCitizenSession();
     setLoginNotice('');
     setPaymentForm(emptyPaymentForm);
@@ -1160,11 +1218,11 @@ function PublicPortal() {
       OPERATIVO: '/operativo',
     };
 
-    setCurrentView(viewByRole[user.role] ?? 'admin');
+    setCurrentView(viewByRole[resolvedUser.role] ?? 'admin');
     setSelectedEvent(null);
     setIsConfirmOpen(false);
     sessionStorage.removeItem('postLoginRedirect');
-    window.history.replaceState(null, '', pathByRole[user.role] ?? '/admin');
+    window.history.replaceState(null, '', pathByRole[resolvedUser.role] ?? '/admin');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   if (authState !== 'ready') {
