@@ -82,7 +82,7 @@ public class SecurityConfig {
 
         corsConfiguration.setAllowedOrigins(List.of(
                 "https://municipalidadsm.online",
-                "http://auth.municipalidadsm.online"
+                "https://auth.municipalidadsm.online"
         ));
 
         corsConfiguration.setAllowedMethods(List.of("*"));

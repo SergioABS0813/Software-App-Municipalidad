@@ -10,6 +10,7 @@ import com.tesis.municipalidadbackendapp.vecinos.service.VecinoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,7 +45,7 @@ public class AuthUserController {
     public AuthenticatedUserResponse obtenerUsuarioAutenticado(@AuthenticationPrincipal Jwt jwt) {
         String keycloakId = jwt.getSubject();
         String email = jwt.getClaimAsString("email");
-        Optional<Usuario> usuarioInterno = usuarioRepository.findByKeycloakId(keycloakId);
+        Optional<Usuario> usuarioInterno = buscarUsuarioInterno(keycloakId, email);
 
         if (usuarioInterno.isPresent()) {
             Usuario usuario = usuarioInterno.get();
@@ -60,6 +61,13 @@ public class AuthUserController {
                 email,
                 obtenerRolAplicacion(jwt)
         );
+    }
+
+    private Optional<Usuario> buscarUsuarioInterno(String keycloakId, String email) {
+        return usuarioRepository.findByKeycloakId(keycloakId)
+                .or(() -> StringUtils.hasText(email)
+                        ? usuarioRepository.findByEmailIgnoreCase(email.trim())
+                        : Optional.empty());
     }
 
     private String normalizarRol(String codigo, String nombre) {

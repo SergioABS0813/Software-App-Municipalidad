@@ -9,11 +9,13 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -39,7 +41,7 @@ public class KeycloakRoleConverter implements Converter<Jwt, Collection<GrantedA
                     .forEach(roles::add);
         }
 
-        usuarioRepository.findByKeycloakId(jwt.getSubject())
+        buscarUsuarioInterno(jwt)
                 .map(this::obtenerRolInterno)
                 .filter(rol -> !rol.isBlank())
                 .ifPresent(roles::add);
@@ -47,6 +49,16 @@ public class KeycloakRoleConverter implements Converter<Jwt, Collection<GrantedA
         return roles.stream()
                 .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
                 .collect(Collectors.toList());
+    }
+
+    private Optional<Usuario> buscarUsuarioInterno(Jwt jwt) {
+        String keycloakId = jwt.getSubject();
+        String email = jwt.getClaimAsString("email");
+
+        return usuarioRepository.findByKeycloakId(keycloakId)
+                .or(() -> StringUtils.hasText(email)
+                        ? usuarioRepository.findByEmailIgnoreCase(email.trim())
+                        : Optional.empty());
     }
 
     private String obtenerRolInterno(Usuario usuario) {

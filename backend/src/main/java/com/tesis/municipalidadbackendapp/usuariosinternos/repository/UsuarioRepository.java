@@ -14,6 +14,8 @@ public interface UsuarioRepository extends JpaRepository<Usuario,Integer> {
 
     Optional<Usuario> findByKeycloakId(String keycloakId);
 
+    Optional<Usuario> findByEmailIgnoreCase(String email);
+
     boolean existsByDni(String dni);
 
     boolean existsByEmail(String email);

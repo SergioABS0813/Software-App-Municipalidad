@@ -1072,7 +1072,7 @@ function PublicPortal() {
     setAuthError('');
     setAuthMode('login');
     setAuthState('redirecting');
-    loginWithKeycloak(getCurrentInternalPath()).catch((error) => {
+    loginWithKeycloak('/admin').catch((error) => {
       console.error('No se pudo abrir el inicio de sesión', error);
       setAuthError('No pudimos abrir el inicio de sesión. Intenta nuevamente.');
       setAuthState('error');
