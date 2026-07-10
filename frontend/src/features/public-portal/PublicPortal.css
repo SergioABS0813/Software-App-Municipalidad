@@ -1,8 +1,15 @@
 .citizen-portal {
   min-height: 100svh;
+  overflow-x: clip;
   background:
     linear-gradient(180deg, rgba(232, 248, 255, 0.72), rgba(255, 255, 255, 1) 42%),
     #ffffff;
+}
+
+.citizen-portal *,
+.citizen-portal *::before,
+.citizen-portal *::after {
+  box-sizing: border-box;
 }
 
 .auth-transition {
@@ -86,6 +93,11 @@
   padding: 0;
   text-decoration: none;
   width: fit-content;
+  min-width: 0;
+}
+
+.brand span {
+  min-width: 0;
 }
 
 .brand-mark {
@@ -150,6 +162,8 @@
   align-items: center;
   display: flex;
   gap: 8px;
+  justify-content: flex-end;
+  min-width: 0;
 }
 
 .portal-nav a,
@@ -541,6 +555,10 @@
   max-width: 1180px;
   padding: 24px 40px 64px;
   scroll-margin-top: 90px;
+}
+
+.events-area {
+  min-width: 0;
 }
 
 .section-anchor {
@@ -2518,7 +2536,8 @@
 
 @media (max-width: 920px) {
   .portal-header {
-    grid-template-columns: 1fr;
+    gap: 12px;
+    grid-template-columns: minmax(0, 1fr) auto;
     padding: 0 20px;
   }
 
@@ -2581,21 +2600,82 @@
 
 @media (max-width: 640px) {
   .portal-header {
-    min-height: 64px;
+    min-height: 56px;
+    padding: 0 12px;
   }
 
-  .brand small,
-  .brand-logo {
+  .brand small {
     display: none;
   }
 
+  .brand-logo {
+    display: block;
+    height: 32px;
+    width: 32px;
+  }
+
+  .brand strong {
+    font-size: 0.86rem;
+    line-height: 1.15;
+  }
+
+  .portal-nav a,
+  .portal-nav button {
+    font-size: 0.84rem;
+    padding: 8px 10px;
+  }
+
   .hero-section {
-    gap: 24px;
-    padding-top: 30px;
+    gap: 20px;
+    padding: 24px 12px 16px;
   }
 
   .hero-copy h1 {
-    font-size: 2.2rem;
+    font-size: clamp(1.85rem, 10vw, 2.2rem);
+  }
+
+  .hero-copy p {
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+
+  .content-grid {
+    gap: 18px;
+    padding: 18px 12px 44px;
+  }
+
+  .section-heading {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .section-heading h2 {
+    font-size: 1.55rem;
+  }
+
+  .section-heading p {
+    margin: 0;
+  }
+
+  .search-panel {
+    padding: 12px;
+  }
+
+  .category-tabs {
+    flex-wrap: nowrap;
+    margin-left: -12px;
+    margin-right: -12px;
+    overflow-x: auto;
+    padding: 0 12px 8px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .category-tabs button {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 0 10px;
+    white-space: nowrap;
   }
 
   .search-control,

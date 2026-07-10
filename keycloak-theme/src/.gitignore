@@ -22,6 +22,7 @@
 /email/html/org-invite.ftl
 /email/html/password-reset.ftl
 /email/html/template.ftl
+!/email/html/template.ftl
 /email/messages/messages_ar.properties
 /email/messages/messages_ca.properties
 /email/messages/messages_cs.properties
