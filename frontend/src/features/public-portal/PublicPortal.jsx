@@ -415,6 +415,16 @@ function getSafeEventsOriginPath() {
   return currentPath;
 }
 
+function isKeycloakLoginCallback() {
+  if (window.location.pathname !== '/login') {
+    return false;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+
+  return ['code', 'state', 'error', 'session_state', 'iss'].some((param) => params.has(param));
+}
+
 function getInitialPortalView() {
   if (window.location.pathname === '/login') {
     return 'portal';
