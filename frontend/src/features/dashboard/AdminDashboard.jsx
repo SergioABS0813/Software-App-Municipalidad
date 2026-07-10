@@ -1823,7 +1823,7 @@ function AdminPaymentReviewDetail({ paymentId, onBack, onChanged }) {
     <>
       <header className="admin-topbar payment-detail-topbar">
         <div>
-          <button className="detail-back-link" type="button" onClick={onBack}>
+          <button className="detail-back-link" type="button" onClick={() => onBack()}>
             &larr; Volver a pagos
           </button>
           <span className="section-kicker">Comprobante de pago</span>
