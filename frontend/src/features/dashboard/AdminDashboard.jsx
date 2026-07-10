@@ -5533,7 +5533,6 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
         await actualizarUsuarioInterno(selectedUser.id, {
           email: normalizedUser.correo,
           areaMunicipalId: normalizedUser.areaId,
-          rolId: Number(userFormData.rolId),
         });
         setUsersReloadKey((currentKey) => currentKey + 1);
       } else {
@@ -5786,7 +5785,7 @@ function validateUserForm(formData, mode) {
     errors.correo = 'Ingrese un correo electrónico válido.';
   }
 
-  if (!formData.rolId) {
+  if (isCreating && !formData.rolId) {
     errors.rol = 'Seleccione un rol.';
   }
 
@@ -5915,22 +5914,30 @@ function UserFormModal({
 
             <label className="form-field">
               Rol
-              <select
-                value={formData.rolId}
-                onChange={(event) => {
-                  const selectedRole = roles.find((role) => String(role.id) === event.target.value);
-                  onFieldChange('rolId', event.target.value);
-                  onFieldChange('rol', selectedRole?.codigo ?? '');
-                }}
-              >
-                <option value="">Seleccionar rol</option>
-                {roles.map((role) => (
-                  <option key={role.id} value={role.id}>{role.codigo}</option>
-                ))}
-              </select>
+              {isEditing ? (
+                <input
+                  className="readonly-input"
+                  disabled
+                  readOnly
+                  value={formData.rol || 'Sin rol'}
+                />
+              ) : (
+                <select
+                  value={formData.rolId}
+                  onChange={(event) => {
+                    const selectedRole = roles.find((role) => String(role.id) === event.target.value);
+                    onFieldChange('rolId', event.target.value);
+                    onFieldChange('rol', selectedRole?.codigo ?? '');
+                  }}
+                >
+                  <option value="">Seleccionar rol</option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>{role.codigo}</option>
+                  ))}
+                </select>
+              )}
               {errors.rol && <small className="form-error">{errors.rol}</small>}
             </label>
-
             {isEditing && (
               <section className="user-security-section span-2">
                 <span>

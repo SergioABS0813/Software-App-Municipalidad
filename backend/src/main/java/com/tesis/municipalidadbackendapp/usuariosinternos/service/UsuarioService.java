@@ -213,33 +213,28 @@ public class UsuarioService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Area municipal no encontrada");
         }
 
-        Rol rolNuevo = rolService.findById(request.rolId());
-        if (rolNuevo == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rol no encontrado");
+        if (request.rolId() != null && !usuario.getRol().getId().equals(request.rolId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "No se permite cambiar el rol de un usuario interno"
+            );
         }
 
         String emailAnterior = usuario.getEmail();
-        String rolAnteriorKeycloak = obtenerNombreRolKeycloak(usuario.getRol());
-        String rolNuevoKeycloak = obtenerNombreRolKeycloak(rolNuevo);
         String emailNuevo = request.email().trim();
         boolean cambioCorreo = !emailAnterior.equalsIgnoreCase(emailNuevo);
         boolean cambioArea = !usuario.getAreaMunicipal().getId().equals(areaMunicipal.getId());
-        boolean cambioRol = !usuario.getRol().getId().equals(rolNuevo.getId());
+        boolean cambioRol = false;
 
         if (cambioCorreo) {
             keycloakAdminService.actualizarCorreoUsuario(usuario.getKeycloakId(), usuario.getNombre(), emailNuevo);
         }
 
-        if (cambioRol) {
-            keycloakAdminService.actualizarRolUsuario(usuario.getKeycloakId(), rolAnteriorKeycloak, rolNuevoKeycloak);
-        }
-
         usuario.setEmail(emailNuevo);
         usuario.setAreaMunicipal(areaMunicipal);
-        usuario.setRol(rolNuevo);
         Usuario guardado = usuarioRepository.save(usuario);
 
-        if (cambioCorreo || cambioArea || cambioRol) {
+        if (cambioCorreo || cambioArea) {
             usuarioNotificacionService.notificarActualizacionCuenta(
                     emailNuevo,
                     guardado.getNombre(),
@@ -347,11 +342,8 @@ public class UsuarioService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El area municipal es obligatoria");
         }
 
-        if (request.rolId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El rol es obligatorio");
-        }
-
         String email = request.email().trim();
+
 
         if (email.length() > MAX_EMAIL_LENGTH) {
             throw new ResponseStatusException(
