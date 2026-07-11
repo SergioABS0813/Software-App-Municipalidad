@@ -713,7 +713,7 @@ public class EventoOperativoService {
             String nombre = StringUtils.hasText(usuario.getNombre()) ? usuario.getNombre() : usuario.getEmail();
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "El usuario " + nombre + " ya no tiene rol OPERATIVO. Retíralo del evento antes de guardar."
+                    "El usuario " + nombre + " ya no tiene rol OPERATIVO. Retiralo del evento antes de guardar."
             );
         }
     }

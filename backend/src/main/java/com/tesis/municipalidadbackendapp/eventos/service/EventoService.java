@@ -1,4 +1,4 @@
-﻿package com.tesis.municipalidadbackendapp.eventos.service;
+package com.tesis.municipalidadbackendapp.eventos.service;
 
 import static com.tesis.municipalidadbackendapp.common.FechaHoraUtils.ahoraLima;
 
