@@ -1846,7 +1846,7 @@ function AdminPaymentReviewDetail({ paymentId, onBack, onChanged }) {
         <div>
           <span className="section-kicker">Comprobante de pago</span>
           <h1>{payment?.eventoTitulo || 'Detalle de comprobante'}</h1>
-          <button className="detail-back-link" type="button" onClick={onBack}>
+          <button className="detail-back-link" type="button" onClick={() => onBack()}>
             &larr; Volver a pagos
           </button>
         </div>
@@ -3904,6 +3904,7 @@ function ExistingEventResources({ deletingResourceId = null, error = '', isLoadi
 function ResourceUploadCard({ accept, label, name, resourceType, showPreview = false }) {
   const [fileName, setFileName] = useState('');
   const [previewUrl, setPreviewUrl] = useState('');
+  const isCoverImage = resourceType === 'IMAGEN_PORTADA';
 
   useEffect(() => {
     return () => {
@@ -3938,6 +3939,9 @@ function ResourceUploadCard({ accept, label, name, resourceType, showPreview = f
         <strong>{label}</strong>
         <em>{resourceType}</em>
       </span>
+      {isCoverImage && (
+        <small className="resource-upload-note">Sugerencia: usa una portada horizontal en proporción 16:9, idealmente cercana a 1672 x 941 px.</small>
+      )}
       {showPreview && (
         <span className="resource-preview">
           {previewUrl ? (
@@ -8662,7 +8666,7 @@ function EditEventView({
                   }
                   key={item.label}
                 >
-                  <span aria-hidden="true">{item.complete ? 'OK' : '!'}</span>
+                  <span aria-hidden="true">{item.complete ? '\u2713' : '!'}</span>
                   {item.label}
                 </p>
               ))}

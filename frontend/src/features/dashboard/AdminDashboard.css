@@ -1,4 +1,4 @@
-﻿.admin-shell {
+.admin-shell {
   background: #f4f8fb;
   color: var(--color-text);
   display: grid;
@@ -3981,6 +3981,13 @@
   font-size: 0.75rem;
   font-style: normal;
   font-weight: 720;
+}
+
+.resource-upload-note {
+  color: #526b85;
+  font-size: 0.76rem;
+  font-weight: 560;
+  line-height: 1.45;
 }
 
 .resource-preview {

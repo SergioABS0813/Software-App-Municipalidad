@@ -2316,7 +2316,19 @@ function PortalHome({
           </a>
         </div>
 
-        {hasFeaturedEvent && (<article className={`featured-event media-${featuredEvent.accent}`}>
+        {hasFeaturedEvent && (<article
+          aria-label={`Ver detalle de ${featuredEvent.title}`}
+          className={`featured-event media-${featuredEvent.accent}`}
+          role="button"
+          tabIndex={0}
+          onClick={() => onEventSelect(featuredEvent)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onEventSelect(featuredEvent);
+            }
+          }}
+        >
           <div className="event-visual" aria-hidden="true">
             {featuredCoverUrl && <img alt="" src={featuredCoverUrl} />}
             <span>{featuredEvent.category}</span>
@@ -2340,13 +2352,6 @@ function PortalHome({
                 </span>
               )}
             </div>
-            <button
-              className="primary-button featured-action"
-              type="button"
-              onClick={() => onEventSelect(featuredEvent)}
-            >
-              Ver detalle
-            </button>
           </div>
         </article>)}
       </section>

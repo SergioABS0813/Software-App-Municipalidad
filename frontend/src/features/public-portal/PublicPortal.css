@@ -1,4 +1,4 @@
-﻿.citizen-portal {
+.citizen-portal {
   min-height: 100svh;
   overflow-x: clip;
   background:
@@ -373,8 +373,17 @@
   border: 1px solid var(--color-border);
   border-radius: 8px;
   box-shadow: 0 20px 54px rgba(10, 86, 194, 0.12);
+  cursor: pointer;
   display: grid;
   overflow: hidden;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.featured-event:hover,
+.featured-event:focus-visible {
+  border-color: rgba(10, 86, 194, 0.24);
+  box-shadow: 0 20px 54px rgba(10, 86, 194, 0.16);
+  outline: none;
 }
 
 .event-visual {
@@ -403,12 +412,17 @@
 }
 
 .featured-event .event-visual {
-  min-height: 154px;
+  aspect-ratio: 16 / 9;
+  background:
+    linear-gradient(90deg, rgba(10, 86, 194, 0.92) 0%, rgba(24, 199, 243, 0.78) 18%, rgba(245, 251, 255, 0.18) 38%, rgba(245, 251, 255, 0.18) 62%, rgba(24, 199, 243, 0.58) 82%, rgba(167, 236, 255, 0.92) 100%),
+    var(--media-bg);
+  min-height: 0;
   padding: 14px;
 }
 
 .featured-event .event-visual img {
   object-fit: contain;
+  object-position: center;
 }
 
 .featured-event .event-visual span {
