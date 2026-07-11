@@ -80,6 +80,7 @@ export async function getEventosGestion({
     estado = '',
     categoriaId = '',
     sinCategoria = false,
+    ordenFechaInicio = '',
     page = 0,
     size = 5,
 } = {}){
@@ -89,6 +90,7 @@ export async function getEventosGestion({
             estado: estado || undefined,
             categoriaId: categoriaId || undefined,
             sinCategoria,
+            ordenFechaInicio: ordenFechaInicio || undefined,
             page,
             size,
         },

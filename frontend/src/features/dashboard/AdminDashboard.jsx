@@ -1036,6 +1036,10 @@ function formatDateToDateTimeLocal(date) {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
+function getCurrentDateTimeLocalValue() {
+  return formatDateToDateTimeLocal(new Date());
+}
+
 function parsePublicEventDateTime(dateLabel = '', timeLabel = '') {
   const directValue = getDateTimeLocalValue(dateLabel);
 
@@ -1383,6 +1387,22 @@ function getNamedFormValue(form, name) {
   }
 
   return control.value;
+}
+
+function normalizeEventDateRange(form) {
+  const startControl = getNamedFormControl(form, 'eventStart');
+  const endControl = getNamedFormControl(form, 'eventEnd');
+
+  if (!startControl || !endControl) {
+    return;
+  }
+
+  const startValue = startControl.value;
+  endControl.disabled = !startValue;
+
+  if (!startValue || (endControl.value && !isDateTimeAfter(startValue, endControl.value))) {
+    endControl.value = '';
+  }
 }
 
 function isNamedChecked(form, name) {
@@ -2039,6 +2059,7 @@ function AdminDashboard({ onLogout, user }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [stateFilter, setStateFilter] = useState('Todos');
   const [categoryFilter, setCategoryFilter] = useState('Todas');
+  const [startDateOrder, setStartDateOrder] = useState('');
   const [activePendingPopover, setActivePendingPopover] = useState(null);
   const [activeFormSection, setActiveFormSection] = useState(eventFormSections[0].id);
   const eventCatalogRequestRef = useRef(0);
@@ -2195,6 +2216,7 @@ function AdminDashboard({ onLogout, user }) {
     getEventosGestion({
       categoriaId: selectedCategoryId,
       estado: stateFilter === 'Todos' ? '' : stateFilter,
+      ordenFechaInicio: startDateOrder,
       page: eventsPage.number,
       sinCategoria: categoryFilter === UNCATEGORIZED_FILTER_VALUE,
       size: 5,
@@ -2229,7 +2251,7 @@ function AdminDashboard({ onLogout, user }) {
     return () => {
       isMounted = false;
     };
-  }, [categoryFilter, eventsPage.number, eventsReloadKey, searchTerm, stateFilter]);
+  }, [categoryFilter, eventsPage.number, eventsReloadKey, searchTerm, startDateOrder, stateFilter]);
 
   useEffect(() => {
     loadManagementCards();
@@ -2407,6 +2429,11 @@ function AdminDashboard({ onLogout, user }) {
 
   function handleEventCategoryFilterChange(value) {
     setCategoryFilter(value);
+    resetEventsPage();
+  }
+
+  function handleStartDateOrderChange(value) {
+    setStartDateOrder(value);
     resetEventsPage();
   }
 
@@ -3072,6 +3099,14 @@ function AdminDashboard({ onLogout, user }) {
                     value={categoryFilter}
                     onChange={handleEventCategoryFilterChange}
                   />
+                </label>
+                <label>
+                  Orden por inicio
+                  <select value={startDateOrder} onChange={(event) => handleStartDateOrderChange(event.target.value)}>
+                    <option value="">Actualizacion reciente</option>
+                    <option value="DESC">Inicio: mayor a menor</option>
+                    <option value="ASC">Inicio: menor a mayor</option>
+                  </select>
                 </label>
               </div>
 
@@ -7699,6 +7734,7 @@ function NewEventView({
   const [goalType, setGoalType] = useState('CANTIDAD_ASISTENTES');
   const [surveyEnabled, setSurveyEnabled] = useState(false);
   const [surveyCommentsEnabled, setSurveyCommentsEnabled] = useState(false);
+  const minimumEventStartValue = useMemo(() => getCurrentDateTimeLocalValue(), []);
   const [eventStartValue, setEventStartValue] = useState('');
   const [requiresRegistration, setRequiresRegistration] = useState(true);
   const [requiresControl, setRequiresControl] = useState(true);
@@ -7719,6 +7755,7 @@ function NewEventView({
 
   function syncChecklistFromForm() {
     const form = formRef.current;
+    normalizeEventDateRange(form);
 
     setCapacityMode(getNamedFormValue(form, 'capacityMode') || 'defined');
     setAudienceType(getNamedFormValue(form, 'publico_tipo') || 'GENERAL');
@@ -7774,6 +7811,7 @@ function NewEventView({
 
   function requestEventAction(actionType) {
     const form = formRef.current;
+    normalizeEventDateRange(form);
     onRequestAction(
       actionType,
       buildEventCreatePayload(form, actionType),
@@ -7866,11 +7904,16 @@ function NewEventView({
             <div className="form-grid">
               <label className="form-field">
                 Inicio del evento
-                <input name="eventStart" type="datetime-local" />
+                <input min={minimumEventStartValue} name="eventStart" type="datetime-local" />
               </label>
               <label className="form-field">
                 Fin del evento
-                <input min={eventStartValue || undefined} name="eventEnd" type="datetime-local" />
+                <input
+                  disabled={!eventStartValue}
+                  min={eventStartValue || minimumEventStartValue}
+                  name="eventEnd"
+                  type="datetime-local"
+                />
               </label>
               <label className="form-field">
                 Costo referencial
@@ -8123,6 +8166,7 @@ function EditEventView({
   const [goalType, setGoalType] = useState(event.metaTipo ?? 'CANTIDAD_ASISTENTES');
   const [surveyEnabled, setSurveyEnabled] = useState(Boolean(event.encuestaSatisfaccionHabilitada));
   const [surveyCommentsEnabled, setSurveyCommentsEnabled] = useState(Boolean(event.encuestaComentarioHabilitado));
+  const minimumEventStartValue = useMemo(() => getCurrentDateTimeLocalValue(), []);
   const [eventStartValue, setEventStartValue] = useState(() => getEventStartDateTimeValue(event));
   const [requiresRegistration, setRequiresRegistration] = useState(() => requiresEventRegistration(event));
   const [requiresControl, setRequiresControl] = useState(() => requiresAttendanceControl(event));
@@ -8138,22 +8182,24 @@ function EditEventView({
     !checklist.hasCriticalPending;
 
   function syncChecklistFromForm() {
+    const form = formRef.current;
+    normalizeEventDateRange(form);
     setHasFormChanges(true);
-    setCapacityMode(getNamedFormValue(formRef.current, 'capacityMode') || 'defined');
-    setAudienceType(getNamedFormValue(formRef.current, 'publico_tipo') || 'GENERAL');
-    setGoalEnabled(isNamedChecked(formRef.current, 'attendanceGoalEnabled'));
-    setGoalType(getNamedFormValue(formRef.current, 'attendanceGoalType') || 'CANTIDAD_ASISTENTES');
-    setSurveyEnabled(isNamedChecked(formRef.current, 'surveyEnabled'));
-    setSurveyCommentsEnabled(isNamedChecked(formRef.current, 'surveyCommentsEnabled'));
-    setEventStartValue(getNamedFormValue(formRef.current, 'eventStart'));
-    const nextRequiresRegistration = isNamedChecked(formRef.current, 'requiresRegistration');
-    const nextRequiresControl = nextRequiresRegistration && isNamedChecked(formRef.current, 'requiresAttendanceControl');
-    const nextRequiresPayment = nextRequiresRegistration && isNamedChecked(formRef.current, 'requiresPayment');
+    setCapacityMode(getNamedFormValue(form, 'capacityMode') || 'defined');
+    setAudienceType(getNamedFormValue(form, 'publico_tipo') || 'GENERAL');
+    setGoalEnabled(isNamedChecked(form, 'attendanceGoalEnabled'));
+    setGoalType(getNamedFormValue(form, 'attendanceGoalType') || 'CANTIDAD_ASISTENTES');
+    setSurveyEnabled(isNamedChecked(form, 'surveyEnabled'));
+    setSurveyCommentsEnabled(isNamedChecked(form, 'surveyCommentsEnabled'));
+    setEventStartValue(getNamedFormValue(form, 'eventStart'));
+    const nextRequiresRegistration = isNamedChecked(form, 'requiresRegistration');
+    const nextRequiresControl = nextRequiresRegistration && isNamedChecked(form, 'requiresAttendanceControl');
+    const nextRequiresPayment = nextRequiresRegistration && isNamedChecked(form, 'requiresPayment');
     setRequiresRegistration(nextRequiresRegistration);
     setRequiresControl(nextRequiresControl);
     setRequiresPayment(nextRequiresPayment);
-    setSelectedOperativeIds(nextRequiresControl ? getSelectedOperativeIdsFromForm(formRef.current) : []);
-    setChecklistEvent(getChecklistEventFromForm(formRef.current, eventWithResources, { categories, locations }));
+    setSelectedOperativeIds(nextRequiresControl ? getSelectedOperativeIdsFromForm(form) : []);
+    setChecklistEvent(getChecklistEventFromForm(form, eventWithResources, { categories, locations }));
   }
 
   function handleRegistrationChange(checked) {
@@ -8187,6 +8233,7 @@ function EditEventView({
 
   function requestEventAction(actionType, payloadActionType) {
     const form = formRef.current;
+    normalizeEventDateRange(form);
     onRequestAction(
       actionType,
       buildEventCreatePayload(form, payloadActionType, eventWithResources),
@@ -8345,6 +8392,7 @@ function EditEventView({
                 Inicio del evento
                 <input
                   defaultValue={getEventStartDateTimeValue(event)}
+                  min={minimumEventStartValue}
                   name="eventStart"
                   type="datetime-local"
                 />
@@ -8353,7 +8401,8 @@ function EditEventView({
                 Fin del evento
                 <input
                   defaultValue={getEventEndDateTimeValue(event)}
-                  min={eventStartValue || undefined}
+                  disabled={!eventStartValue}
+                  min={eventStartValue || minimumEventStartValue}
                   name="eventEnd"
                   type="datetime-local"
                 />

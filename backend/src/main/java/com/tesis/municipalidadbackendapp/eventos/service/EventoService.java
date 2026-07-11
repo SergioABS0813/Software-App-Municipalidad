@@ -90,15 +90,17 @@ public class EventoService {
             String estadoCodigo,
             Integer categoriaId,
             boolean sinCategoria,
+            String ordenFechaInicio,
             int page,
             int size
     ) {
         int pageSize = Math.max(1, Math.min(size, 50));
-        PageRequest pageable = PageRequest.of(
-                Math.max(page, 0),
-                pageSize,
-                Sort.by(Sort.Direction.DESC, "eventoActualizadoEn").and(Sort.by(Sort.Direction.DESC, "id"))
-        );
+        Sort sort = switch (ordenFechaInicio == null ? "" : ordenFechaInicio.toUpperCase()) {
+            case "ASC" -> Sort.by(Sort.Direction.ASC, "fechaHoraInicio").and(Sort.by(Sort.Direction.ASC, "id"));
+            case "DESC" -> Sort.by(Sort.Direction.DESC, "fechaHoraInicio").and(Sort.by(Sort.Direction.DESC, "id"));
+            default -> Sort.by(Sort.Direction.DESC, "eventoActualizadoEn").and(Sort.by(Sort.Direction.DESC, "id"));
+        };
+        PageRequest pageable = PageRequest.of(Math.max(page, 0), pageSize, sort);
 
         return eventoRepository.findAllPanelAdministrativo(
                 texto,

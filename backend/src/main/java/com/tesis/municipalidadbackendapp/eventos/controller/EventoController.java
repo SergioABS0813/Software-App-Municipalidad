@@ -41,6 +41,7 @@ public class EventoController {
             @RequestParam(required = false) String estado,
             @RequestParam(required = false) Integer categoriaId,
             @RequestParam(defaultValue = "false") boolean sinCategoria,
+            @RequestParam(defaultValue = "") String ordenFechaInicio,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size
     ) {
@@ -49,6 +50,7 @@ public class EventoController {
                 estado,
                 categoriaId,
                 sinCategoria,
+                ordenFechaInicio,
                 page,
                 size
         );

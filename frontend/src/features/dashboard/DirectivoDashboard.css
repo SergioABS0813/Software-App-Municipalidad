@@ -839,7 +839,7 @@
   }
 
   .highlighted-events-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .directive-resource-grid {
@@ -1289,7 +1289,7 @@
 .directive-personal-info > .directive-info-list {
   border: 0;
   gap: 12px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   overflow: visible;
 }
 
@@ -1518,7 +1518,7 @@
 .directive-resource-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-top: 18px;
 }
 

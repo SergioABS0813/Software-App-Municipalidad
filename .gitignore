@@ -28,3 +28,7 @@ dist-ssr
 #Credenciales de Google
 infraestructura/backup-cron/credentials/
 *.json
+
+dist.zip
+
+dist.zip

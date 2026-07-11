@@ -192,6 +192,7 @@ function mapDirectiveReviewDetailFromApi(event) {
       role: 'Directivo',
     } : null,
     referenceCost: event.costoReferencial,
+    residentCost: event.costoVecinal,
     requirements: (event.requisitos ?? []).map((item) => item.descripcion).filter(Boolean),
     resourceItems,
     resources,
@@ -497,7 +498,8 @@ function getDisplayValue(value, fallback) {
 }
 
 function parseClockMinutes(value) {
-  const match = String(value ?? '').match(/(\d{1,2})(?::(\d{2}))?\s*(a\.m\.|p\.m\.)?/i);
+  console.log(String(value));
+  const match = String(value ?? '').match(/(\d{1,2})(?::(\d{2}))?\s*(a\.\s*m\.|p\.\s*m\.)?/i);
 
   if (!match) {
     return null;
@@ -507,11 +509,11 @@ function parseClockMinutes(value) {
   const minutes = Number(match[2] ?? 0);
   const period = match[3]?.toLowerCase();
 
-  if (period === 'p.m.' && hours < 12) {
+  if (period === 'p. m.' && hours < 12) {
     hours += 12;
   }
 
-  if (period === 'a.m.' && hours === 12) {
+  if (period === 'a. m.' && hours === 12) {
     hours = 0;
   }
 
@@ -529,10 +531,14 @@ function parseDurationMinutes(value) {
 }
 
 function formatClockMinutes(totalMinutes) {
+  /*PROBLEMA */
+  console.log("total_minutes", totalMinutes);
   const normalizedMinutes = totalMinutes % (24 * 60);
   const hours24 = Math.floor(normalizedMinutes / 60);
+  console.log(hours24);
   const minutes = normalizedMinutes % 60;
   const period = hours24 >= 12 ? 'p.m.' : 'a.m.';
+  console.log(period)
   const hours12 = hours24 % 12 || 12;
 
   return `${hours12}:${String(minutes).padStart(2, '0')} ${period}`;
@@ -551,12 +557,20 @@ function getDirectiveScheduleLabel(event) {
   return `${date} · ${formatClockMinutes(startMinutes)} - ${formatClockMinutes(startMinutes + durationMinutes)}`;
 }
 
-function getReferenceCostLabel(event) {
-  const referenceCost = Number(event.referenceCost);
+function formatCurrencyAmount(value) {
+  const amount = Number(value);
 
-  return Number.isFinite(referenceCost) && referenceCost > 0
-    ? `S/ ${referenceCost.toLocaleString('es-PE')}`
+  return Number.isFinite(amount) && amount > 0
+    ? `S/ ${amount.toLocaleString('es-PE')}`
     : 'No especificado';
+}
+
+function getReferenceCostLabel(event) {
+  return formatCurrencyAmount(event.referenceCost);
+}
+
+function getResidentCostLabel(event) {
+  return formatCurrencyAmount(event.residentCost);
 }
 
 function normalizeHistoryType(value) {
@@ -2803,6 +2817,12 @@ function DirectiveReviewView({ event, historyError = '', historyItems = [], isLo
       label: 'Público objetivo',
       value: getDisplayValue(event.audience, 'Público general'),
     },
+    {
+      icon: 'note',
+      label: 'Costo vecinal',
+      hint: 'Monto que pagará el vecino si el evento requiere pago.',
+      value: getResidentCostLabel(event),
+    },
   ];
   const metadataItems = [
     {
@@ -2946,7 +2966,7 @@ function DirectiveReviewView({ event, historyError = '', historyItems = [], isLo
       )}
 
       <section className="admin-panel directive-personal-info">
-        <span className="section-kicker">Información personal</span>
+        <span className="section-kicker">Información relevante</span>
         <h2>Datos complementarios del evento</h2>
         <ReviewInfoList items={mainInfoItems} />
       </section>
