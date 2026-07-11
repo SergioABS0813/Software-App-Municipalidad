@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+﻿import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import municipalLogo from '../../assets/images/municipalidad-logo.png';
 import PublicEventDetail from '../public-portal/PublicEventDetail';
 import { formatEventState } from './dashboardData';
@@ -89,8 +89,8 @@ const adminNotifications = [
   },
   {
     id: 2,
-    message: 'Ana Torres envió "Carrera 5K" a revisión.',
-    type: 'Evento enviado a revisión',
+    message: 'Ana Torres enviÃ³ "Carrera 5K" a revisiÃ³n.',
+    type: 'Evento enviado a revisiÃ³n',
     unread: true,
   },
   {
@@ -123,12 +123,12 @@ const defaultPaymentInstructions = 'Ej. Realizar el pago de S/ 10.00 en caja mun
 
 const eventFormSections = [
   { id: 'datos-generales', label: 'Datos generales' },
-  { id: 'programacion', label: 'Programación' },
+  { id: 'programacion', label: 'ProgramaciÃ³n' },
   { id: 'control-asistencia', label: 'Asistencia' },
   { id: 'personal-operativo', label: 'Operativos' },
-  { id: 'evaluacion', label: 'Evaluación' },
+  { id: 'evaluacion', label: 'EvaluaciÃ³n' },
   { id: 'contenido-evento', label: 'Contenido' },
-  { id: 'ubicacion', label: 'Ubicación' },
+  { id: 'ubicacion', label: 'UbicaciÃ³n' },
   { id: 'recursos', label: 'Recursos' },
 ];
 const UNCATEGORIZED_FILTER_VALUE = '__SIN_CATEGORIA__';
@@ -467,7 +467,7 @@ function getSelectedOperativeIdsFromForm(form) {
     .filter((value) => Number.isFinite(value));
 }
 
-// TODO: reemplazar este mock por el catálogo de áreas municipales desde Spring Boot.
+// TODO: reemplazar este mock por el catÃ¡logo de Ã¡reas municipales desde Spring Boot.
 const areasMunicipales = [
   {
     area_municipal_id: 1,
@@ -483,19 +483,19 @@ const areasMunicipales = [
   },
   {
     area_municipal_id: 3,
-    nombre: 'Subgerencia de Educación y Cultura',
+    nombre: 'Subgerencia de EducaciÃ³n y Cultura',
     tipo_area: 'SUBGERENCIA',
     organizar_eventos: true,
   },
   {
     area_municipal_id: 4,
-    nombre: 'Subgerencia de Deporte y Recreación',
+    nombre: 'Subgerencia de Deporte y RecreaciÃ³n',
     tipo_area: 'SUBGERENCIA',
     organizar_eventos: true,
   },
   {
     area_municipal_id: 5,
-    nombre: 'Oficina de Participación Vecinal',
+    nombre: 'Oficina de ParticipaciÃ³n Vecinal',
     tipo_area: 'OFICINA',
     organizar_eventos: true,
   },
@@ -519,7 +519,7 @@ const areasMunicipales = [
   },
   {
     area_municipal_id: 9,
-    nombre: 'Gerencia de Desarrollo Económico y Cooperación',
+    nombre: 'Gerencia de Desarrollo EconÃ³mico y CooperaciÃ³n',
     tipo_area: 'GERENCIA',
     organizar_eventos: true,
   },
@@ -531,7 +531,7 @@ const areasMunicipales = [
   },
   {
     area_municipal_id: 11,
-    nombre: 'Subgerencia de Innovación',
+    nombre: 'Subgerencia de InnovaciÃ³n',
     tipo_area: 'SUBGERENCIA',
     organizar_eventos: true,
   },
@@ -542,7 +542,7 @@ const eventOrganizerAreas = areasMunicipales.filter((area) => area.organizar_eve
 const neighborStatusOptions = [
   { label: 'Todos', value: 'TODOS' },
   { label: 'Activo', value: 'ACTIVO' },
-  { label: 'Pendiente de confirmación', value: 'PENDIENTE_CONFIRMACION' },
+  { label: 'Pendiente de confirmaciÃ³n', value: 'PENDIENTE_CONFIRMACION' },
   { label: 'Inactivo', value: 'INACTIVO' },
 ];
 
@@ -556,9 +556,9 @@ const settingsCategories = [
   // En backend, eventosAsociados debe calcularse con JOIN/COUNT desde eventos.
   { id: 1, nombre: 'Cultura', eventosAsociados: 8 },
   { id: 2, nombre: 'Deporte', eventosAsociados: 5 },
-  { id: 3, nombre: 'Participación vecinal', eventosAsociados: 4 },
+  { id: 3, nombre: 'ParticipaciÃ³n vecinal', eventosAsociados: 4 },
   { id: 4, nombre: 'Salud', eventosAsociados: 3 },
-  { id: 5, nombre: 'Educación', eventosAsociados: 0 },
+  { id: 5, nombre: 'EducaciÃ³n', eventosAsociados: 0 },
 ];
 
 const settingsLocations = [
@@ -619,7 +619,7 @@ const settingsLocations = [
   },
 ];
 
-// TODO: cargar este catálogo desde el CRUD real de ubicaciones en Spring Boot.
+// TODO: cargar este catÃ¡logo desde el CRUD real de ubicaciones en Spring Boot.
 const registeredLocations = [
   {
     ubicacion_id: 1,
@@ -643,8 +643,8 @@ const registeredLocations = [
     ubicacion_id: 3,
     nombre_lugar: 'Parque Media Luna',
     distrito: 'San Miguel',
-    direccion: 'Malecón Bertolotto 610',
-    referencia: 'Módulo municipal junto al ingreso peatonal',
+    direccion: 'MalecÃ³n Bertolotto 610',
+    referencia: 'MÃ³dulo municipal junto al ingreso peatonal',
     latitud: -12.0876,
     longitud: -77.0936,
   },
@@ -972,10 +972,10 @@ function getAudienceLabel(event) {
   const audienceType = event.publico_tipo ?? (event.edad_minima || event.edad_maxima ? 'OBJETIVO' : 'GENERAL');
 
   if (audienceType === 'OBJETIVO' && hasValidAudienceConfig({ ...event, publico_tipo: 'OBJETIVO' })) {
-    return `${event.edad_minima}-${event.edad_maxima} años`;
+    return `${event.edad_minima}-${event.edad_maxima} aÃ±os`;
   }
 
-  return 'Público general';
+  return 'PÃºblico general';
 }
 
 function normalizeSearchText(value = '') {
@@ -1172,12 +1172,12 @@ function getEventChecklist(event, options = {}) {
         hasValidAudienceConfig(event) &&
         (!requiresEventRegistration(event) || hasValidAforo(event)),
       completeLabel: 'Fechas completas',
-      pendingLabel: 'Falta programación o aforo',
+      pendingLabel: 'Falta programaciÃ³n o aforo',
     },
     {
       complete: hasValue(event.ubicacion_id),
-      completeLabel: 'Ubicación registrada',
-      pendingLabel: 'Falta completar ubicación',
+      completeLabel: 'UbicaciÃ³n registrada',
+      pendingLabel: 'Falta completar ubicaciÃ³n',
     },
     {
       complete: hasValidOrderedItems(event.agenda_evento ?? event.agenda),
@@ -1210,7 +1210,7 @@ function getEventChecklist(event, options = {}) {
     items.push({
       complete: false,
       isContextual: true,
-      label: 'Observación pendiente de corregir',
+      label: 'ObservaciÃ³n pendiente de corregir',
     });
   }
 
@@ -1241,7 +1241,7 @@ function getCreationEventChecklist(event) {
         hasValue(event.referenceCost) &&
         hasValue(event.publico_tipo) &&
         hasValidAudienceConfig(event),
-      completeLabel: 'Programación y Aforo completos',
+      completeLabel: 'ProgramaciÃ³n y Aforo completos',
     },
     {
       complete: hasValidOrderedItems(event.agenda_evento ?? event.agenda),
@@ -1253,7 +1253,7 @@ function getCreationEventChecklist(event) {
     },
     {
       complete: hasValue(event.ubicacion_id),
-      completeLabel: 'Ubicación registrada',
+      completeLabel: 'UbicaciÃ³n registrada',
     },
     {
       complete: Boolean(event.resources?.IMAGEN_PORTADA),
@@ -1419,15 +1419,15 @@ function hasNamedFile(form, name) {
 
 function getMissingReviewFields(form, existingEvent = null) {
   const requiredFields = [
-    ['title', 'Título del evento'],
-    ['categoryId', 'Categoría'],
-    ['area_municipal_id', 'Área responsable'],
-    ['descripcion_breve', 'Descripción breve'],
-    ['description', 'Descripción'],
+    ['title', 'TÃ­tulo del evento'],
+    ['categoryId', 'CategorÃ­a'],
+    ['area_municipal_id', 'Ãrea responsable'],
+    ['descripcion_breve', 'DescripciÃ³n breve'],
+    ['description', 'DescripciÃ³n'],
     ['eventStart', 'Inicio o fecha del evento'],
     ['eventEnd', 'Fin u hora del evento'],
     ['referenceCost', 'Costo referencial'],
-    ['ubicacion_id', 'Ubicación del evento'],
+    ['ubicacion_id', 'UbicaciÃ³n del evento'],
     ['agenda_evento_json', 'Agenda del evento'],
     ['requisitos_evento_json', 'Requisitos del evento'],
   ];
@@ -1449,7 +1449,7 @@ function getMissingReviewFields(form, existingEvent = null) {
   const requiresPayment = requiresRegistration && isNamedChecked(form, 'requiresPayment');
 
   if (shortDescription.length > 45) {
-    missingFields.push('Descripción breve de máximo 45 caracteres');
+    missingFields.push('DescripciÃ³n breve de mÃ¡ximo 45 caracteres');
   }
 
   if (hasValue(eventStart) && hasValue(eventEnd) && !isDateTimeAfter(eventStart, eventEnd)) {
@@ -1477,16 +1477,16 @@ function getMissingReviewFields(form, existingEvent = null) {
   }
 
   if (requiresRegistration && capacityMode !== 'none' && Number(getNamedFormValue(form, 'capacity')) <= 0) {
-    missingFields.push('Aforo máximo');
+    missingFields.push('Aforo mÃ¡ximo');
   }
 
   if (audienceType === 'OBJETIVO') {
     if (!Number.isFinite(minAge) || minAge < 0) {
-      missingFields.push('Edad mínima válida');
+      missingFields.push('Edad mÃ­nima vÃ¡lida');
     }
 
     if (!Number.isFinite(maxAge) || maxAge <= minAge || maxAge > 120) {
-      missingFields.push('Edad máxima válida');
+      missingFields.push('Edad mÃ¡xima vÃ¡lida');
     }
   }
 
@@ -1625,6 +1625,7 @@ function AdminPaymentsValidationPage() {
       <AdminPaymentReviewDetail
         paymentId={selectedPaymentId}
         onBack={(message = '') => {
+          window.history.pushState(null, '', '/admin/pagos');
           setSelectedPaymentId(null);
           setReloadKey((currentKey) => currentKey + 1);
           if (message) {
@@ -1843,11 +1844,11 @@ function AdminPaymentReviewDetail({ paymentId, onBack, onChanged }) {
     <>
       <header className="admin-topbar payment-detail-topbar">
         <div>
+          <span className="section-kicker">Comprobante de pago</span>
+          <h1>{payment?.eventoTitulo || 'Detalle de comprobante'}</h1>
           <button className="detail-back-link" type="button" onClick={onBack}>
             &larr; Volver a pagos
           </button>
-          <span className="section-kicker">Comprobante de pago</span>
-          <h1>{payment?.eventoTitulo || 'Detalle de comprobante'}</h1>
         </div>
         {payment && <PaymentStateBadge state={payment.estadoPago} />}
       </header>
@@ -2195,7 +2196,7 @@ function AdminDashboard({ onLogout, user }) {
       console.error('No se pudieron cargar los catalogos de eventos.', error);
 
       if (eventCatalogRequestRef.current === requestId) {
-        setEventCatalogError('No se pudieron cargar los catálogos del evento.');
+        setEventCatalogError('No se pudieron cargar los catÃ¡logos del evento.');
       }
     } finally {
       if (eventCatalogRequestRef.current === requestId) {
@@ -2618,7 +2619,7 @@ function AdminDashboard({ onLogout, user }) {
         pendingEventAction.mode === 'edit'
           ? 'Evento actualizado correctamente.'
           : savedEvent.estadoCodigo === 'PARA_REVISION'
-            ? 'Evento registrado y enviado a revisión.'
+            ? 'Evento registrado y enviado a revisiÃ³n.'
             : 'Evento registrado como borrador.',
       );
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2629,23 +2630,23 @@ function AdminDashboard({ onLogout, user }) {
       setValidationIssue({
         description:
           status === 401 || error.sessionExpired
-            ? 'Tu sesión ya no está activa.'
+            ? 'Tu sesiÃ³n ya no estÃ¡ activa.'
             : status === 403
-              ? 'Tu usuario no puede realizar esta acción.'
-              : 'Revisa la información enviada.',
+              ? 'Tu usuario no puede realizar esta acciÃ³n.'
+              : 'Revisa la informaciÃ³n enviada.',
         kicker:
           status === 401 || error.sessionExpired
-            ? 'Sesión expirada'
+            ? 'SesiÃ³n expirada'
             : status === 403
               ? 'Sin permisos'
-              : 'Datos inválidos',
+              : 'Datos invÃ¡lidos',
         missingFields: [message],
         title:
           status === 401 || error.sessionExpired
-            ? 'Vuelve a iniciar sesión'
+            ? 'Vuelve a iniciar sesiÃ³n'
             : status === 403
-              ? 'Acción no permitida'
-              : 'Datos inválidos o ficha incompleta',
+              ? 'AcciÃ³n no permitida'
+              : 'Datos invÃ¡lidos o ficha incompleta',
         actionLabel: status === 400 ? 'Revisar ficha' : 'Entendido',
       });
     } finally {
@@ -2764,7 +2765,7 @@ function AdminDashboard({ onLogout, user }) {
       <button
         className="admin-mobile-menu-button"
         type="button"
-        aria-label={isSidebarDrawerOpen ? 'Cerrar menú lateral' : 'Abrir menú lateral'}
+        aria-label={isSidebarDrawerOpen ? 'Cerrar menÃº lateral' : 'Abrir menÃº lateral'}
         aria-expanded={isSidebarDrawerOpen}
         onClick={() => setIsSidebarDrawerOpen((isOpen) => !isOpen)}
       >
@@ -2773,7 +2774,7 @@ function AdminDashboard({ onLogout, user }) {
       <button
         className="admin-sidebar-overlay"
         type="button"
-        aria-label="Cerrar menú lateral"
+        aria-label="Cerrar menÃº lateral"
         onClick={closeSidebarDrawer}
       />
       <aside className="admin-sidebar">
@@ -2782,12 +2783,12 @@ function AdminDashboard({ onLogout, user }) {
           type="button"
           aria-label={
             isSidebarDrawerOpen
-              ? 'Cerrar menú lateral'
+              ? 'Cerrar menÃº lateral'
               : isSidebarCollapsed
-                ? 'Abrir menú lateral'
-                : 'Cerrar menú lateral'
+                ? 'Abrir menÃº lateral'
+                : 'Cerrar menÃº lateral'
           }
-          title={isSidebarCollapsed ? 'Abrir menú lateral' : 'Cerrar menú lateral'}
+          title={isSidebarCollapsed ? 'Abrir menÃº lateral' : 'Cerrar menÃº lateral'}
           onClick={toggleSidebarControl}
         >
           <span aria-hidden="true" />
@@ -2801,7 +2802,7 @@ function AdminDashboard({ onLogout, user }) {
           />
           <span>
             <strong>San Miguel</strong>
-            <small>Gestión de eventos</small>
+            <small>GestiÃ³n de eventos</small>
           </span>
         </button>
 
@@ -2898,14 +2899,14 @@ function AdminDashboard({ onLogout, user }) {
                 aria-expanded={isSettingsNavOpen || isSettingsView}
                 onClick={() => setIsSettingsNavOpen((isOpen) => !isOpen)}
               >
-                Configuración
+                ConfiguraciÃ³n
                 <span className="admin-nav-chevron" aria-hidden="true">&#9662;</span>
               </button>
               {(isSettingsNavOpen || isSettingsView) && (
                 <div className="admin-nav-submenu">
                   {[
                     { label: 'Usuarios', path: '/admin/configuracion/usuarios', view: 'settings-users' },
-                    { label: 'Categorías', path: '/admin/configuracion/categorias', view: 'settings-categories' },
+                    { label: 'CategorÃ­as', path: '/admin/configuracion/categorias', view: 'settings-categories' },
                     { label: 'Ubicaciones', path: '/admin/configuracion/ubicaciones', view: 'settings-locations' },
                   ].map((item) => (
                     <button
@@ -3014,7 +3015,7 @@ function AdminDashboard({ onLogout, user }) {
             <header className="admin-topbar">
               <div>
                 <span className="section-kicker">Panel administrativo</span>
-                <h1 id="admin-title">Gestión municipal de eventos</h1>
+                <h1 id="admin-title">GestiÃ³n municipal de eventos</h1>
               </div>
               <div className="admin-topbar-actions">
                 <NotificationMenu
@@ -3091,11 +3092,11 @@ function AdminDashboard({ onLogout, user }) {
                   />
                 </label>
                 <label>
-                  Categoría
+                  CategorÃ­a
                   <ManagementFilterCombobox
-                    emptyLabel="No se encontraron categorías"
+                    emptyLabel="No se encontraron categorÃ­as"
                     options={managementCategoryOptions}
-                    placeholder="Buscar categoría"
+                    placeholder="Buscar categorÃ­a"
                     value={categoryFilter}
                     onChange={handleEventCategoryFilterChange}
                   />
@@ -3114,9 +3115,9 @@ function AdminDashboard({ onLogout, user }) {
                 <div className="admin-table-row admin-table-head">
                   <span>Evento</span>
                   <span>Estado</span>
-                  <span>Categoría</span>
+                  <span>CategorÃ­a</span>
                   <span>Completitud</span>
-                  <span>Acción</span>
+                  <span>AcciÃ³n</span>
                 </div>
                 {isLoadingEvents ? (
                   <TableSkeleton columns={5} rows={5} />
@@ -3159,7 +3160,7 @@ function AdminDashboard({ onLogout, user }) {
                             <ActionIcon />
                           </button>
                         ) : (
-                          <span className="event-action-empty" aria-label="Sin acción disponible">
+                          <span className="event-action-empty" aria-label="Sin acciÃ³n disponible">
                             -
                           </span>
                         )}
@@ -3183,8 +3184,8 @@ function AdminDashboard({ onLogout, user }) {
                   Anterior
                 </button>
                 <span>
-                  Página {eventsPage.totalPages === 0 ? 0 : eventsPage.number + 1} de {eventsPage.totalPages}
-                  {' '}· {eventsPage.totalElements} eventos
+                  PÃ¡gina {eventsPage.totalPages === 0 ? 0 : eventsPage.number + 1} de {eventsPage.totalPages}
+                  {' '}Â· {eventsPage.totalElements} eventos
                 </span>
                 <button
                   className="back-button"
@@ -3267,7 +3268,7 @@ function EventReviewStatusView({ event, onBack }) {
     <section className="review-status-view" aria-labelledby="review-status-title">
       <header className="admin-topbar">
         <div>
-          <span className="section-kicker">Seguimiento de revisión</span>
+          <span className="section-kicker">Seguimiento de revisiÃ³n</span>
           <h1 id="review-status-title">Estado del evento</h1>
         </div>
         <button className="admin-new-event-action event-form-top-action" type="button" onClick={onBack}>
@@ -3841,7 +3842,7 @@ function ExistingEventResources({ deletingResourceId = null, error = '', isLoadi
     return (
       <div className="existing-resources-panel is-empty">
         <span className="section-kicker">Recursos cargados</span>
-        <p>Este evento aún no tiene recursos asociados.</p>
+        <p>Este evento aÃºn no tiene recursos asociados.</p>
       </div>
     );
   }
@@ -3869,7 +3870,7 @@ function ExistingEventResources({ deletingResourceId = null, error = '', isLoadi
                   type="button"
                   onClick={() => onDelete?.(resource)}
                 >
-                  {deletingResourceId === resource.id ? '...' : '×'}
+                  {deletingResourceId === resource.id ? '...' : 'Ã—'}
                 </button>
               )}
               <span className="existing-resource-preview">
@@ -3885,7 +3886,7 @@ function ExistingEventResources({ deletingResourceId = null, error = '', isLoadi
                 <em>{typeLabel}</em>
                 <strong title={title}>{title}</strong>
                 <small>
-                  {[resource.mimeType, fileSize].filter(Boolean).join(' · ') || 'Metadata no disponible'}
+                  {[resource.mimeType, fileSize].filter(Boolean).join(' Â· ') || 'Metadata no disponible'}
                 </small>
               </span>
               {resource.signedUrl && (
@@ -4025,13 +4026,13 @@ function LocationCatalogSelector({ defaultLocationId = '', locations = registere
     <div className="location-catalog-layout">
       <div className="location-catalog-form">
         <label className="form-field">
-          Ubicación del evento
+          UbicaciÃ³n del evento
           <select
             name="ubicacion_id"
             value={selectedLocationId}
             onChange={(event) => setSelectedLocationId(event.target.value)}
           >
-            <option value="">Seleccionar ubicación</option>
+            <option value="">Seleccionar ubicaciÃ³n</option>
             {locations.map((location) => (
               <option key={location.ubicacion_id} value={location.ubicacion_id}>
                 {location.nombre_lugar}
@@ -4039,7 +4040,7 @@ function LocationCatalogSelector({ defaultLocationId = '', locations = registere
             ))}
           </select>
           <small>
-            Selecciona una ubicación registrada en configuración.
+            Selecciona una ubicaciÃ³n registrada en configuraciÃ³n.
           </small>
         </label>
 
@@ -4053,7 +4054,7 @@ function LocationCatalogSelector({ defaultLocationId = '', locations = registere
           </div>
         ) : (
           <div className="location-summary-placeholder">
-            Selecciona una ubicación registrada para ver el detalle.
+            Selecciona una ubicaciÃ³n registrada para ver el detalle.
           </div>
         )}
       </div>
@@ -4067,7 +4068,7 @@ function LocationCatalogSelector({ defaultLocationId = '', locations = registere
             title={`Mapa de ${selectedLocation.nombre_lugar}`}
           />
         ) : (
-          <span>Selecciona una ubicación para visualizar el mapa.</span>
+          <span>Selecciona una ubicaciÃ³n para visualizar el mapa.</span>
         )}
       </div>
     </div>
@@ -4174,14 +4175,14 @@ function OrderedEventListEditor({
                 type="button"
                 onClick={() => moveItem(index, -1)}
               >
-                ↑
+                â†‘
               </button>
               <button
                 disabled={index === items.length - 1}
                 type="button"
                 onClick={() => moveItem(index, 1)}
               >
-                ↓
+                â†“
               </button>
               <button type="button" onClick={() => removeItem(index)}>
                 Eliminar
@@ -4199,9 +4200,9 @@ function OrderedEventListEditor({
 
 function getStateSummaryText(state) {
   const stateMessages = {
-    BORRADOR: 'Completa la ficha para enviarla a revisión.',
+    BORRADOR: 'Completa la ficha para enviarla a revisiÃ³n.',
     CANCELADO: 'Evento cancelado.',
-    PARA_REVISION: 'Pendiente de revisión directiva.',
+    PARA_REVISION: 'Pendiente de revisiÃ³n directiva.',
     EN_CURSO: 'Evento en curso.',
     FINALIZADO: 'Evento finalizado.',
     OBSERVADO: 'Requiere correcciones antes de reenviar.',
@@ -4238,7 +4239,7 @@ function getAdminEventActionConfig(event) {
     return {
       icon: ViewIcon,
       label: `Ver vista previa publica de ${event.title}`,
-      tooltip: 'Ver vista previa pública',
+      tooltip: 'Ver vista previa pÃºblica',
       type: 'preview',
     };
   }
@@ -4449,7 +4450,7 @@ function MunicipalAreaCombobox({
         aria-autocomplete="list"
         aria-expanded={isOpen}
         className="area-combobox-input"
-        placeholder="Buscar o seleccionar área"
+        placeholder="Buscar o seleccionar Ã¡rea"
         role="combobox"
         type="text"
         value={searchValue}
@@ -4476,7 +4477,7 @@ function MunicipalAreaCombobox({
               </button>
             ))
           ) : (
-            <span className="area-combobox-empty">No se encontraron áreas</span>
+            <span className="area-combobox-empty">No se encontraron Ã¡reas</span>
           )}
         </span>
       )}
@@ -4722,7 +4723,7 @@ function CategoryCombobox({ categories = [], defaultCategoryId = '', defaultCate
         aria-autocomplete="list"
         aria-expanded={isOpen}
         className="area-combobox-input"
-        placeholder="Buscar o seleccionar categoría"
+        placeholder="Buscar o seleccionar categorÃ­a"
         role="combobox"
         type="text"
         value={searchValue}
@@ -4748,7 +4749,7 @@ function CategoryCombobox({ categories = [], defaultCategoryId = '', defaultCate
               </button>
             ))
           ) : (
-            <span className="area-combobox-empty">No se encontraron categorías</span>
+            <span className="area-combobox-empty">No se encontraron categorÃ­as</span>
           )}
         </span>
       )}
@@ -5000,7 +5001,7 @@ function NeighborAccountsPage({ adminUserName }) {
         ),
       );
       setEditingContact(false);
-      setNotice('Contacto actualizado correctamente. Se notificó al vecino por correo.');
+      setNotice('Contacto actualizado correctamente. Se notificÃ³ al vecino por correo.');
     } catch (error) {
       setNotice(getApiErrorMessage(error, 'No se pudo actualizar el contacto.'));
     } finally {
@@ -5014,13 +5015,13 @@ function NeighborAccountsPage({ adminUserName }) {
     }
 
     if ((actionModal === 'deactivate' || actionModal === 'reactivate') && !actionReason.trim()) {
-      setNotice('Indica el motivo de la acción.');
+      setNotice('Indica el motivo de la acciÃ³n.');
       return;
     }
 
     if (actionModal === 'resend') {
-      // TODO: conectar reenvío de correo de confirmación con Spring Boot.
-      setNotice('Correo de confirmación reenviado correctamente.');
+      // TODO: conectar reenvÃ­o de correo de confirmaciÃ³n con Spring Boot.
+      setNotice('Correo de confirmaciÃ³n reenviado correctamente.');
       setActionModal(null);
       return;
     }
@@ -5054,7 +5055,7 @@ function NeighborAccountsPage({ adminUserName }) {
         return neighbor;
       }),
     );
-    // TODO: registrar acción en bitácora_accion.
+    // TODO: registrar acciÃ³n en bitÃ¡cora_accion.
     setNotice(actionModal === 'deactivate' ? 'Cuenta desactivada correctamente.' : 'Cuenta reactivada correctamente.');
     setActionModal(null);
   }
@@ -5063,7 +5064,7 @@ function NeighborAccountsPage({ adminUserName }) {
     <section className="neighbor-admin-view" aria-labelledby="neighbor-admin-title">
       <header className="admin-topbar">
         <div>
-          <span className="section-kicker">Gestión ciudadana</span>
+          <span className="section-kicker">GestiÃ³n ciudadana</span>
           <h1 id="neighbor-admin-title">Cuentas vecinales</h1>
           <p>Consulta y administra el estado de las cuentas registradas por los vecinos.</p>
         </div>
@@ -5115,9 +5116,9 @@ function NeighborAccountsPage({ adminUserName }) {
                   {getNeighborStateLabel(neighbor.estado)}
                 </span>
                 <button
-                  aria-label={`Editar información de ${neighbor.nombreCompleto}`}
+                  aria-label={`Editar informaciÃ³n de ${neighbor.nombreCompleto}`}
                   className="table-icon-action is-detail neighbor-detail-action"
-                  data-tooltip="Editar información"
+                  data-tooltip="Editar informaciÃ³n"
                   disabled={isLoadingNeighborDetail}
                   type="button"
                   onClick={() => openNeighborDetailModal(neighbor)}
@@ -5137,8 +5138,8 @@ function NeighborAccountsPage({ adminUserName }) {
               Anterior
             </button>
             <span>
-              Página {neighborsPage.totalPages === 0 ? 0 : neighborsPage.number + 1} de {neighborsPage.totalPages}
-              {' '}· {neighborsPage.totalElements} cuentas
+              PÃ¡gina {neighborsPage.totalPages === 0 ? 0 : neighborsPage.number + 1} de {neighborsPage.totalPages}
+              {' '}Â· {neighborsPage.totalElements} cuentas
             </span>
             <button
               className="back-button"
@@ -5201,7 +5202,7 @@ function NeighborDetailModal({
   const cleanPhone = neighbor.celular.replace(/\D/g, '') || neighbor.celular;
   const contextualAction =
     neighbor.estado === 'PENDIENTE_CONFIRMACION'
-      ? { action: 'resend', label: 'Reenviar confirmación' }
+      ? { action: 'resend', label: 'Reenviar confirmaciÃ³n' }
       : neighbor.estado === 'ACTIVO'
         ? { action: 'deactivate', label: 'Desactivar cuenta' }
         : neighbor.estado === 'INACTIVO'
@@ -5233,7 +5234,7 @@ function NeighborDetailModal({
               type="button"
               onClick={onClose}
             >
-              ×
+              Ã—
             </button>
           </div>
           <div className="neighbor-detail-title-row">
@@ -5259,12 +5260,12 @@ function NeighborDetailModal({
                 <InfoLineIcon />
               </span>
               <span>
-                Si actualizas el correo o celular del vecino, se enviará una notificación al correo registrado.
+                Si actualizas el correo o celular del vecino, se enviarÃ¡ una notificaciÃ³n al correo registrado.
               </span>
             </div>
             {editingContact ? (
               <div className="neighbor-contact-form">
-                <label>Correo electrónico<input value={contactDraft.correo} onChange={(event) => onContactChange((current) => ({ ...current, correo: event.target.value }))} /></label>
+                <label>Correo electrÃ³nico<input value={contactDraft.correo} onChange={(event) => onContactChange((current) => ({ ...current, correo: event.target.value }))} /></label>
                 <label>Celular<input inputMode="numeric" value={contactDraft.celular} onChange={(event) => onContactChange((current) => ({ ...current, celular: event.target.value.replace(/\D/g, '') }))} /></label>
               </div>
             ) : (
@@ -5285,15 +5286,15 @@ function NeighborDetailModal({
                       <small>{registration.fechaEvento}</small>
                     </span>
                     <dl className="neighbor-registration-meta">
-                      <div><dt>Inscripción:</dt><dd>{registration.estadoInscripcion}</dd></div>
-                      <div><dt>Código:</dt><dd>{registration.codigoInscripcion}</dd></div>
+                      <div><dt>InscripciÃ³n:</dt><dd>{registration.estadoInscripcion}</dd></div>
+                      <div><dt>CÃ³digo:</dt><dd>{registration.codigoInscripcion}</dd></div>
                       <div><dt>Asistencia:</dt><dd className={`neighbor-attendance-status ${registration.asistencia.toLowerCase()}`}>{registration.asistencia}</dd></div>
                     </dl>
                   </div>
                 ))}
               </div>
             ) : (
-              <p>Este vecino aún no registra inscripciones.</p>
+              <p>Este vecino aÃºn no registra inscripciones.</p>
             )}
           </section>
         </div>
@@ -5340,18 +5341,18 @@ function NeighborAccountActionModal({ action, reason, onCancel, onConfirm, onRea
     ? 'Desactivar cuenta vecinal'
     : isReactivate
       ? 'Reactivar cuenta vecinal'
-      : 'Reenviar correo de confirmación';
+      : 'Reenviar correo de confirmaciÃ³n';
 
   return (
     <div className="modal-backdrop neighbor-action-backdrop" role="presentation">
       <section className="confirm-modal neighbor-action-modal" role="dialog" aria-modal="true">
-        <span className="section-kicker">Acción administrativa</span>
+        <span className="section-kicker">AcciÃ³n administrativa</span>
         <h2>{title}</h2>
         {action === 'resend' ? (
-          <p>Se reenviará el correo de confirmación al vecino.</p>
+          <p>Se reenviarÃ¡ el correo de confirmaciÃ³n al vecino.</p>
         ) : (
           <label className="neighbor-action-reason">
-            {isDeactivate ? 'Indica el motivo de la desactivación de la cuenta vecinal.' : 'Indica el motivo de la reactivación de la cuenta vecinal.'}
+            {isDeactivate ? 'Indica el motivo de la desactivaciÃ³n de la cuenta vecinal.' : 'Indica el motivo de la reactivaciÃ³n de la cuenta vecinal.'}
             <textarea rows={4} value={reason} onChange={(event) => onReasonChange(event.target.value)} />
           </label>
         )}
@@ -5514,7 +5515,7 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
       setUserFormData(getUserFormData(detailedUser));
       setUserModalMode('edit');
     } catch (error) {
-      setUserNotice(getApiErrorMessage(error, 'No se pudo cargar la información del usuario.'));
+      setUserNotice(getApiErrorMessage(error, 'No se pudo cargar la informaciÃ³n del usuario.'));
     }
   };
 
@@ -5631,7 +5632,7 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
         {userNotice && <p className="settings-inline-notice">{userNotice}</p>}
         <div className="admin-table settings-table settings-users-table">
           <div className="admin-table-row admin-table-head">
-            <span>Usuario</span><span>Correo</span><span>Rol</span><span>Estado</span><span>Acción</span>
+            <span>Usuario</span><span>Correo</span><span>Rol</span><span>Estado</span><span>AcciÃ³n</span>
           </div>
           {isLoadingUsers ? <TableSkeleton columns={5} rows={6} /> : usersError ? (
             <ErrorState description={usersError} onRetry={() => setUsersReloadKey((key) => key + 1)} />
@@ -5667,8 +5668,8 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
             Anterior
           </button>
           <span>
-            Página {usersPage.totalPages === 0 ? 0 : usersPage.number + 1} de {usersPage.totalPages}
-            {' '}· {usersPage.totalElements} usuarios
+            PÃ¡gina {usersPage.totalPages === 0 ? 0 : usersPage.number + 1} de {usersPage.totalPages}
+            {' '}Â· {usersPage.totalElements} usuarios
           </span>
           <button
             className="back-button"
@@ -5714,7 +5715,7 @@ function SettingsUsersPage({ targetUserDetailId = null }) {
 
             if(response.status===429){
               setUserFormData((current) => ({ ...current, identityVerified: false, nombre: '' }));
-              setIdentityLookupNotice('El proveedor de consulta de DNI no está disponible en este momento');
+              setIdentityLookupNotice('El proveedor de consulta de DNI no estÃ¡ disponible en este momento');
             }
 
             setUserFormData((current) => ({
@@ -5807,7 +5808,7 @@ function validateUserForm(formData, mode) {
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   if (isCreating && !/^\d{8}$/.test(formData.dni.trim())) {
-    errors.dni = 'Ingrese un DNI válido de 8 dígitos.';
+    errors.dni = 'Ingrese un DNI vÃ¡lido de 8 dÃ­gitos.';
   }
 
   if (isCreating && (!formData.identityVerified || !formData.nombre.trim())) {
@@ -5815,9 +5816,9 @@ function validateUserForm(formData, mode) {
   }
 
   if (!formData.correo.trim()) {
-    errors.correo = 'Ingrese el correo electrónico.';
+    errors.correo = 'Ingrese el correo electrÃ³nico.';
   } else if (!emailPattern.test(formData.correo.trim())) {
-    errors.correo = 'Ingrese un correo electrónico válido.';
+    errors.correo = 'Ingrese un correo electrÃ³nico vÃ¡lido.';
   }
 
   if (isCreating && !formData.rolId) {
@@ -5825,7 +5826,7 @@ function validateUserForm(formData, mode) {
   }
 
   if (!formData.areaId) {
-    errors.areaId = 'Seleccione un área municipal.';
+    errors.areaId = 'Seleccione un Ã¡rea municipal.';
   }
 
   return errors;
@@ -5877,9 +5878,9 @@ function UserFormModal({
       >
         <header className="neighbor-detail-header user-detail-header">
           <div className="neighbor-detail-kicker-row">
-            <span className="section-kicker">Configuración</span>
+            <span className="section-kicker">ConfiguraciÃ³n</span>
             <button className="neighbor-modal-close" disabled={isSaving || isTogglingState} type="button" aria-label="Cerrar usuario" onClick={onClose}>
-              ×
+              Ã—
             </button>
           </div>
           <div className="neighbor-detail-title-row">
@@ -5930,13 +5931,13 @@ function UserFormModal({
             </label>
 
             <label className="form-field">
-              Correo electrónico
+              Correo electrÃ³nico
               <input type="email" value={formData.correo} onChange={(event) => onFieldChange('correo', event.target.value)} />
               {errors.correo && <small className="form-error">{errors.correo}</small>}
             </label>
 
             <label className="form-field">
-              Área municipal
+              Ãrea municipal
               <UserAreaCombobox
                 value={formData.areaId}
                 onChange={(area) => {
@@ -5978,7 +5979,7 @@ function UserFormModal({
                 <span>
                   <strong>Seguridad de la cuenta</strong>
                   <small>
-                    Permite enviar un enlace para que el usuario restablezca su contraseña desde su correo.
+                    Permite enviar un enlace para que el usuario restablezca su contraseÃ±a desde su correo.
                   </small>
                   {passwordResetNotice && <small className="user-reset-notice">{passwordResetNotice}</small>}
                 </span>
@@ -5995,9 +5996,9 @@ function UserFormModal({
                   <InfoLineIcon />
                 </span>
                 <span>
-                  Los cambios realizados en esta cuenta serán notificados al correo del usuario y registrados en la bitácora del sistema.
+                  Los cambios realizados en esta cuenta serÃ¡n notificados al correo del usuario y registrados en la bitÃ¡cora del sistema.
                   {' '}
-                  Si se modifica el correo electrónico, la notificación será enviada al correo anterior y al nuevo correo registrado.
+                  Si se modifica el correo electrÃ³nico, la notificaciÃ³n serÃ¡ enviada al correo anterior y al nuevo correo registrado.
                 </span>
               </div>
             )}
@@ -6008,7 +6009,7 @@ function UserFormModal({
                   <InfoLineIcon />
                 </span>
                 <span>
-                  Al guardar el usuario, se enviará automáticamente un correo de activación para que establezca su contraseña e ingrese al sistema.
+                  Al guardar el usuario, se enviarÃ¡ automÃ¡ticamente un correo de activaciÃ³n para que establezca su contraseÃ±a e ingrese al sistema.
                 </span>
               </div>
             )}
@@ -6124,7 +6125,7 @@ function UserAreaCombobox({ onChange, value }) {
         aria-autocomplete="list"
         aria-expanded={isOpen}
         className="area-combobox-input"
-        placeholder="Buscar o seleccionar área"
+        placeholder="Buscar o seleccionar Ã¡rea"
         role="combobox"
         type="text"
         value={searchValue}
@@ -6151,7 +6152,7 @@ function UserAreaCombobox({ onChange, value }) {
               </button>
             ))
           ) : (
-            <span className="area-combobox-empty">No se encontraron áreas</span>
+            <span className="area-combobox-empty">No se encontraron Ã¡reas</span>
           )}
         </span>
       )}
@@ -6210,10 +6211,10 @@ function SettingsCategoriesPage({ onEventCatalogChanged }) {
         setCategoryNotice('');
       })
       .catch((error) => {
-        console.error('No se pudieron cargar las categorías', error);
+        console.error('No se pudieron cargar las categorÃ­as', error);
 
         if (isMounted) {
-          setCategoryNotice('No se pudieron cargar las categorías registradas.');
+          setCategoryNotice('No se pudieron cargar las categorÃ­as registradas.');
         }
       })
       .finally(() => {
@@ -6268,12 +6269,12 @@ function SettingsCategoriesPage({ onEventCatalogChanged }) {
     const normalizedName = categoryFormValue.trim();
 
     if (!normalizedName) {
-      setCategoryFormError('Ingrese el nombre de la categoría.');
+      setCategoryFormError('Ingrese el nombre de la categorÃ­a.');
       return;
     }
 
     if (normalizedName.length > 45) {
-      setCategoryFormError('El nombre de la categoría no debe exceder los 45 caracteres.');
+      setCategoryFormError('El nombre de la categorÃ­a no debe exceder los 45 caracteres.');
       return;
     }
 
@@ -6282,7 +6283,7 @@ function SettingsCategoriesPage({ onEventCatalogChanged }) {
     );
 
     if (hasDuplicate) {
-      setCategoryFormError('Ya existe una categoría con ese nombre.');
+      setCategoryFormError('Ya existe una categorÃ­a con ese nombre.');
       return;
     }
 
@@ -6293,10 +6294,10 @@ function SettingsCategoriesPage({ onEventCatalogChanged }) {
       setCategoriesPage((currentPage) => ({ ...currentPage, number: 0 }));
       setCategoriesReloadKey((currentKey) => currentKey + 1);
       onEventCatalogChanged?.();
-      setCategoryNotice('Categoría registrada correctamente.');
+      setCategoryNotice('CategorÃ­a registrada correctamente.');
       closeCategoryForm();
     } catch (error) {
-      setCategoryFormError(getApiErrorMessage(error, 'No se pudo guardar la categoría.'));
+      setCategoryFormError(getApiErrorMessage(error, 'No se pudo guardar la categorÃ­a.'));
     } finally {
       setIsSavingCategory(false);
     }
@@ -6305,7 +6306,7 @@ function SettingsCategoriesPage({ onEventCatalogChanged }) {
   const requestCategoryDelete = (category) => {
     if (category.eventosAsociados > 0) {
       setCategoryNotice(
-        `No se puede eliminar la categoría ${category.nombre} porque tiene eventos asociados.`,
+        `No se puede eliminar la categorÃ­a ${category.nombre} porque tiene eventos asociados.`,
       );
       return;
     }
@@ -6326,11 +6327,11 @@ function SettingsCategoriesPage({ onEventCatalogChanged }) {
       setCategoriesPage((currentPage) => ({ ...currentPage, number: 0 }));
       setCategoriesReloadKey((currentKey) => currentKey + 1);
       onEventCatalogChanged?.();
-      setCategoryNotice('Categoría eliminada correctamente.');
+      setCategoryNotice('CategorÃ­a eliminada correctamente.');
     } catch (error) {
       setCategoryToDelete(null);
       setCategoryNotice(
-        getApiErrorMessage(error, 'No se pudo eliminar la categoría.'),
+        getApiErrorMessage(error, 'No se pudo eliminar la categorÃ­a.'),
       );
     } finally {
       setIsDeletingCategory(false);
@@ -6340,21 +6341,21 @@ function SettingsCategoriesPage({ onEventCatalogChanged }) {
   return (
     <>
       <SettingsTablePage
-        actionLabel="Nueva categoría"
-        cardKicker="Catálogo"
-        cardTitle="Categorías registradas"
-        description="Gestiona las categorías utilizadas para clasificar eventos municipales."
-        searchPlaceholder="Buscar categoría"
+        actionLabel="Nueva categorÃ­a"
+        cardKicker="CatÃ¡logo"
+        cardTitle="CategorÃ­as registradas"
+        description="Gestiona las categorÃ­as utilizadas para clasificar eventos municipales."
+        searchPlaceholder="Buscar categorÃ­a"
         searchValue={searchValue}
-        title="Categorías"
+        title="CategorÃ­as"
         onAction={openCategoryForm}
         onSearchChange={handleCategorySearchChange}
       >
         {categoryNotice && <p className="settings-inline-notice">{categoryNotice}</p>}
-        {isLoadingCategories && <p className="settings-inline-notice">Cargando categorías...</p>}
+        {isLoadingCategories && <p className="settings-inline-notice">Cargando categorÃ­as...</p>}
         <div className="admin-table settings-table settings-categories-table">
           <div className="admin-table-row admin-table-head">
-            <span>Categoría</span><span>Eventos asociados</span><span>Acción</span>
+            <span>CategorÃ­a</span><span>Eventos asociados</span><span>AcciÃ³n</span>
           </div>
           {isLoadingCategories ? <TableSkeleton columns={3} rows={5} /> : categories.length === 0 ? (
             <EmptyState title="Sin categorias registradas" description="Registra una categoria para clasificar los eventos." />
@@ -6364,11 +6365,11 @@ function SettingsCategoriesPage({ onEventCatalogChanged }) {
               <span className="category-events-count">{category.eventosAsociados}</span>
               <span className="settings-row-actions category-row-actions">
                 <button
-                  aria-label={`Eliminar categoría ${category.nombre}`}
+                  aria-label={`Eliminar categorÃ­a ${category.nombre}`}
                   className="table-icon-action is-detail neighbor-detail-action category-delete-action"
                   data-tooltip={
                     category.eventosAsociados === 0
-                      ? 'Eliminar categoría'
+                      ? 'Eliminar categorÃ­a'
                       : 'No se puede eliminar porque tiene eventos asociados'
                   }
                   type="button"
@@ -6390,8 +6391,8 @@ function SettingsCategoriesPage({ onEventCatalogChanged }) {
             Anterior
           </button>
           <span>
-            Página {categoriesPage.totalPages === 0 ? 0 : categoriesPage.number + 1} de {categoriesPage.totalPages}
-            {' '}· {categoriesPage.totalElements} categorías
+            PÃ¡gina {categoriesPage.totalPages === 0 ? 0 : categoriesPage.number + 1} de {categoriesPage.totalPages}
+            {' '}Â· {categoriesPage.totalElements} categorÃ­as
           </span>
           <button
             className="back-button"
@@ -6440,10 +6441,10 @@ function CategoryFormModal({ error, isSaving, onCancel, onSave, onValueChange, v
         aria-labelledby="category-form-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <span className="section-kicker">Configuración</span>
-        <h2 id="category-form-title">Nueva categoría</h2>
+        <span className="section-kicker">ConfiguraciÃ³n</span>
+        <h2 id="category-form-title">Nueva categorÃ­a</h2>
         <label className="form-field">
-          Nombre de categoría
+          Nombre de categorÃ­a
           <input
             autoFocus
             maxLength={45}
@@ -6458,7 +6459,7 @@ function CategoryFormModal({ error, isSaving, onCancel, onSave, onValueChange, v
             Cancelar
           </button>
           <LoadingButton className="primary-button" loading={isSaving} loadingLabel="Creando..." onClick={onSave}>
-            {isSaving ? 'Guardando...' : 'Guardar categoría'}
+            {isSaving ? 'Guardando...' : 'Guardar categorÃ­a'}
           </LoadingButton>
         </div>
       </section>
@@ -6476,17 +6477,17 @@ function CategoryDeleteModal({ category, isDeleting = false, onCancel, onConfirm
         aria-labelledby="category-delete-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <span className="section-kicker">Configuración</span>
-        <h2 id="category-delete-title">Eliminar categoría</h2>
+        <span className="section-kicker">ConfiguraciÃ³n</span>
+        <h2 id="category-delete-title">Eliminar categorÃ­a</h2>
         <p>
-          ¿Deseas eliminar la categoría "{category.nombre}"? Esta acción no se puede deshacer.
+          Â¿Deseas eliminar la categorÃ­a "{category.nombre}"? Esta acciÃ³n no se puede deshacer.
         </p>
         <div className="modal-actions">
           <button className="back-button" disabled={isDeleting} type="button" onClick={onCancel}>
             Cancelar
           </button>
           <LoadingButton className="primary-button danger-action" loading={isDeleting} loadingLabel="Eliminando..." onClick={onConfirm}>
-            Eliminar categoría
+            Eliminar categorÃ­a
           </LoadingButton>
         </div>
       </section>
@@ -6665,7 +6666,7 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
         setLocationsPage((currentPage) => ({ ...currentPage, number: 0 }));
         setLocationsReloadKey((currentKey) => currentKey + 1);
         onEventCatalogChanged?.();
-        setLocationNotice('Ubicación registrada correctamente.');
+        setLocationNotice('UbicaciÃ³n registrada correctamente.');
         closeLocationModal();
       } catch (error) {
         setLocationFormErrors(getLocationBackendErrors(error));
@@ -6720,7 +6721,7 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
       onEventCatalogChanged?.();
     } catch (error) {
       setLocationFormErrors({
-        general: getApiErrorMessage(error, 'No se pudo actualizar el estado de la ubicación.'),
+        general: getApiErrorMessage(error, 'No se pudo actualizar el estado de la ubicaciÃ³n.'),
       });
     } finally {
       setIsTogglingLocationState(false);
@@ -6730,7 +6731,7 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
   const requestLocationDelete = (location) => {
     if (location.eventosAsociados > 0) {
       setLocationNotice(
-        `No se puede eliminar la ubicación ${location.nombre} porque tiene eventos asociados.`,
+        `No se puede eliminar la ubicaciÃ³n ${location.nombre} porque tiene eventos asociados.`,
       );
       return;
     }
@@ -6751,11 +6752,11 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
       setLocationsPage((currentPage) => ({ ...currentPage, number: 0 }));
       setLocationsReloadKey((currentKey) => currentKey + 1);
       onEventCatalogChanged?.();
-      setLocationNotice('Ubicación eliminada correctamente.');
+      setLocationNotice('UbicaciÃ³n eliminada correctamente.');
     } catch (error) {
       setLocationToDelete(null);
       setLocationNotice(
-        getApiErrorMessage(error, 'No se pudo eliminar la ubicación.'),
+        getApiErrorMessage(error, 'No se pudo eliminar la ubicaciÃ³n.'),
       );
     } finally {
       setIsDeletingLocation(false);
@@ -6765,11 +6766,11 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
   return (
     <>
       <SettingsTablePage
-        actionLabel="Nueva ubicación"
-        cardKicker="Catálogo"
+        actionLabel="Nueva ubicaciÃ³n"
+        cardKicker="CatÃ¡logo"
         cardTitle="Ubicaciones registradas"
         description="Administra los espacios municipales o puntos recurrentes donde se desarrollan eventos."
-        searchPlaceholder="Buscar por nombre, dirección o referencia"
+        searchPlaceholder="Buscar por nombre, direcciÃ³n o referencia"
         searchValue={searchValue}
         title="Ubicaciones"
         onAction={openLocationCreate}
@@ -6779,7 +6780,7 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
         {isLoadingLocations && <p className="settings-inline-notice">Cargando ubicaciones...</p>}
         <div className="admin-table settings-table settings-locations-table">
           <div className="admin-table-row admin-table-head">
-            <span>Ubicación</span><span>Dirección</span><span>Estado</span><span>Detalle</span>
+            <span>UbicaciÃ³n</span><span>DirecciÃ³n</span><span>Estado</span><span>Detalle</span>
           </div>
           {isLoadingLocations ? <TableSkeleton columns={4} rows={5} /> : locations.length === 0 ? (
             <EmptyState title="Sin ubicaciones registradas" description="Registra un espacio municipal para utilizarlo en los eventos." />
@@ -6799,20 +6800,20 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
               <SettingsStatus state={location.estado} />
               <span className="settings-row-actions">
                 <button
-                  aria-label={`Ver o editar ubicación ${location.nombre}`}
+                  aria-label={`Ver o editar ubicaciÃ³n ${location.nombre}`}
                   className="table-icon-action is-detail neighbor-detail-action location-detail-action"
-                  data-tooltip="Ver/editar ubicación"
+                  data-tooltip="Ver/editar ubicaciÃ³n"
                   type="button"
                   onClick={() => openLocationDetail(location)}
                 >
                   <ViewIcon />
                 </button>
                 <button
-                  aria-label={`Eliminar ubicación ${location.nombre}`}
+                  aria-label={`Eliminar ubicaciÃ³n ${location.nombre}`}
                   className="table-icon-action is-detail neighbor-detail-action category-delete-action"
                   data-tooltip={
                     location.eventosAsociados === 0
-                      ? 'Eliminar ubicación'
+                      ? 'Eliminar ubicaciÃ³n'
                       : 'No se puede eliminar porque tiene eventos asociados'
                   }
                   type="button"
@@ -6834,8 +6835,8 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
             Anterior
           </button>
           <span>
-            Página {locationsPage.totalPages === 0 ? 0 : locationsPage.number + 1} de {locationsPage.totalPages}
-            {' '}· {locationsPage.totalElements} ubicaciones
+            PÃ¡gina {locationsPage.totalPages === 0 ? 0 : locationsPage.number + 1} de {locationsPage.totalPages}
+            {' '}Â· {locationsPage.totalElements} ubicaciones
           </span>
           <button
             className="back-button"
@@ -6877,14 +6878,14 @@ function SettingsLocationsPage({ onEventCatalogChanged }) {
 }
 
 function getLocationBackendErrors(error) {
-  const message = getApiErrorMessage(error, 'No se pudo guardar la ubicación.');
+  const message = getApiErrorMessage(error, 'No se pudo guardar la ubicaciÃ³n.');
   const normalizedMessage = message.toLowerCase();
 
   if (normalizedMessage.includes('nombre')) {
     return { nombre: message };
   }
 
-  if (normalizedMessage.includes('dirección') || normalizedMessage.includes('direccion')) {
+  if (normalizedMessage.includes('direcciÃ³n') || normalizedMessage.includes('direccion')) {
     return { direccion: message };
   }
 
@@ -6917,17 +6918,17 @@ function LocationDeleteModal({ isDeleting = false, location, onCancel, onConfirm
         aria-labelledby="location-delete-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <span className="section-kicker">Configuración</span>
-        <h2 id="location-delete-title">Eliminar ubicación</h2>
+        <span className="section-kicker">ConfiguraciÃ³n</span>
+        <h2 id="location-delete-title">Eliminar ubicaciÃ³n</h2>
         <p>
-          ¿Deseas eliminar la ubicación "{location.nombre}"? Esta acción no se puede deshacer.
+          Â¿Deseas eliminar la ubicaciÃ³n "{location.nombre}"? Esta acciÃ³n no se puede deshacer.
         </p>
         <div className="modal-actions">
           <button className="back-button" disabled={isDeleting} type="button" onClick={onCancel}>
             Cancelar
           </button>
           <LoadingButton className="primary-button danger-action" loading={isDeleting} loadingLabel="Eliminando..." onClick={onConfirm}>
-            Eliminar ubicación
+            Eliminar ubicaciÃ³n
           </LoadingButton>
         </div>
       </section>
@@ -6963,15 +6964,15 @@ function validateLocationForm(formData) {
   const errors = {};
 
   if (!formData.nombre.trim()) {
-    errors.nombre = 'Ingrese el nombre de la ubicación.';
+    errors.nombre = 'Ingrese el nombre de la ubicaciÃ³n.';
   } else if (formData.nombre.trim().length > LOCATION_TEXT_MAX_LENGTH) {
     errors.nombre = `El nombre no debe exceder los ${LOCATION_TEXT_MAX_LENGTH} caracteres.`;
   }
 
   if (!formData.direccion.trim()) {
-    errors.direccion = 'Ingrese la dirección de la ubicación.';
+    errors.direccion = 'Ingrese la direcciÃ³n de la ubicaciÃ³n.';
   } else if (formData.direccion.trim().length > LOCATION_TEXT_MAX_LENGTH) {
-    errors.direccion = `La dirección no debe exceder los ${LOCATION_TEXT_MAX_LENGTH} caracteres.`;
+    errors.direccion = `La direcciÃ³n no debe exceder los ${LOCATION_TEXT_MAX_LENGTH} caracteres.`;
   }
 
   if (formData.referencia.trim().length > LOCATION_TEXT_MAX_LENGTH) {
@@ -6984,7 +6985,7 @@ function validateLocationForm(formData) {
   if (!formData.latitud.trim()) {
     errors.latitud = 'La latitud es obligatoria. Ajusta el marcador en el mapa.';
   } else if (latitud === null) {
-    errors.latitud = 'La latitud debe ser numérica.';
+    errors.latitud = 'La latitud debe ser numÃ©rica.';
   } else if (latitud < -90 || latitud > 90) {
     errors.latitud = 'La latitud debe estar entre -90 y 90.';
   }
@@ -6992,7 +6993,7 @@ function validateLocationForm(formData) {
   if (!formData.longitud.trim()) {
     errors.longitud = 'La longitud es obligatoria. Ajusta el marcador en el mapa.';
   } else if (longitud === null) {
-    errors.longitud = 'La longitud debe ser numérica.';
+    errors.longitud = 'La longitud debe ser numÃ©rica.';
   } else if (longitud < -180 || longitud > 180) {
     errors.longitud = 'La longitud debe estar entre -180 y 180.';
   }
@@ -7099,7 +7100,7 @@ function LocationCoordinatePicker({ errors, formData, onFieldChange }) {
           draggable: true,
           map,
           position: initialPosition,
-          title: 'Ubicación seleccionada',
+          title: 'UbicaciÃ³n seleccionada',
         });
 
         googleMapRef.current = map;
@@ -7135,14 +7136,14 @@ function LocationCoordinatePicker({ errors, formData, onFieldChange }) {
             const location = place.geometry?.location;
 
             if (!location) {
-              setMapNotice('Selecciona una opción del buscador de Google Maps.');
+              setMapNotice('Selecciona una opciÃ³n del buscador de Google Maps.');
               return;
             }
 
             moveMapMarker(
               location.lat(),
               location.lng(),
-              'Punto seleccionado. Puedes mover el marcador para ajustar la ubicación exacta.',
+              'Punto seleccionado. Puedes mover el marcador para ajustar la ubicaciÃ³n exacta.',
             );
           });
         }
@@ -7182,18 +7183,18 @@ function LocationCoordinatePicker({ errors, formData, onFieldChange }) {
   }, [currentCoordinates?.latitud, currentCoordinates?.longitud]);
 
   const searchLocationOnMap = async () => {
-    const query = [formData.nombre, formData.direccion, 'San Miguel Lima Perú']
+    const query = [formData.nombre, formData.direccion, 'San Miguel Lima PerÃº']
       .map((value) => value?.trim())
       .filter(Boolean)
       .join(', ');
 
     if (!query) {
-      setMapNotice('Ingresa un nombre o dirección para buscar el punto.');
+      setMapNotice('Ingresa un nombre o direcciÃ³n para buscar el punto.');
       return;
     }
 
     if (!googleGeocoderRef.current) {
-      setMapNotice('Google Maps todavía se está cargando.');
+      setMapNotice('Google Maps todavÃ­a se estÃ¡ cargando.');
       return;
     }
 
@@ -7210,7 +7211,7 @@ function LocationCoordinatePicker({ errors, formData, onFieldChange }) {
         const firstResult = Array.isArray(results) ? results[0] : null;
 
         if (status !== 'OK' || !firstResult?.geometry?.location) {
-          setMapNotice('No se encontró un punto para esa búsqueda. Ajusta el marcador manualmente.');
+          setMapNotice('No se encontrÃ³ un punto para esa bÃºsqueda. Ajusta el marcador manualmente.');
           return;
         }
 
@@ -7219,7 +7220,7 @@ function LocationCoordinatePicker({ errors, formData, onFieldChange }) {
         moveMapMarker(
           location.lat(),
           location.lng(),
-          'Punto encontrado. Puedes mover el marcador para ajustar la ubicación exacta.',
+          'Punto encontrado. Puedes mover el marcador para ajustar la ubicaciÃ³n exacta.',
         );
       },
     );
@@ -7228,7 +7229,7 @@ function LocationCoordinatePicker({ errors, formData, onFieldChange }) {
   return (
     <div className="location-coordinate-picker">
       <div className="location-map-toolbar">
-        <p>Mueve el marcador en el mapa para ajustar la ubicación exacta.</p>
+        <p>Mueve el marcador en el mapa para ajustar la ubicaciÃ³n exacta.</p>
         <button
           className="neighbor-secondary-action"
           type="button"
@@ -7242,7 +7243,7 @@ function LocationCoordinatePicker({ errors, formData, onFieldChange }) {
         ref={autocompleteInputRef}
         className="location-google-search"
         disabled={!isGoogleMapsReady}
-        placeholder="Buscar en Google Maps por nombre o dirección"
+        placeholder="Buscar en Google Maps por nombre o direcciÃ³n"
         type="search"
       />
       <div
@@ -7277,7 +7278,7 @@ function LocationDetailModal({
   const visibleLocation = isEditing ? normalizeLocationFromForm(formData, location) : location;
   const mapEmbedUrl = getSettingsLocationMapEmbedUrl(visibleLocation);
   const mapsUrl = getSettingsLocationMapsUrl(visibleLocation);
-  const modalTitle = mode === 'create' ? 'Nueva ubicación' : visibleLocation?.nombre;
+  const modalTitle = mode === 'create' ? 'Nueva ubicaciÃ³n' : visibleLocation?.nombre;
   const statusLabel = visibleLocation?.estado === 'ACTIVO' ? 'Activa' : 'Inactiva';
 
   const updateField = (field, value) => {
@@ -7298,9 +7299,9 @@ function LocationDetailModal({
       >
         <header className="neighbor-detail-header location-detail-header">
           <div className="neighbor-detail-kicker-row">
-            <span className="section-kicker">Detalle de ubicación</span>
-            <button className="neighbor-modal-close" type="button" aria-label="Cerrar detalle de ubicación" onClick={onClose}>
-              ×
+            <span className="section-kicker">Detalle de ubicaciÃ³n</span>
+            <button className="neighbor-modal-close" type="button" aria-label="Cerrar detalle de ubicaciÃ³n" onClick={onClose}>
+              Ã—
             </button>
           </div>
           <div className="neighbor-detail-title-row">
@@ -7320,11 +7321,11 @@ function LocationDetailModal({
           ) : (
             <dl className="neighbor-detail-list location-detail-list">
               <div>
-                <dt>Nombre de ubicación</dt>
+                <dt>Nombre de ubicaciÃ³n</dt>
                 <dd>{visibleLocation.nombre}</dd>
               </div>
               <div>
-                <dt>Dirección</dt>
+                <dt>DirecciÃ³n</dt>
                 <dd>{visibleLocation.direccion}</dd>
               </div>
               <div>
@@ -7346,7 +7347,7 @@ function LocationDetailModal({
             </dl>
           )}
 
-          <section className="location-map-card" aria-label="Previsualización de ubicación en mapa">
+          <section className="location-map-card" aria-label="PrevisualizaciÃ³n de ubicaciÃ³n en mapa">
             <div className="neighbor-section-heading">
               <h3>Mapa</h3>
               {!isEditing && mapsUrl && (
@@ -7364,7 +7365,7 @@ function LocationDetailModal({
             ) : mapEmbedUrl ? (
               <iframe
                 src={mapEmbedUrl}
-                title={`Mapa de ${visibleLocation?.nombre || 'ubicación'}`}
+                title={`Mapa de ${visibleLocation?.nombre || 'ubicaciÃ³n'}`}
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
               />
@@ -7381,13 +7382,13 @@ function LocationDetailModal({
                 Cancelar
               </button>
               <LoadingButton className="neighbor-primary-action modal-loading-action" loading={isSaving} loadingLabel="Guardando..." onClick={onSave}>
-                Guardar ubicación
+                Guardar ubicaciÃ³n
               </LoadingButton>
             </>
           ) : (
             <>
               <button className="neighbor-secondary-action" type="button" onClick={onEdit}>
-                Editar ubicación
+                Editar ubicaciÃ³n
               </button>
               <LoadingButton
                 className={
@@ -7399,7 +7400,7 @@ function LocationDetailModal({
                 loadingLabel={visibleLocation?.estado === 'ACTIVO' ? 'Desactivando...' : 'Activando...'}
                 onClick={onToggleState}
               >
-                {visibleLocation?.estado === 'ACTIVO' ? 'Desactivar ubicación' : 'Activar ubicación'}
+                {visibleLocation?.estado === 'ACTIVO' ? 'Desactivar ubicaciÃ³n' : 'Activar ubicaciÃ³n'}
               </LoadingButton>
             </>
           )}
@@ -7432,7 +7433,7 @@ function LocationForm({ errors, formData, onFieldChange }) {
         </select>
       </label>
       <label className="form-field span-2">
-        Dirección
+        DirecciÃ³n
         <input
           maxLength={LOCATION_TEXT_MAX_LENGTH}
           value={formData.direccion}
@@ -7491,7 +7492,7 @@ function SettingsTablePage({
     <section className="settings-view" aria-labelledby={`settings-${title.toLowerCase()}-title`}>
       <header className="admin-topbar">
         <div>
-          <span className="section-kicker">Configuración</span>
+          <span className="section-kicker">ConfiguraciÃ³n</span>
           <h1 id={`settings-${title.toLowerCase()}-title`}>{title}</h1>
           <p>{description}</p>
         </div>
@@ -7570,8 +7571,8 @@ function EvaluationTrackingSection({
   return (
     <article className="event-form-section" id="evaluacion">
       <div className="form-section-heading">
-        <span className="section-kicker">Evaluación</span>
-        <h2>Evaluación y seguimiento</h2>
+        <span className="section-kicker">EvaluaciÃ³n</span>
+        <h2>EvaluaciÃ³n y seguimiento</h2>
       </div>
       <div className="form-grid">
         <fieldset className="form-field span-2 form-choice-group">
@@ -7598,7 +7599,7 @@ function EvaluationTrackingSection({
 
         {hasDefinedCapacity && (
           <label className="form-field">
-            Aforo máximo
+            Aforo mÃ¡ximo
             <input
               defaultValue={normalizedCapacityValue}
               min="1"
@@ -7654,8 +7655,8 @@ function EvaluationTrackingSection({
             type="checkbox"
           />
           <span>
-            <strong>Enviar encuesta de satisfacción al finalizar el evento</strong>
-            <small>Prepara una encuesta de 1 a 5 estrellas para una futura automatización.</small>
+            <strong>Enviar encuesta de satisfacciÃ³n al finalizar el evento</strong>
+            <small>Prepara una encuesta de 1 a 5 estrellas para una futura automatizaciÃ³n.</small>
           </span>
         </label>
       </div>
@@ -7852,7 +7853,7 @@ function NewEventView({
       >
         {(isLoadingCatalogs || catalogError) && (
           <p className="settings-inline-notice">
-            {catalogError || 'Actualizando catálogos...'}
+            {catalogError || 'Actualizando catÃ¡logos...'}
           </p>
         )}
         <section className="event-form-main">
@@ -7863,7 +7864,7 @@ function NewEventView({
             </div>
             <div className="form-grid">
               <label className="form-field span-2">
-                Título del evento
+                TÃ­tulo del evento
                 <input name="title" placeholder="Ej. Festival Cultural Barrial" />
               </label>
               <label className="form-field">
@@ -7871,11 +7872,11 @@ function NewEventView({
                 <CategoryCombobox categories={categories} onCategoryChange={syncChecklistFromForm} />
               </label>
               <label className="form-field">
-                Área responsable
+                Ãrea responsable
                 <MunicipalAreaCombobox areas={areas} onAreaChange={syncChecklistFromForm} />
               </label>
               <label className="form-field span-2">
-                Descripción breve
+                DescripciÃ³n breve
                 <textarea
                   maxLength={45}
                   name="descripcion_breve"
@@ -7883,14 +7884,14 @@ function NewEventView({
                   rows={3}
                 />
                 <small>
-                  Resumen corto que se mostrará en la agenda y en la cabecera del evento. Máximo 45 caracteres.
+                  Resumen corto que se mostrarÃ¡ en la agenda y en la cabecera del evento. MÃ¡ximo 45 caracteres.
                 </small>
               </label>
               <label className="form-field span-2">
-                Descripción
+                DescripciÃ³n
                 <textarea
                   name="description"
-                  placeholder="Describe el objetivo, público y actividades principales del evento."
+                  placeholder="Describe el objetivo, pÃºblico y actividades principales del evento."
                 />
               </label>
             </div>
@@ -7898,7 +7899,7 @@ function NewEventView({
 
           <article className="event-form-section" id="programacion">
             <div className="form-section-heading">
-              <span className="section-kicker">Programación</span>
+              <span className="section-kicker">ProgramaciÃ³n</span>
               <h2>Fechas</h2>
             </div>
             <div className="form-grid">
@@ -7928,18 +7929,18 @@ function NewEventView({
               <label className="form-field">
                 Dirigido a
                 <select defaultValue="GENERAL" name="publico_tipo">
-                  <option value="GENERAL">Público general</option>
-                  <option value="OBJETIVO">Público objetivo</option>
+                  <option value="GENERAL">PÃºblico general</option>
+                  <option value="OBJETIVO">PÃºblico objetivo</option>
                 </select>
               </label>
               {audienceType === 'OBJETIVO' && (
                 <>
                   <label className="form-field">
-                    Edad mínima
+                    Edad mÃ­nima
                     <input min="0" name="edad_minima" placeholder="13" type="number" />
                   </label>
                   <label className="form-field">
-                    Edad máxima
+                    Edad mÃ¡xima
                     <input max="120" min="1" name="edad_maxima" placeholder="25" type="number" />
                   </label>
                 </>
@@ -7995,9 +7996,9 @@ function NewEventView({
             <div className="event-content-grid">
               <OrderedEventListEditor
                 addLabel="Agregar actividad"
-                description="Define las actividades principales en el orden en que se realizarán."
+                description="Define las actividades principales en el orden en que se realizarÃ¡n."
                 hiddenInputName="agenda_evento_json"
-                itemPlaceholder="Recepción ciudadana"
+                itemPlaceholder="RecepciÃ³n ciudadana"
                 kicker="Programa"
                 title="Agenda del evento"
                 onListChange={syncChecklistFromForm}
@@ -8016,7 +8017,7 @@ function NewEventView({
 
           <article className="event-form-section" id="ubicacion">
             <div className="form-section-heading">
-              <span className="section-kicker">Ubicación</span>
+              <span className="section-kicker">UbicaciÃ³n</span>
               <h2>Lugar del evento</h2>
             </div>
             <LocationCatalogSelector locations={locations} />
@@ -8056,8 +8057,8 @@ function NewEventView({
           </section>
 
           <section className="admin-panel validation-side-card">
-            <span className="section-kicker">Revisión</span>
-            <h2>Validación de ficha</h2>
+            <span className="section-kicker">RevisiÃ³n</span>
+            <h2>ValidaciÃ³n de ficha</h2>
             <div className="dynamic-checklist new-event-checklist">
               {checklist.items.map((item) => (
                 <p
@@ -8085,7 +8086,7 @@ function NewEventView({
               type="button"
               onClick={requestReview}
             >
-              Enviar a revisión
+              Enviar a revisiÃ³n
             </button>
           </div>
         </aside>
@@ -8115,6 +8116,16 @@ function getInvalidOperativeLabel(operative) {
     || operative?.email
     || `Usuario ${operative?.usuarioId ?? operative?.id}`;
 }
+
+function getFinalizedEventNotice(event) {
+  const finishedAt = event.eventEnd || event.fechaHoraFin || event.time;
+  const formattedFinishedAt = formatManagementDateTime(finishedAt);
+
+  return formattedFinishedAt
+    ? `Este evento finalizó el ${formattedFinishedAt}. La ficha queda disponible solo para consulta.`
+    : 'Este evento ya finalizó. La ficha queda disponible solo para consulta.';
+}
+
 function EditEventView({
   areas = eventOrganizerAreas,
   categories = [],
@@ -8174,6 +8185,7 @@ function EditEventView({
   const [selectedOperativeIds, setSelectedOperativeIds] = useState(() => event.operativosAsignadosIds ?? []);
   const [checklistEvent, setChecklistEvent] = useState(() => eventWithResources);
   const [hasFormChanges, setHasFormChanges] = useState(false);
+  const isFinalizedEvent = event.state === 'FINALIZADO';
   const checklist = getEventChecklist(checklistEvent, {
     observationAddressed: hasFormChanges,
   });
@@ -8182,6 +8194,10 @@ function EditEventView({
     !checklist.hasCriticalPending;
 
   function syncChecklistFromForm() {
+    if (isFinalizedEvent) {
+      return;
+    }
+
     const form = formRef.current;
     normalizeEventDateRange(form);
     setHasFormChanges(true);
@@ -8203,6 +8219,10 @@ function EditEventView({
   }
 
   function handleRegistrationChange(checked) {
+    if (isFinalizedEvent) {
+      return;
+    }
+
     setRequiresRegistration(checked);
     if (!checked) {
       setRequiresControl(false);
@@ -8214,6 +8234,10 @@ function EditEventView({
   }
 
   function handleControlChange(checked) {
+    if (isFinalizedEvent) {
+      return;
+    }
+
     setRequiresControl(checked);
     if (checked) {
       setRequiresRegistration(true);
@@ -8223,6 +8247,10 @@ function EditEventView({
   }
 
   function handlePaymentToggle(checked) {
+    if (isFinalizedEvent) {
+      return;
+    }
+
     setRequiresPayment(checked);
     if (checked) {
       setRequiresRegistration(true);
@@ -8232,6 +8260,10 @@ function EditEventView({
   }
 
   function requestEventAction(actionType, payloadActionType) {
+    if (isFinalizedEvent) {
+      return;
+    }
+
     const form = formRef.current;
     normalizeEventDateRange(form);
     onRequestAction(
@@ -8242,6 +8274,10 @@ function EditEventView({
   }
 
   function requestReview() {
+    if (isFinalizedEvent) {
+      return;
+    }
+
     const missingFields = getMissingReviewFields(formRef.current, eventWithResources);
 
     if (missingFields.length > 0) {
@@ -8301,6 +8337,18 @@ function EditEventView({
   }, [loadEventResources]);
 
   useEffect(() => {
+    if (!isFinalizedEvent || !formRef.current) {
+      return;
+    }
+
+    formRef.current
+      .querySelectorAll('.event-form-main input, .event-form-main select, .event-form-main textarea, .event-form-main button')
+      .forEach((control) => {
+        control.disabled = true;
+      });
+  }, [eventResources, isFinalizedEvent, requiresControl, requiresPayment, requiresRegistration]);
+
+  useEffect(() => {
     if (formRef.current) {
       setChecklistEvent(getChecklistEventFromForm(formRef.current, eventWithResources, { categories, locations }));
       return;
@@ -8313,7 +8361,7 @@ function EditEventView({
     <section className="new-event-view" aria-labelledby="edit-event-title">
       <header className="admin-topbar">
         <div>
-          <span className="section-kicker">Edición de evento</span>
+          <span className="section-kicker">EdiciÃ³n de evento</span>
           <h1 id="edit-event-title">Editar evento municipal</h1>
         </div>
         <button className="admin-new-event-action event-form-top-action" type="button" onClick={onBack}>
@@ -8331,7 +8379,7 @@ function EditEventView({
       >
         {(isLoadingCatalogs || catalogError) && (
           <p className="settings-inline-notice">
-            {catalogError || 'Actualizando catálogos...'}
+            {catalogError || 'Actualizando catÃ¡logos...'}
           </p>
         )}
         <section className="event-form-main">
@@ -8342,11 +8390,11 @@ function EditEventView({
             </div>
             <div className="form-grid">
               <label className="form-field span-2">
-                Título del evento
+                TÃ­tulo del evento
                 <input defaultValue={event.title} name="title" />
               </label>
               <label className="form-field">
-                Categoría
+                CategorÃ­a
                 <CategoryCombobox
                   categories={categories}
                   defaultCategoryId={event.categoria_id}
@@ -8355,7 +8403,7 @@ function EditEventView({
                 />
               </label>
               <label className="form-field">
-                Área responsable
+                Ãrea responsable
                 <MunicipalAreaCombobox
                   areas={areas}
                   defaultAreaId={eventWithMunicipalArea.area_municipal_id}
@@ -8364,7 +8412,7 @@ function EditEventView({
                 />
               </label>
               <label className="form-field span-2">
-                Descripción breve
+                DescripciÃ³n breve
                 <textarea
                   defaultValue={event.descripcion_breve ?? event.summary ?? ''}
                   maxLength={45}
@@ -8372,11 +8420,11 @@ function EditEventView({
                   rows={3}
                 />
                 <small>
-                  Resumen corto que se mostrará en la agenda y en la cabecera del evento. Máximo 45 caracteres.
+                  Resumen corto que se mostrarÃ¡ en la agenda y en la cabecera del evento. MÃ¡ximo 45 caracteres.
                 </small>
               </label>
               <label className="form-field span-2">
-                Descripción
+                DescripciÃ³n
                 <textarea defaultValue={event.description} name="description" />
               </label>
             </div>
@@ -8384,7 +8432,7 @@ function EditEventView({
 
           <article className="event-form-section" id="programacion">
             <div className="form-section-heading">
-              <span className="section-kicker">Programación</span>
+              <span className="section-kicker">ProgramaciÃ³n</span>
               <h2>Fechas</h2>
             </div>
             <div className="form-grid">
@@ -8420,14 +8468,14 @@ function EditEventView({
               <label className="form-field">
                 Dirigido a
                 <select defaultValue={initialAudienceType} name="publico_tipo">
-                  <option value="GENERAL">Público general</option>
-                  <option value="OBJETIVO">Público objetivo</option>
+                  <option value="GENERAL">PÃºblico general</option>
+                  <option value="OBJETIVO">PÃºblico objetivo</option>
                 </select>
               </label>
               {audienceType === 'OBJETIVO' && (
                 <>
                   <label className="form-field">
-                    Edad mínima
+                    Edad mÃ­nima
                     <input
                       defaultValue={event.edad_minima ?? ''}
                       min="0"
@@ -8437,7 +8485,7 @@ function EditEventView({
                     />
                   </label>
                   <label className="form-field">
-                    Edad máxima
+                    Edad mÃ¡xima
                     <input
                       defaultValue={event.edad_maxima ?? ''}
                       max="120"
@@ -8506,10 +8554,10 @@ function EditEventView({
             <div className="event-content-grid">
               <OrderedEventListEditor
                 addLabel="Agregar actividad"
-                description="Define las actividades principales en el orden en que se realizarán."
+                description="Define las actividades principales en el orden en que se realizarÃ¡n."
                 hiddenInputName="agenda_evento_json"
                 initialItems={event.agenda_evento ?? event.agenda}
-                itemPlaceholder="Recepción ciudadana"
+                itemPlaceholder="RecepciÃ³n ciudadana"
                 kicker="Programa"
                 title="Agenda del evento"
                 onListChange={syncChecklistFromForm}
@@ -8529,7 +8577,7 @@ function EditEventView({
 
           <article className="event-form-section" id="ubicacion">
             <div className="form-section-heading">
-              <span className="section-kicker">Ubicación</span>
+              <span className="section-kicker">UbicaciÃ³n</span>
               <h2>Lugar del evento</h2>
             </div>
             <LocationCatalogSelector defaultLocationId={event.ubicacion_id} locations={locations} />
@@ -8604,8 +8652,8 @@ function EditEventView({
             </section>
           )}
           <section className="admin-panel validation-side-card">
-            <span className="section-kicker">Revisión</span>
-            <h2>Validación de ficha</h2>
+            <span className="section-kicker">RevisiÃ³n</span>
+            <h2>ValidaciÃ³n de ficha</h2>
             <div className="dynamic-checklist">
               {checklist.items.map((item) => (
                 <p
@@ -8614,7 +8662,7 @@ function EditEventView({
                   }
                   key={item.label}
                 >
-                  <span aria-hidden="true">{item.complete ? '✓' : '!'}</span>
+                  <span aria-hidden="true">{item.complete ? 'âœ“' : '!'}</span>
                   {item.label}
                 </p>
               ))}
@@ -8622,31 +8670,39 @@ function EditEventView({
           </section>
 
           <div className="event-form-actions">
-            {event.state === 'BORRADOR' && (
-              <button
-                className="admin-secondary-action event-delete-action"
-                type="button"
-                onClick={() => onRequestDelete(event)}
-              >
-                Eliminar evento
-              </button>
-            )}
-            <button
-              className="admin-secondary-action event-draft-action"
-              type="button"
-              onClick={() => requestEventAction('save-changes', 'draft')}
-            >
-              Guardar cambios
-            </button>
-            {['BORRADOR', 'OBSERVADO'].includes(event.state) && (
-              <button
-                className="admin-new-event-action event-review-action"
-                disabled={!canSendToReview}
-                type="button"
-                onClick={requestReview}
-              >
-                Enviar a revisión
-              </button>
+            {isFinalizedEvent ? (
+              <p className="event-finalized-readonly-message">
+                {getFinalizedEventNotice(event)}
+              </p>
+            ) : (
+              <>
+                {event.state === 'BORRADOR' && (
+                  <button
+                    className="admin-secondary-action event-delete-action"
+                    type="button"
+                    onClick={() => onRequestDelete(event)}
+                  >
+                    Eliminar evento
+                  </button>
+                )}
+                <button
+                  className="admin-secondary-action event-draft-action"
+                  type="button"
+                  onClick={() => requestEventAction('save-changes', 'draft')}
+                >
+                  Guardar cambios
+                </button>
+                {['BORRADOR', 'OBSERVADO'].includes(event.state) && (
+                  <button
+                    className="admin-new-event-action event-review-action"
+                    disabled={!canSendToReview}
+                    type="button"
+                    onClick={requestReview}
+                  >
+                    Enviar a revisiÃ³n
+                  </button>
+                )}
+              </>
             )}
           </div>
         </aside>
@@ -8683,7 +8739,7 @@ function ResourceDeleteModal({ isDeleting = false, onCancel, onConfirm, resource
         <span className="section-kicker">Recurso del evento</span>
         <h2 id="delete-event-resource-title">Eliminar recurso</h2>
         <p>
-          ¿Deseas eliminar el {resourceType.toLowerCase()} "{resourceName}"? Esta acción quitará el archivo del bucket y del evento.
+          Â¿Deseas eliminar el {resourceType.toLowerCase()} "{resourceName}"? Esta acciÃ³n quitarÃ¡ el archivo del bucket y del evento.
         </p>
         <div className="modal-actions">
           <button className="back-button" disabled={isDeleting} type="button" onClick={onCancel}>
@@ -8700,11 +8756,11 @@ function ResourceDeleteModal({ isDeleting = false, onCancel, onConfirm, resource
 
 function ValidationIssueModal({
   actionLabel = 'Revisar ficha',
-  description = 'Para enviar este evento a revisión directiva, primero registra los siguientes campos:',
+  description = 'Para enviar este evento a revisiÃ³n directiva, primero registra los siguientes campos:',
   kicker = 'Ficha incompleta',
   missingFields,
   onClose,
-  title = 'Completa la información requerida',
+  title = 'Completa la informaciÃ³n requerida',
 }) {
   return (
     <div className="modal-backdrop" role="presentation">
@@ -8749,7 +8805,7 @@ function DeleteDraftEventModal({ event, isDeleting = false, onCancel, onConfirm 
         <span className="section-kicker">Borrador</span>
         <h2 id="delete-draft-event-title">Eliminar evento</h2>
         <p>
-          ¿Deseas eliminar el evento "{event.title}"? Esta acción no se puede deshacer.
+          Â¿Deseas eliminar el evento "{event.title}"? Esta acciÃ³n no se puede deshacer.
         </p>
         <div className="modal-actions">
           <button className="back-button" disabled={isDeleting} type="button" onClick={onCancel}>
@@ -8826,10 +8882,10 @@ function ConfirmEventActionModal({ action, isSaving = false, onCancel, onConfirm
   const title = getEventActionTitle(actionType, action.eventTitle);
   const description = getEventActionDescription(actionType, isCreate);
   const confirmLabel = isSaveChanges
-    ? 'Sí, guardar cambios'
+    ? 'SÃ­, guardar cambios'
     : isReview
-      ? 'Sí, enviar a revisión'
-      : 'Sí, guardar borrador';
+      ? 'SÃ­, enviar a revisiÃ³n'
+      : 'SÃ­, guardar borrador';
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -8843,7 +8899,7 @@ function ConfirmEventActionModal({ action, isSaving = false, onCancel, onConfirm
           {isSaveChanges
             ? 'Guardar cambios'
             : isReview
-              ? 'Enviar a revisión'
+              ? 'Enviar a revisiÃ³n'
               : 'Guardar borrador'}
         </span>
         <h2 id="confirm-event-action-title">{title}</h2>
@@ -8868,36 +8924,36 @@ function ConfirmEventActionModal({ action, isSaving = false, onCancel, onConfirm
 
 function getEventActionTitle(actionType, eventTitle) {
   if (actionType === 'save-changes') {
-    return `¿Estás seguro de guardar los cambios de "${eventTitle}"?`;
+    return `Â¿EstÃ¡s seguro de guardar los cambios de "${eventTitle}"?`;
   }
 
   if (actionType === 'review-changes') {
-    return `¿Estás seguro de enviar "${eventTitle}" a revisión?`;
+    return `Â¿EstÃ¡s seguro de enviar "${eventTitle}" a revisiÃ³n?`;
   }
 
   if (actionType === 'review') {
-    return '¿Estás seguro de enviar este evento a revisión?';
+    return 'Â¿EstÃ¡s seguro de enviar este evento a revisiÃ³n?';
   }
 
-  return '¿Estás seguro de guardar este evento como borrador?';
+  return 'Â¿EstÃ¡s seguro de guardar este evento como borrador?';
 }
 
 function getEventActionDescription(actionType, isCreate) {
   if (actionType === 'save-changes') {
-    return 'Los cambios quedarán registrados en la ficha del evento y volverás a la gestión municipal de eventos.';
+    return 'Los cambios quedarÃ¡n registrados en la ficha del evento y volverÃ¡s a la gestiÃ³n municipal de eventos.';
   }
 
   if (actionType === 'review-changes') {
-    return 'La ficha corregida pasará a PARA_REVISION para que el usuario directivo pueda aprobarla u observarla.';
+    return 'La ficha corregida pasarÃ¡ a PARA_REVISION para que el usuario directivo pueda aprobarla u observarla.';
   }
 
   if (actionType === 'review') {
-    return 'El evento pasará a PARA_REVISION para que el usuario directivo pueda aprobarlo u observarlo antes de publicarlo.';
+    return 'El evento pasarÃ¡ a PARA_REVISION para que el usuario directivo pueda aprobarlo u observarlo antes de publicarlo.';
   }
 
   return isCreate
-    ? 'El evento permanecerá como BORRADOR y podrás completarlo o editarlo antes de enviarlo al directivo.'
-    : 'La ficha conservará sus cambios como BORRADOR dentro del flujo administrativo.';
+    ? 'El evento permanecerÃ¡ como BORRADOR y podrÃ¡s completarlo o editarlo antes de enviarlo al directivo.'
+    : 'La ficha conservarÃ¡ sus cambios como BORRADOR dentro del flujo administrativo.';
 }
 
 export default AdminDashboard;

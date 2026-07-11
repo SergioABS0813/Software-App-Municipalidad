@@ -1,4 +1,4 @@
-.admin-shell {
+﻿.admin-shell {
   background: #f4f8fb;
   color: var(--color-text);
   display: grid;
@@ -122,7 +122,7 @@
 .admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav-logout::after {
   align-items: center;
   color: currentColor;
-  content: '•';
+  content: 'â€¢';
   display: inline-flex;
   font-size: 1rem;
   font-weight: 800;
@@ -133,10 +133,10 @@
   width: 28px;
 }
 
-.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav[aria-label='Navegacion administrativa'] > .admin-nav-link:nth-child(1)::after { content: '▣'; }
-.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav[aria-label='Navegacion administrativa'] > .admin-nav-link:nth-child(2)::after { content: '♙'; }
-.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav-group > .admin-nav-link::after { content: '⚙'; }
-.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav-logout::after { content: '↪'; }
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav[aria-label='Navegacion administrativa'] > .admin-nav-link:nth-child(1)::after { content: 'â–£'; }
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav[aria-label='Navegacion administrativa'] > .admin-nav-link:nth-child(2)::after { content: 'â™™'; }
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav-group > .admin-nav-link::after { content: 'âš™'; }
+.admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav-logout::after { content: 'â†ª'; }
 .admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav[aria-label^='Secciones'] > .admin-nav-link:nth-child(1)::after { content: 'DG'; }
 .admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav[aria-label^='Secciones'] > .admin-nav-link:nth-child(2)::after { content: 'PR'; }
 .admin-shell:is(.is-sidebar-collapsed, .is-sidebar-transitioning) .admin-nav[aria-label^='Secciones'] > .admin-nav-link:nth-child(3)::after { content: 'AS'; }
@@ -1364,7 +1364,7 @@
   font-size: 0.9rem;
   font-weight: 750;
   gap: 8px;
-  margin-bottom: 14px;
+  margin-top: 12px;
   padding: 0;
   width: fit-content;
 }
@@ -3436,6 +3436,14 @@
   line-height: 1.35;
 }
 
+.event-form-main input:disabled,
+.event-form-main select:disabled,
+.event-form-main textarea:disabled,
+.event-form-main button:disabled {
+  cursor: not-allowed;
+  opacity: 0.74;
+}
+
 .area-combobox {
   display: block;
   position: relative;
@@ -4411,6 +4419,18 @@
   background: #edf3f8;
   border-color: var(--color-border);
   color: #6c8198;
+}
+
+.event-finalized-readonly-message {
+  background: #f6fbfe;
+  border: 1px solid rgba(2, 132, 199, 0.16);
+  border-radius: 8px;
+  color: #24415f;
+  font-size: 0.88rem;
+  font-weight: 650;
+  line-height: 1.45;
+  margin: 0;
+  padding: 12px 13px;
 }
 
 .validation-missing-list {

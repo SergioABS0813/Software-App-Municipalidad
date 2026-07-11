@@ -1,4 +1,4 @@
-.citizen-portal {
+﻿.citizen-portal {
   min-height: 100svh;
   overflow-x: clip;
   background:
@@ -405,6 +405,10 @@
 .featured-event .event-visual {
   min-height: 154px;
   padding: 14px;
+}
+
+.featured-event .event-visual img {
+  object-fit: contain;
 }
 
 .featured-event .event-visual span {
@@ -924,7 +928,7 @@
 .detail-media img {
   height: 100%;
   inset: 0;
-  object-fit: cover;
+  object-fit: contain;
   position: absolute;
   width: 100%;
 }

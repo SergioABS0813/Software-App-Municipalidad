@@ -1,4 +1,4 @@
-package com.tesis.municipalidadbackendapp.eventos.service;
+﻿package com.tesis.municipalidadbackendapp.eventos.service;
 
 import static com.tesis.municipalidadbackendapp.common.FechaHoraUtils.ahoraLima;
 
@@ -576,6 +576,9 @@ public class EventoService {
 
         Evento evento = eventoRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evento no encontrado"));
+        if ("FINALIZADO".equals(evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : "")) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "No se puede modificar un evento finalizado");
+        }
         Categoria categoria = obtenerCategoriaOpcional(request.categoriaId());
         AreaMunicipal areaMunicipal = obtenerAreaMunicipalOpcional(request.areaMunicipalId());
         Ubicacion ubicacion = obtenerUbicacionOpcional(request.ubicacionId());
@@ -887,7 +890,7 @@ public class EventoService {
 
         //Parte 1:Datos generales (1/6)
         if (tieneDatosGeneralesCompletos(evento)) completos++;
-        //Parte 2:Programación o Aforo (2/6)
+        //Parte 2:ProgramaciÃ³n o Aforo (2/6)
         if (tieneProgramacionValida(evento)) completos++;
         //Parte 3:Agenda (3/6)
         boolean tieneAgenda = agendaEventoRepository.findByEvento(evento).size() != 0;
@@ -895,7 +898,7 @@ public class EventoService {
         //Parte 4: Requisitos (4/6)
         boolean tieneRequisitos = requisitoEventoRepository.findByEvento(evento).size() != 0;
         if (tieneRequisitos) completos++;
-        //Parte 5: Ubicación (5/6)
+        //Parte 5: UbicaciÃ³n (5/6)
         if (evento.getUbicacion() != null) completos++;
         //Parte 6: Recursos Adjuntos (6/6)
         if (tienePortada(evento)) completos++;
@@ -1242,7 +1245,7 @@ public class EventoService {
     }
 
     private String valorDetalle(String valor) {
-        return hasText(valor) ? valor.trim() : "Sin título";
+        return hasText(valor) ? valor.trim() : "Sin tÃ­tulo";
     }
 
     private EstadoEvento obtenerEstadoEvento(String codigo) {
@@ -1502,12 +1505,12 @@ public class EventoService {
         if(numeroObservacionesPendientes>0){
             alertas.add(new EventoPanelAdministrativoDto.AlertaFichaEventoPanelAdministrativoDto(
                     "OBSERVACION_DIRECTIVO",
-                    numeroObservacionesPendientes == 1 ? "1 observación del directivo": numeroObservacionesPendientes + " observaciones del directivo."));
+                    numeroObservacionesPendientes == 1 ? "1 observaciÃ³n del directivo": numeroObservacionesPendientes + " observaciones del directivo."));
 
         }
     }
 
-    private boolean esObservacionPendiente(ObservacionEvento observacion) { //Los únicos estados que tiene observación son: ATENDIDA y PENDIENTE
+    private boolean esObservacionPendiente(ObservacionEvento observacion) { //Los Ãºnicos estados que tiene observaciÃ³n son: ATENDIDA y PENDIENTE
         if (observacion == null) {
             return false;
         }
@@ -1532,9 +1535,9 @@ public class EventoService {
         if (!hasText(evento.getTitulo()) || !hasText(evento.getDescripcion()) || evento.getAreaMunicipal() == null || !hasText(evento.getDescripcionBreve()) || evento.getCategoria() == null){
             agregarAlertaCampoPendiente(alertas, "Completar datos generales del evento");
         }
-        //Parte 2:Programación (2/6)
+        //Parte 2:ProgramaciÃ³n (2/6)
         if (!tieneProgramacionValida(evento)){
-            agregarAlertaCampoPendiente(alertas, "Completar programación del evento");
+            agregarAlertaCampoPendiente(alertas, "Completar programaciÃ³n del evento");
 
         }
         //Parte 3:Agenda (3/6)
@@ -1547,9 +1550,9 @@ public class EventoService {
         if (!tieneRequisitos) {
             agregarAlertaCampoPendiente(alertas, "Definir requisitos del evento");
         }
-        //Parte 5: Ubicación (5/6)
+        //Parte 5: UbicaciÃ³n (5/6)
         if (evento.getUbicacion() == null){
-            agregarAlertaCampoPendiente(alertas, "Agregar ubicación del evento");
+            agregarAlertaCampoPendiente(alertas, "Agregar ubicaciÃ³n del evento");
         }
         //Parte 6: Recursos Adjuntos (6/6)
         if (!tienePortada(evento)){
