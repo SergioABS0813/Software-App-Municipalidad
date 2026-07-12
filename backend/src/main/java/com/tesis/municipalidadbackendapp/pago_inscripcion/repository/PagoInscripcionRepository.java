@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -53,4 +54,14 @@ public interface PagoInscripcionRepository extends JpaRepository<PagoInscripcion
         WHERE p.id = :id
     """)
     Optional<PagoInscripcion> findDetalleById(@Param("id") Integer id);
+
+    @Query("""
+        SELECT COALESCE(SUM(p.monto), 0)
+        FROM PagoInscripcion p
+        JOIN p.inscripcion i
+        JOIN i.evento e
+        WHERE e.id = :eventoId
+          AND UPPER(p.estadoPago) = 'VALIDADO'
+    """)
+    BigDecimal sumMontoValidadoByEventoId(@Param("eventoId") Integer eventoId);
 }

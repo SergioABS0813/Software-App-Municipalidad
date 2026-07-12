@@ -430,6 +430,7 @@ export default function PublicEventDetail({
   paymentForm = {},
   paymentError = '',
   paymentNotice = '',
+  maxPaymentDate = '',
   isUploadingPaymentReceipt = false,
   reservationActionClassName = '',
   reservationActionDisabled = null,
@@ -724,6 +725,7 @@ export default function PublicEventDetail({
                   Fecha de pago
                   <input
                     disabled={isPaymentFormDisabled}
+                    max={maxPaymentDate}
                     type="date"
                     value={paymentForm.fechaPago ?? ''}
                     onChange={(changeEvent) => onPaymentFieldChange?.('fechaPago', changeEvent.target.value)}

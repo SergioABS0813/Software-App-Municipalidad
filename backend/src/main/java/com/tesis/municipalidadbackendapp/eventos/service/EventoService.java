@@ -28,6 +28,7 @@ import com.tesis.municipalidadbackendapp.eventos.repository.*;
 import com.tesis.municipalidadbackendapp.inscripciones.entity.Inscripcion;
 import com.tesis.municipalidadbackendapp.inscripciones.enums.EstadoInscripcion;
 import com.tesis.municipalidadbackendapp.inscripciones.repository.InscripcionRepository;
+import com.tesis.municipalidadbackendapp.pago_inscripcion.repository.PagoInscripcionRepository;
 import com.tesis.municipalidadbackendapp.notificaciones.service.NotificacionService;
 import com.tesis.municipalidadbackendapp.qr.repository.CodigoQrRepository;
 import com.tesis.municipalidadbackendapp.organizacion.entity.AreaMunicipal;
@@ -78,6 +79,7 @@ public class EventoService {
     private final CodigoQrRepository codigoQrRepository;
     private final ValoracionEventoService valoracionEventoService;
     private final InscripcionRepository inscripcionRepository;
+    private final PagoInscripcionRepository pagoInscripcionRepository;
     private final AsistenciaRepository asistenciaRepository;
     private final ValoracionEventoRepository valoracionEventoRepository;
     private final EventoOperativoService eventoOperativoService;
@@ -216,6 +218,7 @@ public class EventoService {
                 evento.getCostoReferencial(),
                 requierePago(evento),
                 evento.getCostoVecinal(),
+                pagoInscripcionRepository.sumMontoValidadoByEventoId(evento.getId()),
                 evento.getInstruccionesPago(),
                 evento.getAforoMaximo(),
                 evento.getMetaTipo(),

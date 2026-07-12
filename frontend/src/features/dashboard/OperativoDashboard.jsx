@@ -808,10 +808,6 @@ function OperativoDashboard({ onLogout, user }) {
       missingFields.push('Buscar y validar DNI');
     }
 
-    if (requiresAdditionalManualData && !formData.get('manualDataConsent')) {
-      missingFields.push('Aceptacion de tratamiento de datos');
-    }
-
     if (missingFields.length > 0) {
       setOperativeValidationIssue({
         fields: missingFields,
@@ -825,6 +821,7 @@ function OperativoDashboard({ onLogout, user }) {
       dni: formData.get('manualDni')?.trim(),
       email: requiresAdditionalManualData && hasEmail ? manualEmail : null,
       lastNames: manualRegistrationIdentity.lastNames,
+      fullName: manualRegistrationIdentity.fullName,
       names: manualRegistrationIdentity.names,
       phone: requiresAdditionalManualData && hasPhone ? manualPhone : null,
     });

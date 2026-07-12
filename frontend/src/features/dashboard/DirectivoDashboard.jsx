@@ -250,6 +250,8 @@ function mapDirectiveReportFromApi(report) {
     puntuacionPromedio: report.promedioSatisfaccion ?? null,
     totalValoraciones: Number(report.totalValoraciones ?? 0),
     referenceCost: report.costoReferencial ?? 0,
+    residentCost: report.costoVecinal ?? 0,
+    validatedIncome: Number(report.ingresosValidados ?? 0),
     aforoMaximo,
     usedCapacityRate: aforoMaximo && aforoMaximo > 0 && totalAsistentes > 0
       ? Math.round((totalAsistentes / aforoMaximo) * 100)
@@ -2024,6 +2026,8 @@ function downloadReportCsv(report) {
     ['validaciones_manual', report.manualValidated],
     ['validaciones_anuladas', report.cancelled],
     ['costo_referencial', report.referenceCost],
+    ['costo_vecinal', report.residentCost],
+    ['ingresos_validados', report.validatedIncome],
     ['fecha_generacion', report.generatedAt],
   ];
   const csvContent = rows
@@ -2086,6 +2090,7 @@ function openReportPdf(report) {
           <tr><td>Validaciones manuales</td><td>${report.manualValidated}</td></tr>
           <tr><td>Validaciones anuladas</td><td>${report.cancelled}</td></tr>
           <tr><td>Costo referencial</td><td>S/ ${report.referenceCost.toLocaleString('es-PE')}</td></tr>
+          <tr><td>Ingresos validados</td><td>S/ ${report.validatedIncome.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
           <tr><td>Fecha de generación</td><td>${report.generatedAt}</td></tr>
         </table>
       </body>
@@ -2440,6 +2445,17 @@ function EventReportView({ report, onActiveSectionChange, onBack, onCancelEvent 
                 {report.usedCapacityRate !== null && costPerAttendee && (
                   <small>
                     Costo por asistente: {costPerAttendeeLabel}
+                  </small>
+                )}
+              </dd>
+            </div>
+            <div className="is-emphasis">
+              <dt>Ingresos validados</dt>
+              <dd>
+                <span>S/ {report.validatedIncome.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                {report.residentCost > 0 && (
+                  <small>
+                    Costo vecinal: S/ {report.residentCost.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </small>
                 )}
               </dd>

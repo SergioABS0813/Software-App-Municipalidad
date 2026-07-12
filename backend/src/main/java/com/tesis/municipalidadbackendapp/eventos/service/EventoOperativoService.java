@@ -20,6 +20,8 @@ import com.tesis.municipalidadbackendapp.eventos.repository.EventoOperativoRepos
 import com.tesis.municipalidadbackendapp.inscripciones.repository.InscripcionRepository;
 import com.tesis.municipalidadbackendapp.inscripciones.entity.Inscripcion;
 import com.tesis.municipalidadbackendapp.inscripciones.enums.EstadoInscripcion;
+import com.tesis.municipalidadbackendapp.pago_inscripcion.entity.PagoInscripcion;
+import com.tesis.municipalidadbackendapp.pago_inscripcion.repository.PagoInscripcionRepository;
 import com.tesis.municipalidadbackendapp.asistencias.entity.Asistencia;
 import com.tesis.municipalidadbackendapp.asistencias.repository.AsistenciaRepository;
 import com.tesis.municipalidadbackendapp.qr.entity.CodigoQr;
@@ -40,8 +42,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -66,6 +71,7 @@ public class EventoOperativoService {
     private final UsuarioAutenticadoService usuarioAutenticadoService;
     private final BitacoraAccionService bitacoraAccionService;
     private final InscripcionRepository inscripcionRepository;
+    private final PagoInscripcionRepository pagoInscripcionRepository;
     private final AsistenciaRepository asistenciaRepository;
     private final CodigoQrRepository codigoQrRepository;
     private final CodigoQrTokenService codigoQrTokenService;
@@ -102,7 +108,7 @@ public class EventoOperativoService {
         }
 
         BackendResponseDto respuestaDni = apiDniService.obtenerNombrePorDni(dniNormalizado);
-        String nombreCompleto = String.valueOf(respuestaDni.data());
+        String nombreCompleto = normalizarNombreCompletoDni(respuestaDni.data());
         PartesNombre partesNombre = separarNombreCompleto(nombreCompleto);
         return new OperativoManualRegistrationIdentityDto(
                 dniNormalizado,
@@ -401,6 +407,7 @@ public class EventoOperativoService {
         String dni = normalizarDni(request.dni());
         String nombres = normalizarTexto(request.names());
         String apellidos = normalizarTexto(request.lastNames());
+        String nombreCompletoSolicitud = normalizarNombreCompletoDni(request.fullName());
         String celular = normalizarTexto(request.phone());
         String email = normalizarTexto(request.email());
 
@@ -414,24 +421,31 @@ public class EventoOperativoService {
                 .filter(StringUtils::hasText)
                 .isPresent();
 
+        PartesNombre partesResueltas = resolverPartesNombreManual(nombres, apellidos, nombreCompletoSolicitud, vecinoPorDni.orElse(null));
+        String nombresManual = partesResueltas.nombres();
+        String apellidosManual = partesResueltas.apellidos();
+
         if (!vecinoRegistradoEnPlataforma
-                && (!StringUtils.hasText(nombres) || !StringUtils.hasText(apellidos)
-                || !Boolean.TRUE.equals(request.aceptaTratamientoDatos()))) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Completa los datos del ciudadano y confirma el tratamiento de datos");
+                && (!StringUtils.hasText(nombresManual) || !StringUtils.hasText(apellidosManual))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Completa nombres y apellidos del ciudadano antes de registrar la inscripcion manual");
         }
 
+        boolean aceptaTratamientoDatos = Boolean.TRUE.equals(request.aceptaTratamientoDatos());
+
         Vecino vecino = vecinoPorDni
-                .map(vecinoExistente -> completarDatosVecinoManual(vecinoExistente, nombres, apellidos, celular, email))
-                .orElseGet(() -> crearVecinoManual(dni, nombres, apellidos, celular, email));
+                .map(vecinoExistente -> completarDatosVecinoManual(vecinoExistente, nombresManual, apellidosManual, celular, email, aceptaTratamientoDatos))
+                .orElseGet(() -> crearVecinoManual(dni, nombresManual, apellidosManual, celular, email, aceptaTratamientoDatos));
 
 
         Inscripcion inscripcion = inscripcionRepository.findByEventoIdAndVecinoId(eventoId, vecino.getId())
-                .map(existente -> prepararInscripcionManualExistente(existente, evento, vecino))
-                .orElseGet(() -> crearInscripcionManual(evento, vecino));
+                .map(existente -> prepararInscripcionManualExistente(existente, evento, vecino, usuario))
+                .orElseGet(() -> crearInscripcionManual(evento, vecino, usuario));
+
 
 
         OperativoQrValidationResponseDto response = registrarAsistenciaManual(eventoId, inscripcion, usuario, "Inscripcion manual en puerta");
         if ("SUCCESS".equals(response.status())) {
+            registrarPagoPresencialInscripcionManual(inscripcion, usuario);
             registrarBitacoraInscripcionManual(inscripcion, usuario, httpRequest);
             vecinoNotificacionService.enviarConstanciaInscripcionManualValidada(inscripcion);
         }
@@ -468,26 +482,28 @@ public class EventoOperativoService {
         return respuestaQr("SUCCESS", "Validacion exitosa", "Asistencia validada correctamente.", "success", nombreVecino(inscripcion), inscripcion.getCodigoInscripcion(), toValidacionRecienteDto(guardada));
     }
 
-    private Vecino crearVecinoManual(String dni, String nombres, String apellidos, String celular, String email) {
+    private Vecino crearVecinoManual(String dni, String nombres, String apellidos, String celular, String email, boolean aceptaTratamientoDatos) {
         Vecino vecino = new Vecino();
         vecino.setKeycloakId(null);
         vecino.setDni(dni);
-        vecino.setNombre(nombreCompleto(nombres, apellidos));
+        vecino.setNombre(limitarTexto(nombreCompleto(nombres, apellidos), 45));
         vecino.setCelular(celular);
         vecino.setEmail(email);
         vecino.setFechaCreado(ahoraLima());
-        vecino.setAceptaTratamientoDatos((byte) 1);
-        vecino.setFechaAceptacionDatos(ahoraLima());
+        vecino.setAceptaTratamientoDatos((byte) (aceptaTratamientoDatos ? 1 : 0));
+        if (aceptaTratamientoDatos) {
+            vecino.setFechaAceptacionDatos(ahoraLima());
+        }
         vecino.setEstadoVecino(obtenerEstadoVecinoActivo());
         return vecinoRepository.save(vecino);
     }
 
-    private Vecino completarDatosVecinoManual(Vecino vecino, String nombres, String apellidos, String celular, String email) {
+    private Vecino completarDatosVecinoManual(Vecino vecino, String nombres, String apellidos, String celular, String email, boolean aceptaTratamientoDatos) {
         boolean tieneCuentaPlataforma = StringUtils.hasText(vecino.getKeycloakId());
 
         if (!tieneCuentaPlataforma) {
             if (!StringUtils.hasText(vecino.getNombre())) {
-                vecino.setNombre(nombreCompleto(nombres, apellidos));
+                vecino.setNombre(limitarTexto(nombreCompleto(nombres, apellidos), 45));
             }
             if (!StringUtils.hasText(vecino.getCelular()) && StringUtils.hasText(celular)) {
                 vecino.setCelular(celular);
@@ -497,9 +513,11 @@ public class EventoOperativoService {
             }
         }
 
-        if (vecino.getAceptaTratamientoDatos() == null || vecino.getAceptaTratamientoDatos() == 0) {
+        if (aceptaTratamientoDatos && (vecino.getAceptaTratamientoDatos() == null || vecino.getAceptaTratamientoDatos() == 0)) {
             vecino.setAceptaTratamientoDatos((byte) 1);
             vecino.setFechaAceptacionDatos(ahoraLima());
+        } else if (vecino.getAceptaTratamientoDatos() == null) {
+            vecino.setAceptaTratamientoDatos((byte) 0);
         }
         if (vecino.getEstadoVecino() == null) {
             vecino.setEstadoVecino(obtenerEstadoVecinoActivo());
@@ -507,7 +525,46 @@ public class EventoOperativoService {
         return vecinoRepository.save(vecino);
     }
 
-    private Inscripcion crearInscripcionManual(Evento evento, Vecino vecino) {
+
+    private void registrarPagoPresencialInscripcionManual(Inscripcion inscripcion, Usuario operativo) {
+        Evento evento = inscripcion.getEvento();
+        if (!requierePagoPresencial(evento)) {
+            return;
+        }
+
+        Instant ahora = ahoraLima();
+        PagoInscripcion pago = pagoInscripcionRepository.findByInscripcionId(inscripcion.getId())
+                .orElseGet(() -> {
+                    PagoInscripcion nuevo = new PagoInscripcion();
+                    nuevo.setInscripcion(inscripcion);
+                    return nuevo;
+                });
+
+        pago.setMonto(obtenerMontoPagoPresencial(evento));
+        pago.setMedioPago("Pago presencial");
+        pago.setNumeroOperacion(null);
+        pago.setFechaPago(LocalDate.ofInstant(ahora, ZONA_LIMA));
+        pago.setUrlComprobante(null);
+        pago.setEstadoPago("VALIDADO");
+        pago.setObservacion("Pago registrado y validado presencialmente durante la inscripcion manual del vecino en el punto de control del evento.");
+        pago.setValidadoPorUsuario(operativo);
+        pago.setFechaRegistro(ahora);
+        pago.setFechaValidacion(ahora);
+        pagoInscripcionRepository.save(pago);
+    }
+
+    private boolean requierePagoPresencial(Evento evento) {
+        return evento != null
+                && evento.getRequierePago() != null
+                && evento.getRequierePago() == 1
+                && evento.getCostoVecinal() != null
+                && evento.getCostoVecinal() > 0;
+    }
+
+    private BigDecimal obtenerMontoPagoPresencial(Evento evento) {
+        return BigDecimal.valueOf(evento.getCostoVecinal().doubleValue()).setScale(2, RoundingMode.HALF_UP);
+    }
+    private Inscripcion crearInscripcionManual(Evento evento, Vecino vecino, Usuario operativo) {
         validarCuposInscripcionManual(evento);
         Instant ahora = ahoraLima();
         Inscripcion inscripcion = new Inscripcion();
@@ -515,12 +572,13 @@ public class EventoOperativoService {
         inscripcion.setVecino(vecino);
         inscripcion.setFechaInscripcion(ahora);
         inscripcion.setOrigenInscripcion("MANUAL_OPERATIVO");
+        inscripcion.setRegistradoPorUsuario(operativo);
         inscripcion.setCodigoInscripcion(generarCodigoInscripcionManual(evento, vecino, ahora));
         inscripcion.setEstadoInscripcion(EstadoInscripcion.CONFIRMADA);
         return inscripcionRepository.save(inscripcion);
     }
 
-    private Inscripcion prepararInscripcionManualExistente(Inscripcion inscripcion, Evento evento, Vecino vecino) {
+    private Inscripcion prepararInscripcionManualExistente(Inscripcion inscripcion, Evento evento, Vecino vecino, Usuario operativo) {
         EstadoInscripcion estado = inscripcion.getEstadoInscripcion();
 
         if (estado == null || estado == EstadoInscripcion.CONFIRMADA) {
@@ -538,6 +596,7 @@ public class EventoOperativoService {
         Instant ahora = ahoraLima();
         inscripcion.setFechaInscripcion(ahora);
         inscripcion.setOrigenInscripcion("MANUAL_OPERATIVO");
+        inscripcion.setRegistradoPorUsuario(operativo);
         inscripcion.setCodigoInscripcion(generarCodigoInscripcionManual(evento, vecino, ahora));
         inscripcion.setMotivoCancelacion(null);
         inscripcion.setObservacionCancelacion(null);
@@ -589,6 +648,28 @@ public class EventoOperativoService {
     private record PartesNombre(String nombres, String apellidos) {
     }
 
+    private PartesNombre resolverPartesNombreManual(String nombres, String apellidos, String nombreCompletoSolicitud, Vecino vecinoExistente) {
+        if (StringUtils.hasText(nombres) && StringUtils.hasText(apellidos)) {
+            return new PartesNombre(nombres, apellidos);
+        }
+
+        String nombreBase = StringUtils.hasText(nombreCompletoSolicitud)
+                ? nombreCompletoSolicitud
+                : vecinoExistente != null ? normalizarNombreCompletoDni(vecinoExistente.getNombre()) : "";
+        PartesNombre partes = separarNombreCompleto(nombreBase);
+
+        String nombresResueltos = StringUtils.hasText(nombres) ? nombres : partes.nombres();
+        String apellidosResueltos = StringUtils.hasText(apellidos) ? apellidos : partes.apellidos();
+        return new PartesNombre(nombresResueltos, apellidosResueltos);
+    }
+
+    private String normalizarNombreCompletoDni(String valor) {
+        String texto = normalizarTexto(valor);
+        if (!StringUtils.hasText(texto) || "null".equalsIgnoreCase(texto)) {
+            return "";
+        }
+        return texto.replaceAll("\\s+", " ");
+    }
     private PartesNombre separarNombreCompleto(String nombreCompleto) {
         String[] partes = normalizarTexto(nombreCompleto).split("\\s+");
         if (partes.length == 0 || !StringUtils.hasText(partes[0])) {
@@ -604,6 +685,14 @@ public class EventoOperativoService {
     }
     private String nombreCompleto(String nombres, String apellidos) {
         return (nombres + " " + apellidos).trim().replaceAll("\\s+", " ");
+    }
+
+    private String limitarTexto(String valor, int maximo) {
+        String texto = normalizarTexto(valor);
+        if (texto.length() <= maximo) {
+            return texto;
+        }
+        return texto.substring(0, maximo);
     }
 
     private String normalizarDni(String dni) {

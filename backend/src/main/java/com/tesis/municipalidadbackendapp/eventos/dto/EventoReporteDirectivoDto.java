@@ -1,5 +1,6 @@
 package com.tesis.municipalidadbackendapp.eventos.dto;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public record EventoReporteDirectivoDto(
@@ -25,6 +26,7 @@ public record EventoReporteDirectivoDto(
         Float costoReferencial,
         Boolean requierePago,
         Float costoVecinal,
+        BigDecimal ingresosValidados,
         String instruccionesPago,
         Integer aforoMaximo,
         String metaTipo,

@@ -1,5 +1,6 @@
 package com.tesis.municipalidadbackendapp.pago_inscripcion.service;
 
+import static com.tesis.municipalidadbackendapp.common.FechaHoraUtils.ZONA_LIMA;
 import static com.tesis.municipalidadbackendapp.common.FechaHoraUtils.ahoraLima;
 
 import com.tesis.municipalidadbackendapp.bitacora.service.BitacoraAccionService;
@@ -82,6 +83,12 @@ public class PagoInscripcionService {
         if (inscripcion.getEstadoInscripcion() == EstadoInscripcion.CONFIRMADA
                 || inscripcion.getEstadoInscripcion() == EstadoInscripcion.CANCELADA) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "La inscripcion ya no permite actualizar comprobante");
+        }
+        if (fechaPago == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de pago es obligatoria");
+        }
+        if (fechaPago.isAfter(LocalDate.now(ZONA_LIMA))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de pago no puede ser posterior a la fecha actual");
         }
 
         PagoInscripcion pago = pagoInscripcionRepository.findByInscripcionId(inscripcionId)

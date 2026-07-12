@@ -38,6 +38,14 @@ const emptyPaymentForm = {
   archivo: null,
 };
 
+function getTodayInputDate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return year + '-' + month + '-' + day;
+}
+
 const institutionalUsers = [
   {
     email: 'admin@munisanmiguel.gob.pe',
@@ -913,6 +921,11 @@ function PublicPortal() {
       return;
     }
 
+    if (paymentForm.fechaPago > getTodayInputDate()) {
+      setPaymentError('La fecha de pago no puede ser posterior a la fecha actual.');
+      return;
+    }
+
     setIsUploadingPaymentReceipt(true);
     setPaymentError('');
     setPaymentNotice('');
@@ -1217,6 +1230,7 @@ function PublicPortal() {
               paymentForm={paymentForm}
               paymentError={paymentError}
               paymentNotice={paymentNotice}
+              maxPaymentDate={getTodayInputDate()}
               isUploadingPaymentReceipt={isUploadingPaymentReceipt}
               onBack={closeEventDetail}
               onCancelRegistration={cancelEventRegistration}
