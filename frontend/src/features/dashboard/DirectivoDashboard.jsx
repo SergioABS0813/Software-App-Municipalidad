@@ -13,6 +13,7 @@ import {
   getHistorialEvento,
   getEventosRevisionDirectiva,
   getNotificacionesDirectivo,
+  getReporteDirectivoFinalizado,
   getReportesDirectivosFinalizados,
   getResumenCardsDirectivo,
   marcarNotificacionComoLeida,
@@ -290,6 +291,7 @@ const reviewFilters = [
 ];
 
 const reviewableStates = ['PARA_REVISION'];
+const reportState = 'FINALIZADO';
 const emptyDirectiveStatsSummary = {
   observados: 0,
   porRevisar: 0,
@@ -959,6 +961,80 @@ function DirectivoDashboard({ onLogout, user }) {
     return directiveReports.find((report) => String(report.id) === String(eventId)) ?? null;
   }
 
+  function setDirectiveReportItem(report) {
+    setDirectiveReportItems((currentReports) => {
+      const exists = currentReports.some((currentReport) => String(currentReport.id) === String(report.id));
+      return exists
+        ? currentReports.map((currentReport) => String(currentReport.id) === String(report.id) ? report : currentReport)
+        : [report, ...currentReports];
+    });
+  }
+
+  async function openDirectiveReportEvent(eventId) {
+    setIsLoadingReports(true);
+    setReportsError('');
+
+    try {
+      let report = findDirectiveReportById(eventId);
+
+      if (!report) {
+        const reportData = await getReporteDirectivoFinalizado(eventId);
+        report = mapDirectiveReportFromApi(reportData);
+        setDirectiveReportItem(report);
+      }
+
+      setSelectedReportEvent(report);
+      setSelectedReviewEvent(null);
+      setCurrentDirectiveView('reports');
+      setActiveReviewSection('report-section');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return report;
+    } catch (error) {
+      setSelectedReportEvent(null);
+      setSelectedReviewEvent(null);
+      setCurrentDirectiveView('reports');
+      setReportsError(getApiErrorMessage(error, 'No se pudo cargar el reporte del evento.'));
+      return null;
+    } finally {
+      setIsLoadingReports(false);
+    }
+  }
+
+  async function openDirectiveEventFromNotification(eventId) {
+    setIsLoadingReviewDetail(true);
+    setReviewEventsError('');
+    setReportsError('');
+    setReviewHistoryItems([]);
+    setReviewHistoryError('');
+
+    try {
+      const detail = await getDetalleRevisionDirectiva(eventId);
+      const mappedEvent = mapDirectiveReviewDetailFromApi(detail);
+      const currentState = String(mappedEvent.state ?? '').toUpperCase();
+
+      if (currentState === reportState) {
+        window.history.pushState(null, '', `/directivo/eventos/${eventId}/reporte`);
+        await openDirectiveReportEvent(eventId);
+        return;
+      }
+
+      await loadEventHistory(eventId);
+      window.history.pushState(null, '', `/directivo/eventos/${eventId}/revision`);
+      setSelectedReviewEvent(mappedEvent);
+      setSelectedReportEvent(null);
+      setCurrentDirectiveView('review');
+      setActiveReviewSection('ficha-directiva');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      setSelectedReviewEvent(null);
+      setSelectedReportEvent(null);
+      setCurrentDirectiveView('review');
+      setReviewEventsError(getApiErrorMessage(error, 'No se pudo cargar el detalle del evento.'));
+    } finally {
+      setIsLoadingReviewDetail(false);
+    }
+  }
+
   async function handleNotificationOpen(notification) {
     const destination = notification?.urlDestino;
 
@@ -966,33 +1042,15 @@ function DirectivoDashboard({ onLogout, user }) {
       return;
     }
 
-    window.history.pushState(null, '', destination);
-
     const eventMatch = destination.match(/^\/directivo\/eventos\/([^/]+)\/(revision|reporte)$/);
     if (!eventMatch) {
+      window.history.pushState(null, '', destination);
       return;
     }
 
-    const [, eventId, action] = eventMatch;
-
-    if (action === 'reporte') {
-      const report = findDirectiveReportById(eventId);
-      if (report) {
-        setSelectedReportEvent(report);
-        setSelectedReviewEvent(null);
-        setCurrentDirectiveView('reports');
-        setActiveReviewSection('report-section');
-      } else {
-        setSelectedReportEvent(null);
-        setSelectedReviewEvent(null);
-        setCurrentDirectiveView('reports');
-      }
-      return;
-    }
-
-    await openDirectiveReviewEvent(eventId);
+    const [, eventId] = eventMatch;
+    await openDirectiveEventFromNotification(eventId);
   }
-
   const directiveNotificationMenu = (
     <NotificationMenu
       error={notificationError}
@@ -1591,7 +1649,7 @@ function ReportsDashboardView({ error = '', isLoading = false, notificationMenu,
   ];
   const selectedMonthLabel = reportMonthOptions.find(([value]) => value === reportMonth)?.[1] ?? 'Todos';
   const highlightedPeriodLabel = reportMonth === 'all'
-    ? `del ano ${reportYear}`
+    ? `del año ${reportYear}`
     : `de ${selectedMonthLabel.toLowerCase()} ${reportYear}`;
   const globallyFilteredReports = reports.filter((report) => {
     const reportDate = parseReportCompletedDate(report);
@@ -1706,7 +1764,7 @@ function ReportsDashboardView({ error = '', isLoading = false, notificationMenu,
       icon: FileSearchIcon,
       label: 'Eventos finalizados',
       tone: 'is-decision',
-      trend: 'segun filtros activos',
+      trend: 'según filtros activos',
       value: globallyFilteredReports.length,
     },
     {
@@ -1725,14 +1783,14 @@ function ReportsDashboardView({ error = '', isLoading = false, notificationMenu,
     },
     {
       icon: ChartColumnIcon,
-      label: 'Adopcion QR promedio',
+      label: 'Adopción QR promedio',
       tone: 'is-report-capacity',
       trend: 'solo eventos con QR',
       value: averageQrAdoption === null ? 'No disponible' : `${averageQrAdoption}%`,
     },
     {
       icon: BadgeCheckIcon,
-      label: 'Satisfaccion promedio',
+      label: 'Satisfacción promedio',
       tone: 'is-month-approved',
       trend: `${totalSatisfactionRatings} valoraciones`,
       value: averageSatisfaction === null ? 'No disponible' : `${averageSatisfaction.toFixed(1)} / 5`,
@@ -1790,11 +1848,11 @@ function ReportsDashboardView({ error = '', isLoading = false, notificationMenu,
   }
 
   const highlightedCards = [
-    ['attendance', 'Mas asistido'],
+    ['attendance', 'Más asistido'],
     ['attendance-rate', 'Mejor tasa asistencia'],
-    ['qr-adoption', 'Mejor adopcion QR'],
-    ['satisfaction', 'Mayor satisfaccion'],
-    ['low-participation', 'Menor participacion'],
+    ['qr-adoption', 'Mejor adopción QR'],
+    ['satisfaction', 'Mayor satisfacción'],
+    ['low-participation', 'Menor participación'],
   ].map(([criteria, label]) => {
     const report = getTopReport(criteria);
     return {
@@ -1810,8 +1868,8 @@ function ReportsDashboardView({ error = '', isLoading = false, notificationMenu,
       <header className="admin-topbar">
         <div>
           <span className="section-kicker">Reportes directivos</span>
-          <h1 id="reports-title">Analisis de eventos finalizados</h1>
-          <p>Consulta metricas acumuladas y reportes individuales de los eventos municipales finalizados.</p>
+          <h1 id="reports-title">Análisis de eventos finalizados</h1>
+          <p>Consulta métricas acumuladas y reportes individuales de los eventos municipales finalizados.</p>
         </div>
         <div className="admin-topbar-actions">
           {notificationMenu}
@@ -1823,7 +1881,7 @@ function ReportsDashboardView({ error = '', isLoading = false, notificationMenu,
 
       <section className="reports-global-filters" aria-label="Filtros globales de analisis">
         <label>
-          Ano
+          Año
           <select
             value={reportYear}
             onChange={(event) => setReportYear(event.target.value)}
@@ -1857,7 +1915,7 @@ function ReportsDashboardView({ error = '', isLoading = false, notificationMenu,
         </label>
       </section>
 
-      <section className="admin-stats reports-global-stats" aria-label="Metricas globales de eventos finalizados">
+      <section className="admin-stats reports-global-stats" aria-label="Métricas globales de eventos finalizados">
         {globalReportStats.map((stat) => (
           <article
             className={`admin-stat-card management-stat-card directive-stat-card ${stat.tone}`}
@@ -1953,7 +2011,7 @@ function ReportsDashboardView({ error = '', isLoading = false, notificationMenu,
             <span>Evento</span>
             <span>Inscritos</span>
             <span>Asistentes</span>
-            <span>Satisfaccion</span>
+            <span>Satisfacción</span>
             <span>Fecha de cierre</span>
             <span>Reporte</span>
           </div>
@@ -2813,7 +2871,11 @@ function DirectiveReviewView({ event, historyError = '', historyItems = [], isLo
   const [previewResource, setPreviewResource] = useState(null);
   const aforoMaximo = getAforoMaximo(event);
   const canDecide = reviewableStates.includes(event.state);
-  const canCancelEvent = event.state !== 'CANCELADO';
+  const canCancelEvent = !['CANCELADO', 'FINALIZADO'].includes(event.state);
+  const decisionTitle = canDecide ? 'Aprobacion directiva' : 'Seguimiento del evento';
+  const decisionMessage = canDecide
+    ? 'Selecciona una accion para continuar con el proceso de publicacion.'
+    : 'Este evento ya no esta pendiente de aprobacion u observacion. Puedes revisar la ficha y los recursos como consulta directiva.';
   const reviewTimeMetric = getReviewTimeMetric(event);
   const shouldShowPreviousObservation = Boolean(event.previousObservation);
   const mainInfoItems = [
@@ -3107,11 +3169,9 @@ function DirectiveReviewView({ event, historyError = '', historyItems = [], isLo
 
       <section className="admin-panel directive-decision-panel" id="decision-directiva" ref={decisionRef}>
         <div>
-          <span className="section-kicker">Decisión</span>
-          <h2>Aprobación directiva</h2>
-          <p>
-            Selecciona una acción para continuar con el proceso de publicación.
-          </p>
+          <span className="section-kicker">Decision</span>
+          <h2>{decisionTitle}</h2>
+          <p>{decisionMessage}</p>
         </div>
         <div className="directive-decision-actions">
           {canDecide && (
@@ -3137,18 +3197,19 @@ function DirectiveReviewView({ event, historyError = '', historyItems = [], isLo
               </button>
             </>
           )}
-          <button
-            className="table-text-action observe"
-            disabled={!canCancelEvent}
-            type="button"
-            onClick={() => onDecision({
-              eventId: event.id,
-              eventTitle: event.title,
-              type: 'cancel',
-            })}
-          >
-            Cancelar
-          </button>
+          {canCancelEvent && (
+            <button
+              className="table-text-action observe"
+              type="button"
+              onClick={() => onDecision({
+                eventId: event.id,
+                eventTitle: event.title,
+                type: 'cancel',
+              })}
+            >
+              Cancelar
+            </button>
+          )}
         </div>
       </section>
     </section>

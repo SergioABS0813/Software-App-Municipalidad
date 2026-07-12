@@ -276,6 +276,11 @@ export async function getReportesDirectivosFinalizados(){
     const response = await api.get("eventos/directivo/reportes");
     return response.data;
 }
+
+export async function getReporteDirectivoFinalizado(id){
+    const response = await api.get(`eventos/directivo/reportes/${id}`);
+    return response.data;
+}
 export async function getResumenCardsDirectivo(){
     const response = await api.get("eventos/directivo/cards");
     return response.data;

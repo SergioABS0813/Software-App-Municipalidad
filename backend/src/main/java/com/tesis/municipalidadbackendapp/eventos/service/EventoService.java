@@ -161,6 +161,19 @@ public class EventoService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public EventoReporteDirectivoDto obtenerReporteDirectivoFinalizado(Integer id) {
+        Evento evento = eventoRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evento no encontrado"));
+        String estado = evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : "";
+
+        if (!"FINALIZADO".equals(estado)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "El reporte directivo solo esta disponible para eventos finalizados");
+        }
+
+        return toReporteDirectivoDto(evento);
+    }
+
     private EventoReporteDirectivoDto toReporteDirectivoDto(Evento evento) {
         List<Inscripcion> inscripciones = inscripcionRepository.findByEventoId(evento.getId());
         List<Integer> inscripcionIds = inscripciones.stream().map(Inscripcion::getId).toList();
@@ -247,15 +260,10 @@ public class EventoService {
         return bitacoraAccionService.listarHistorialEvento(id);
     }
 
+    @Transactional(readOnly = true)
     public EventoRevisionDirectivaDetalleDto obtenerDetalleRevisionDirectiva(Integer id) {
         Evento evento = eventoRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evento no encontrado"));
-        String estado = evento.getEstadoEvento() != null ? evento.getEstadoEvento().getCodigo() : "";
-
-        if (!List.of("PARA_REVISION", "OBSERVADO").contains(estado)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "El evento no esta disponible en revision directiva");
-        }
-
         return toRevisionDirectivaDetalleDto(evento);
     }
 

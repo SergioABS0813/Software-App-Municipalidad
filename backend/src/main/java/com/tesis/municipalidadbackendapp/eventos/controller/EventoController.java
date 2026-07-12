@@ -129,6 +129,12 @@ public class EventoController {
     public List<EventoReporteDirectivoDto> obtenerReportesDirectivosFinalizados() {
         return eventoService.obtenerReportesDirectivosFinalizados();
     }
+
+    @GetMapping("directivo/reportes/{id}")
+    public EventoReporteDirectivoDto obtenerReporteDirectivoFinalizado(@PathVariable Integer id) {
+        return eventoService.obtenerReporteDirectivoFinalizado(id);
+    }
+
     @GetMapping("directivo/revision")
     public Page<EventoRevisionDirectivaResumenDto> obtenerEventosRevisionDirectiva(
             @RequestParam(defaultValue = "TODOS") String estado,
