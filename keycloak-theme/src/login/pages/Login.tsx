@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../KcContext";
 import municipalLogo from "../assets/municipalidad-logo.png";
+import portadaOficialLogin from "../assets/portada_oficial_login.png";
 
 type LoginKcContext = Extract<KcContext, { pageId: "login.ftl" }>;
 
@@ -147,7 +148,9 @@ export default function Login(props: {
                 </p>
             </section>
 
-            <aside className="kc-login-art-side" aria-hidden="true" />
+            <aside className="kc-login-art-side" aria-hidden="true">
+                <img alt="" src={portadaOficialLogin} />
+            </aside>
         </main>
     );
 }

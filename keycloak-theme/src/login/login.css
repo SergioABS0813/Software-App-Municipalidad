@@ -368,43 +368,38 @@ input {
 }
 
 .kc-login-art-side {
-    background:
-        radial-gradient(circle at 35% 18%, rgba(255, 255, 255, 0.95) 0 2px, transparent 3px),
-        radial-gradient(circle at 82% 14%, rgba(255, 255, 255, 0.9) 0 3px, transparent 4px),
-        radial-gradient(circle at 68% 70%, rgba(255, 255, 255, 0.75) 0 8px, transparent 9px),
-        radial-gradient(circle at 28% 72%, rgba(255, 255, 255, 0.75) 0 6px, transparent 7px),
-        linear-gradient(135deg, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0) 42%),
-        linear-gradient(115deg, #e8f8ff 0%, #75ddff 30%, #0a56c2 58%, #07377e 100%);
+    background: linear-gradient(115deg, #e8f8ff 0%, #75ddff 35%, #0a56c2 100%);
     min-height: 100svh;
     overflow: hidden;
     position: relative;
 }
 
+.kc-login-art-side img {
+    height: 100%;
+    inset: 0;
+    object-fit: cover;
+    object-position: center;
+    position: absolute;
+    width: 100%;
+    z-index: 0;
+}
+
 .kc-login-art-side::before,
 .kc-login-art-side::after {
     content: "";
+    inset: 0;
+    pointer-events: none;
     position: absolute;
 }
 
 .kc-login-art-side::before {
-    background:
-        linear-gradient(105deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0) 48%),
-        linear-gradient(125deg, rgba(10, 86, 194, 0.86), rgba(117, 221, 255, 0.18) 48%, rgba(232, 248, 255, 0.72));
-    border-radius: 50%;
-    filter: blur(1px);
-    height: 82%;
-    left: -15%;
-    top: 10%;
-    transform: rotate(-18deg);
-    width: 132%;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 42%);
+    z-index: 1;
 }
 
 .kc-login-art-side::after {
-    background:
-        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.92) 0 10px, rgba(65, 131, 230, 0.42) 11px 18px, transparent 19px),
-        radial-gradient(circle at 18% 30%, rgba(255, 255, 255, 0.84) 0 3px, transparent 4px),
-        radial-gradient(circle at 72% 66%, rgba(255, 255, 255, 0.74) 0 4px, transparent 5px);
-    inset: 0;
+    background: linear-gradient(180deg, rgba(3, 26, 61, 0.08), rgba(3, 26, 61, 0.18));
+    z-index: 2;
 }
 
 .kc-register-form-side {

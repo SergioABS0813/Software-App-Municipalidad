@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../KcContext";
 import municipalLogo from "../assets/municipalidad-logo.png";
+import portadaOficialLogin from "../assets/portada_oficial_login.png";
 import { consultaDni, registrarVecino } from "../services/api/crear-vecino-service";
 
 type RegisterKcContext = Extract<KcContext, { pageId: "register.ftl" }>;
@@ -324,7 +325,9 @@ export default function RegisterCitizen(props: {
 
             </section>
 
-            <aside className="kc-login-art-side" aria-hidden="true" />
+            <aside className="kc-login-art-side" aria-hidden="true">
+                <img alt="" src={portadaOficialLogin} />
+            </aside>
         </main>
     );
 }

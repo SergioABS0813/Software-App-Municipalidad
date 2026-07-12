@@ -2,6 +2,7 @@ import { type FormEvent, useState } from "react";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../KcContext";
 import municipalLogo from "../assets/municipalidad-logo.png";
+import portadaOficialLogin from "../assets/portada_oficial_login.png";
 import {recuperarContrasena} from '../services/reset-password';
 
 type ResetPasswordKcContext = Extract<KcContext, { pageId: "login-reset-password.ftl" }>;
@@ -271,7 +272,9 @@ export default function ResetPassword(props: {
                 </p>
             </section>
 
-            <aside className="kc-login-art-side" aria-hidden="true" />
+            <aside className="kc-login-art-side" aria-hidden="true">
+                <img alt="" src={portadaOficialLogin} />
+            </aside>
         </main>
     );
 }

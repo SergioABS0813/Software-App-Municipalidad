@@ -3,6 +3,7 @@ import { kcSanitize } from "keycloakify/lib/kcSanitize";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../KcContext";
 import municipalLogo from "../assets/municipalidad-logo.png";
+import portadaOficialLogin from "../assets/portada_oficial_login.png";
 
 type LoginUpdatePasswordKcContext = Extract<KcContext, { pageId: "login-update-password.ftl" }>;
 
@@ -147,7 +148,9 @@ export default function LoginUpdatePassword(props: {
                 </form>
             </section>
 
-            <aside className="kc-login-art-side" aria-hidden="true" />
+            <aside className="kc-login-art-side" aria-hidden="true">
+                <img alt="" src={portadaOficialLogin} />
+            </aside>
         </main>
     );
 }
