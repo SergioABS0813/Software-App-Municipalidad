@@ -495,7 +495,7 @@ export default function PublicEventDetail({
               {backLabel}
             </button>
 
-            <h1 id="event-detail-title">{event.title}</h1>
+            <h1 id="event-detail-title" style={{fontSize: "25px"}}>{event.title}</h1>
             <p>{getEventFullDescription(event)}</p>
             <div className="detail-quick-meta" aria-label="Datos rápidos del evento">
               <span>
@@ -545,12 +545,12 @@ export default function PublicEventDetail({
         <aside className="reservation-card" aria-label="Reserva al evento">
           <div className="reservation-card-header">
             <span className="section-kicker">{reservationCardKicker}</span>
-            <h2>{reservationCardTitle}</h2>
+            <h2 style={{fontSize: "20px"}}>{reservationCardTitle}</h2>
           </div>
 
           {requiresRegistration && (
             <div className={`reservation-availability ${availabilityState.tone}`}>
-              <strong>{availabilityState.label}</strong>
+              <strong style={{fontSize: "20px"}}>{availabilityState.label}</strong>
               <span>
                 {availabilityState.isAvailable
                   ? 'Disponibles para este evento'
@@ -836,7 +836,7 @@ function BuildingIcon() {
 
 function ExternalLinkIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
+    <svg aria-hidden="true" className="reservation-external-icon" viewBox="0 0 24 24">
       <path d="M14 4h6v6" />
       <path d="m10 14 10-10" />
       <path d="M20 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5" />

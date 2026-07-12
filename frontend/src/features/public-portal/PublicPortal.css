@@ -347,6 +347,24 @@
   padding: 0 18px;
 }
 
+.search-control button {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.search-control button svg {
+  display: none;
+  fill: none;
+  height: 19px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.1;
+  width: 19px;
+}
+
 .agenda-jump-link {
   color: var(--brand-primary);
   display: inline-flex;
@@ -422,7 +440,7 @@
 
 .featured-event .event-visual img {
   object-fit: contain;
-  object-position: center;
+  object-position: right center;
 }
 
 .featured-event .event-visual span {
@@ -670,6 +688,7 @@
   align-items: center;
   background: transparent;
   border-bottom: 1px solid #e2e8f0;
+  cursor: pointer;
   display: grid;
   gap: 20px;
   grid-template-columns: 236px minmax(0, 1fr) 132px;
@@ -677,8 +696,10 @@
   transition: background-color 160ms ease;
 }
 
-.event-card:hover {
+.event-card:hover,
+.event-card:focus-visible {
   background: #f8fbfd;
+  outline: none;
 }
 
 .event-card-media {
@@ -724,8 +745,8 @@
 
 .event-card h3 {
   color: var(--color-text-strong);
-  font-size: 1.15rem;
-  line-height: 1.25;
+  font-size: 1.02rem;
+  line-height: 1.2;
   margin: 0;
 }
 
@@ -880,7 +901,7 @@
 
 .detail-shell {
   margin: 0 auto;
-  max-width: 1280px;
+  max-width: 1080px;
   padding: 20px 40px 72px;
 }
 
@@ -927,11 +948,11 @@
 .detail-media {
   align-items: end;
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 45%),
-    var(--media-bg);
+    radial-gradient(circle at 28% 50%, rgba(255, 255, 255, 0.28), transparent 34%),
+    linear-gradient(90deg, #0a56c2 0%, #189fe3 15%, rgba(245, 251, 255, 0.12) 31%, rgba(245, 251, 255, 0.12) 69%, #35c9ec 85%, #a7ecff 100%);
   border-radius: 16px;
   display: flex;
-  height: clamp(280px, 27vw, 360px);
+  height: clamp(330px, 31vw, 430px);
   min-height: 0;
   overflow: hidden;
   padding: 24px;
@@ -960,15 +981,23 @@
 }
 
 .detail-heading {
-  max-width: 860px;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .detail-heading h1 {
   color: var(--color-text-strong);
-  font-size: clamp(2.05rem, 3.6vw, 3rem);
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
   letter-spacing: 0;
   line-height: 1.08;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
   margin-top: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .detail-heading p {
@@ -976,7 +1005,7 @@
   font-size: 1.05rem;
   line-height: 1.7;
   margin-top: 16px;
-  max-width: 700px;
+  max-width: 100%;
 }
 
 .detail-quick-meta {
@@ -1017,19 +1046,26 @@
 .detail-layout {
   align-items: start;
   display: grid;
-  gap: 28px;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
+  gap: 32px;
+  grid-template-columns: minmax(0, 620px) minmax(320px, 340px);
+  justify-content: center;
   margin-top: 28px;
 }
 
 .detail-content {
   display: grid;
   gap: 28px;
+  max-width: 620px;
+  min-width: 0;
+  overflow: hidden;
+  width: 100%;
 }
 
 .detail-main {
   display: grid;
   gap: 18px;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .detail-section,
@@ -1335,6 +1371,7 @@
   border-top: 1px solid #e2e8f0;
   color: inherit;
   display: grid;
+  min-height: 0;
   gap: 12px;
   grid-template-columns: 22px minmax(0, 1fr) auto;
   padding: 14px 0 10px;
@@ -1400,6 +1437,7 @@
   margin: 0 -8px;
   padding-left: 8px;
   padding-right: 8px;
+  height: auto;
   transition:
     background-color 160ms ease,
     color 160ms ease;
@@ -2679,12 +2717,44 @@
     padding: 12px;
   }
 
+  .search-control {
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) 48px;
+  }
+
+  .search-control input {
+    min-height: 46px;
+  }
+
+  .search-control button {
+    border-radius: 8px;
+    min-height: 46px;
+    padding: 0;
+    width: 48px;
+  }
+
+  .search-control button svg {
+    display: block;
+  }
+
+  .search-control button span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
   .category-tabs {
     flex-wrap: nowrap;
-    margin-left: -12px;
-    margin-right: -12px;
+    margin-left: 0;
+    margin-right: 0;
     overflow-x: auto;
-    padding: 0 12px 8px;
+    padding: 0 0 8px;
     scroll-snap-type: x proximity;
     -webkit-overflow-scrolling: touch;
   }
@@ -2696,8 +2766,6 @@
     white-space: nowrap;
   }
 
-  .search-control,
-  .event-card,
   .stats-grid,
   .two-columns,
   .receipt-header,
@@ -2717,13 +2785,28 @@
   .detail-media {
     aspect-ratio: 16 / 9;
     border-radius: 12px;
-    height: auto;
+    height: clamp(240px, 58vw, 330px);
     min-height: 0;
     padding: 16px;
   }
 
   .detail-heading h1 {
-    font-size: 1.9rem;
+    font-size: clamp(1.45rem, 7vw, 1.9rem);
+  }
+
+  .featured-event-meta {
+    flex-wrap: nowrap;
+    font-size: 0.82rem;
+    gap: 8px 12px;
+  }
+
+  .featured-event-meta span {
+    white-space: nowrap;
+  }
+
+  .featured-event-meta svg {
+    height: 15px;
+    width: 15px;
   }
 
   .detail-quick-meta {
@@ -2746,22 +2829,56 @@
     max-height: none;
     padding: 8px;
   }
-
-  .section-heading,
-  .event-card-action {
+  .section-heading {
     align-items: stretch;
   }
 
+  .event-card {
+    align-items: center;
+    gap: 12px;
+    grid-template-columns: minmax(108px, 34vw) minmax(0, 1fr);
+    padding: 14px 0;
+  }
+
   .event-card-media {
+    border-radius: 8px;
     width: 100%;
+  }
+
+  .event-card-body {
+    gap: 4px;
+  }
+
+  .event-card-body time {
+    font-size: 0.74rem;
+  }
+
+  .event-card h3 {
+    font-size: 0.88rem;
+    line-height: 1.18;
+  }
+
+  .event-card p {
+    font-size: 0.78rem;
+    line-height: 1.35;
+    line-clamp: 1;
+    -webkit-line-clamp: 1;
+  }
+
+  .event-card-body > span {
+    font-size: 0.74rem;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .event-card-action {
-    justify-items: stretch;
+    display: none;
   }
 
-  .event-card-action button {
-    width: 100%;
+  .sidebar {
+    display: none;
   }
 
   .receipt-actions {

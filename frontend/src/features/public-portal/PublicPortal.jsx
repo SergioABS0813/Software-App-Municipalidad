@@ -365,30 +365,6 @@ function clearCitizenSession() {
   }
 }
 
-function buscarIdentidadPorDni(dni) {
-  // TODO: reemplazar por endpoint Spring Boot que consulte RENIEC o el servicio oficial.
-  const mockIdentities = {
-    12345678: {
-      apellidos: 'Bustamante Villanueva',
-      dni: '12345678',
-      nombreCompleto: 'Sergio André Bustamante Villanueva',
-      nombres: 'Sergio André',
-    },
-    87654321: {
-      apellidos: 'Rojas Mendoza',
-      dni: '87654321',
-      nombreCompleto: 'María Fernanda Rojas Mendoza',
-      nombres: 'María Fernanda',
-    },
-  };
-
-  return new Promise((resolve) => {
-    window.setTimeout(() => {
-      resolve(mockIdentities[dni] ?? null);
-    }, 650);
-  });
-}
-
 function hasActiveCitizenSession(authenticatedUser) {
   if (authenticatedUser?.role === 'VECINO' || authenticatedUser?.rol === 'VECINO') {
     return true;
@@ -2078,7 +2054,8 @@ function VecinoRegisterPage({ onBack, onLogin }) {
     if (!formData.celular.trim()) {
       return 'Ingresa tu número de celular.';
     }
-
+
+
 
     if (!formData.acceptsDataUse) {
       return 'Debes aceptar el uso de tus datos para crear la cuenta.';
@@ -2203,7 +2180,8 @@ function VecinoRegisterPage({ onBack, onLogin }) {
                 value={formData.celular}
                 onChange={(event) => updateField('celular', event.target.value)}
               />
-            </label>
+            </label>
+
           </div>
 
           <label className="data-consent-control">
@@ -2276,6 +2254,14 @@ function UsersIcon() {
   );
 }
 
+function SearchIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <circle cx="11" cy="11" r="6" />
+      <path d="m16 16 4 4" />
+    </svg>
+  );
+}
 function PortalHome({
   categories,
   featuredEvent,
@@ -2331,14 +2317,10 @@ function PortalHome({
         >
           <div className="event-visual" aria-hidden="true">
             {featuredCoverUrl && <img alt="" src={featuredCoverUrl} />}
-            <span>{featuredEvent.category}</span>
+            <span style={{ color: '#0a56c2' }}>{featuredEvent.status}</span>
           </div>
           <div className="featured-content">
-            <div className="featured-labels">
-              <span className="featured-kicker">{featuredKicker}</span>
-              <span className="featured-status">{featuredEvent.status}</span>
-            </div>
-            <h2>{featuredEvent.title}</h2>
+            <h3>{featuredEvent.title}</h3>
             <p>{getEventShortDescription(featuredEvent)}</p>
             <div className="featured-event-meta" aria-label={`Datos rápidos del ${featuredKicker.toLowerCase()}`}>
               <span>
@@ -2377,8 +2359,9 @@ function PortalHome({
                 value={searchTerm}
                 onChange={(event) => onSearchChange(event.target.value)}
               />
-              <button type="submit" onClick={(event) => event.preventDefault()}>
-                Buscar
+              <button aria-label="Buscar evento" type="submit" onClick={(event) => event.preventDefault()}>
+                <SearchIcon />
+                <span>Buscar</span>
               </button>
             </div>
           </form>
@@ -2411,7 +2394,20 @@ function PortalHome({
               const shortDescription = getEventShortDescription(event);
 
               return (
-              <article className="event-card" key={event.id}>
+              <article
+                aria-label={`Ver detalle de ${event.title}`}
+                className="event-card"
+                key={event.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => onEventSelect(event)}
+                onKeyDown={(keyboardEvent) => {
+                  if (keyboardEvent.key === 'Enter' || keyboardEvent.key === ' ') {
+                    keyboardEvent.preventDefault();
+                    onEventSelect(event);
+                  }
+                }}
+              >
                 <div className={`event-card-media media-${event.accent}`}>
                   {coverUrl && <img alt="" src={coverUrl} />}
                 </div>
@@ -2423,9 +2419,6 @@ function PortalHome({
                 </div>
                 <div className="event-card-action">
                   <time>{event.time}</time>
-                  <button type="button" onClick={() => onEventSelect(event)}>
-                    Ver detalle
-                  </button>
                 </div>
               </article>
               );
