@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import municipalLogo from '../../assets/images/municipalidad-logo.png';
-import eventReviewPlaceholder from '../../assets/images/event-review-placeholder.png';
+import municipalLogo from '../../assets/images/municipalidad-logo.webp';
 import { formatEventState } from './dashboardData';
 import NotificationMenu from './NotificationMenu';
 import { CardSkeleton, EmptyState, ErrorState, TableSkeleton } from '../../components/feedback/LoadingStates';
@@ -468,14 +467,6 @@ function getDirectiveReviewResourceKind(type, resource) {
   }
 
   return 'image';
-}
-
-function getResourcePreviewUrl(resourceValue, kind) {
-  if (typeof resourceValue === 'string') {
-    return resourceValue;
-  }
-
-  return kind === 'image' ? eventReviewPlaceholder : null;
 }
 
 function getEventMapsUrl(event) {
@@ -3068,7 +3059,7 @@ function DirectiveReviewView({ event, historyError = '', historyItems = [], isLo
             const kind = getDirectiveReviewResourceKind(type, resourceItem);
             const resourceUrl = getDirectiveResourceUrl(resourceItem, fallbackValue);
             const isAvailable = Boolean(resourceUrl);
-            const previewUrl = resourceUrl ?? getResourcePreviewUrl(fallbackValue, kind);
+            const previewUrl = resourceUrl;
             const resourceName = getDirectiveResourceName(resourceItem, label);
             const externalUrl = resourceUrl;
             const resourceActionLabel = kind === 'video'

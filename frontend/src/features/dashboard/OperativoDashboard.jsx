@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import municipalLogo from '../../assets/images/municipalidad-logo.png';
+import municipalLogo from '../../assets/images/municipalidad-logo.webp';
 import { getApiErrorMessage } from '../../services/api/api';
 import {
   anularAsistenciaOperativo,

@@ -1,13 +1,5 @@
-import eventReviewPlaceholder from '../../../assets/images/event-review-placeholder.png';
 
-export const eventCategories = [
-  'Todos',
-  'Cultura',
-  'Talleres',
-  'Familia',
-  'Deporte',
-  'Comunidad',
-];
+
 
 export const events = [
   {
@@ -39,7 +31,6 @@ export const events = [
       {
         recurso_id: 6,
         tipo_recurso: 'PORTADA',
-        url_recurso: eventReviewPlaceholder,
         nombre_archivo: 'portada-festival-cultural-barrial.png',
         fecha_subida: '2026-05-20T09:40:00',
         evento_id: 1,
@@ -47,7 +38,6 @@ export const events = [
       {
         recurso_id: 1,
         tipo_recurso: 'AFICHE',
-        url_recurso: eventReviewPlaceholder,
         nombre_archivo: 'afiche-festival-cultural-barrial.png',
         fecha_subida: '2026-05-20T10:00:00',
         evento_id: 1,
@@ -91,7 +81,6 @@ export const events = [
       {
         recurso_id: 7,
         tipo_recurso: 'PORTADA',
-        url_recurso: eventReviewPlaceholder,
         nombre_archivo: 'portada-taller-marinera.png',
         fecha_subida: '2026-05-22T11:00:00',
         evento_id: 2,
@@ -127,7 +116,6 @@ export const events = [
       {
         recurso_id: 8,
         tipo_recurso: 'PORTADA',
-        url_recurso: eventReviewPlaceholder,
         nombre_archivo: 'portada-cine-familiar.png',
         fecha_subida: '2026-05-24T15:00:00',
         evento_id: 3,
@@ -163,7 +151,6 @@ export const events = [
       {
         recurso_id: 9,
         tipo_recurso: 'PORTADA',
-        url_recurso: eventReviewPlaceholder,
         nombre_archivo: 'portada-carrera-vecinal.png',
         fecha_subida: '2026-05-25T10:30:00',
         evento_id: 4,
@@ -199,7 +186,6 @@ export const events = [
       {
         recurso_id: 10,
         tipo_recurso: 'PORTADA',
-        url_recurso: eventReviewPlaceholder,
         nombre_archivo: 'portada-voluntariado-local.png',
         fecha_subida: '2026-05-26T12:20:00',
         evento_id: 5,

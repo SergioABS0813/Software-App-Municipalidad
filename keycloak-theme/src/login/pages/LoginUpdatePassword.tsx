@@ -2,7 +2,7 @@ import { useState } from "react";
 import { kcSanitize } from "keycloakify/lib/kcSanitize";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../KcContext";
-import municipalLogo from "../assets/municipalidad-logo.png";
+import municipalLogo from "../assets/municipalidad-logo.webp";
 import portadaOficialLogin from "../assets/portada_oficial_login.png";
 
 type LoginUpdatePasswordKcContext = Extract<KcContext, { pageId: "login-update-password.ftl" }>;

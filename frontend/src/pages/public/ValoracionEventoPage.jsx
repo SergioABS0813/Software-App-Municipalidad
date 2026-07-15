@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import municipalLogo from '../../assets/images/municipalidad-logo.png';
+import municipalLogo from '../../assets/images/municipalidad-logo.webp';
 import StarRating from '../../components/public/StarRating';
 import {
   enviarValoracion,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import municipalLogo from '../../assets/images/municipalidad-logo.png';
+import municipalLogo from '../../assets/images/municipalidad-logo.webp';
 import PublicEventDetail from '../public-portal/PublicEventDetail';
 import { formatEventState } from './dashboardData';
 import NotificationMenu from './NotificationMenu';
@@ -545,12 +545,6 @@ const neighborStatusOptions = [
   { label: 'Pendiente de confirmación', value: 'PENDIENTE_CONFIRMACION' },
   { label: 'Inactivo', value: 'INACTIVO' },
 ];
-
-const identityLookupMock = {
-  11223344: { nombreCompleto: 'Operativo de asistencia' },
-  12345678: { nombreCompleto: 'Administrador municipal' },
-  87654321: { nombreCompleto: 'Directivo de Cultura' },
-};
 
 const settingsCategories = [
   // En backend, eventosAsociados debe calcularse con JOIN/COUNT desde eventos.

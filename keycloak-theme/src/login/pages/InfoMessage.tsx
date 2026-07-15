@@ -1,7 +1,7 @@
 import { kcSanitize } from "keycloakify/lib/kcSanitize";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../KcContext";
-import municipalLogo from "../assets/municipalidad-logo.png";
+import municipalLogo from "../assets/municipalidad-logo.webp";
 
 type InfoKcContext = Extract<KcContext, { pageId: "info.ftl" }>;
 

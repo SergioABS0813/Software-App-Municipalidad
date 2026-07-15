@@ -717,9 +717,8 @@
   font-weight: 560;
   line-height: 1.42;
   margin: 4px 0 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .notification-empty {

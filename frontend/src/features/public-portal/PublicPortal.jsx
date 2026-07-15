@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import municipalLogo from '../../assets/images/municipalidad-logo.png';
+import municipalLogo from '../../assets/images/municipalidad-logo.webp';
 import AdminDashboard from '../dashboard/AdminDashboard';
 import DirectivoDashboard from '../dashboard/DirectivoDashboard';
 import OperativoDashboard from '../dashboard/OperativoDashboard';
