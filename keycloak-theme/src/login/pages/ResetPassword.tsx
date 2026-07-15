@@ -2,7 +2,7 @@ import { type FormEvent, useState } from "react";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../KcContext";
 import municipalLogo from "../assets/municipalidad-logo.webp";
-import portadaOficialLogin from "../assets/portada_oficial_login.png";
+import portadaOficialLogin from "../assets/portada_oficial_login.webp";
 import {recuperarContrasena} from '../services/reset-password';
 
 type ResetPasswordKcContext = Extract<KcContext, { pageId: "login-reset-password.ftl" }>;
