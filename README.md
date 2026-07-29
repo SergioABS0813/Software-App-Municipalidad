@@ -45,7 +45,12 @@ las municipalidades de San Miguel, Pueblo Libre y Jesús María, Lima, Perú.**
 
 ## Flujo principal
 
-![Arquitectura desplegada en Google Cloud](docs/diagrama-mermaid-flujo-principal.png)
+### Diagrama del flujo principal
+<div align="center">
+  <img src="docs/diagrama-mermaid-flujo-principal.png" height="700">
+</div>
+
+### Resumen del flujo principal
 
 <p align="center">
   <img src="docs/flujo-principal-resumen/crear-editrar-evento.png" width="49%" height="185" alt="Crear o editar evento">
