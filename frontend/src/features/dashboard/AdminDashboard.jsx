@@ -423,6 +423,8 @@ function buildEventCreatePayload(form, actionType) {
   const requiresRegistration = isNamedChecked(form, 'requiresRegistration');
   const requiereControlAsistencia = requiresRegistration && isNamedChecked(form, 'requiresAttendanceControl');
   const requiresPayment = requiresRegistration && isNamedChecked(form, 'requiresPayment');
+  const eventStart = getNamedFormValue(form, 'eventStart');
+  const eventEnd = getNamedFormValue(form, 'eventEnd');
 
   return {
     titulo: emptyToNull(getNamedFormValue(form, 'title')),
@@ -430,8 +432,8 @@ function buildEventCreatePayload(form, actionType) {
     descripcion: emptyToNull(getNamedFormValue(form, 'description')),
     categoriaId: numberOrNull(getNamedFormValue(form, 'categoryId')),
     areaMunicipalId: numberOrNull(getNamedFormValue(form, 'area_municipal_id')),
-    fechaHoraInicio: emptyToNull(getNamedFormValue(form, 'eventStart')),
-    fechaHoraFin: emptyToNull(getNamedFormValue(form, 'eventEnd')),
+    fechaHoraInicio: emptyToNull(eventStart),
+    fechaHoraFin: emptyToNull(eventEnd),
     costoReferencial: numberOrNull(getNamedFormValue(form, 'referenceCost')),
     requierePago: requiresPayment,
     costoVecinal: requiresPayment ? numberOrNull(getNamedFormValue(form, 'paymentCost')) : null,
@@ -1232,7 +1234,6 @@ function getCreationEventChecklist(event) {
       complete:
         hasValidEventSchedule(event) &&
         (!requiresEventRegistration(event) || hasValidAforo(event)) &&
-        hasValue(event.referenceCost) &&
         hasValue(event.publico_tipo) &&
         hasValidAudienceConfig(event),
       completeLabel: 'Programación y Aforo completos',
@@ -1291,6 +1292,8 @@ function getChecklistEventFromForm(form, event, catalogs = {}) {
   const requiresRegistration = isNamedChecked(form, 'requiresRegistration');
   const requiresControl = requiresRegistration && isNamedChecked(form, 'requiresAttendanceControl');
   const requiresPayment = requiresRegistration && isNamedChecked(form, 'requiresPayment');
+  const eventStart = getNamedFormValue(form, 'eventStart');
+  const eventEnd = getNamedFormValue(form, 'eventEnd');
 
   return {
     ...event,
@@ -1304,7 +1307,7 @@ function getChecklistEventFromForm(form, event, catalogs = {}) {
     }),
     category: selectedCategory?.nombre ?? '',
     categoria_id: selectedCategoryId,
-    date: getNamedFormValue(form, 'eventStart'),
+    date: eventStart,
     descripcion_breve: getNamedFormValue(form, 'descripcion_breve'),
     description: getNamedFormValue(form, 'description'),
     district: selectedLocation?.distrito ?? '',
@@ -1341,13 +1344,17 @@ function getChecklistEventFromForm(form, event, catalogs = {}) {
     requiresPayment,
     requiereInscripcion: requiresRegistration,
     requiereControlAsistencia: requiresControl,
+    eventEnd,
+    eventStart,
+    fechaHoraFin: eventEnd,
+    fechaHoraInicio: eventStart,
     operativosAsignadosIds: requiresControl ? getSelectedOperativeIdsFromForm(form) : [],
     spots: requiresRegistration
       ? (getNamedFormValue(form, 'capacityMode') === 'none'
         ? ''
         : positiveCapacityOrZero(getNamedFormValue(form, 'capacity')))
       : '',
-    time: getNamedFormValue(form, 'eventEnd'),
+    time: eventEnd,
     title: getNamedFormValue(form, 'title'),
     ubicacion_id: selectedLocationId,
     venue: selectedLocation?.nombre_lugar ?? '',
@@ -1420,7 +1427,6 @@ function getMissingReviewFields(form, existingEvent = null) {
     ['description', 'Descripción'],
     ['eventStart', 'Inicio o fecha del evento'],
     ['eventEnd', 'Fin u hora del evento'],
-    ['referenceCost', 'Costo referencial'],
     ['ubicacion_id', 'Ubicación del evento'],
     ['agenda_evento_json', 'Agenda del evento'],
     ['requisitos_evento_json', 'Requisitos del evento'],
