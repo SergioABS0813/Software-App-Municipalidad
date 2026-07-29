@@ -45,7 +45,32 @@ las municipalidades de San Miguel, Pueblo Libre y Jesús María, Lima, Perú.**
 
 ## Flujo principal
 
-![Flujo principal de gestión](docs/images/flujo-principal.png)
+![Arquitectura desplegada en Google Cloud](docs/diagrama-mermaid-flujo-principal.png)
+
+<p align="center">
+  <img src="docs/flujo-principal-resumen/crear-editrar-evento.png" width="49%" height="185" alt="Crear o editar evento">
+  <img src="docs/flujo-principal-resumen/crear-editar-evento-pt2.png" width="49%" height="185" alt="Continuación de creación del evento">
+</p>
+
+<p align="center">
+  <img src="docs/flujo-principal-resumen/portal-publico.png" width="49%" height="185" alt="Portal público">
+  <img src="docs/flujo-principal-resumen/detalle-evento.png" width="49%" height="185" alt="Detalle de un evento">
+</p>
+
+<p align="center">
+  <img src="docs/flujo-principal-resumen/detalle-evento-pt2.png" width="49%" height="185" alt="Portal público">
+  <img src="docs/flujo-principal-resumen/detalle-evento-pt3.png" width="49%" height="185" alt="Detalle de un evento">
+</p>
+
+<p align="center">
+  <img src="docs/flujo-principal-resumen/validacion-comprobantes.png" width="49%" height="185" alt="Portal público">
+  <img src="docs/flujo-principal-resumen/repote-evento.png" width="49%" height="185" alt="Detalle de un evento">
+</p>
+
+<p align="center">
+  <img src="docs/flujo-principal-resumen/reportes-eventos-pt2.png" width="49%" height="185" alt="Portal público">
+  <img src="docs/flujo-principal-resumen/exportar-reportes-eventos.png" width="49%" height="185" alt="Detalle de un evento">
+</p>
 
 ## Roles
 
