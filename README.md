@@ -4,7 +4,7 @@ Plataforma web desplegada en Google Cloud para centralizar la publicación,
 inscripción, validación de pagos, control de asistencia y generación de
 reportes de eventos municipales.
 
-![Vista principal del portal](docs/images/portal-publico.png)
+![Vista principal del portal](docs/portal-publico.png)
 
 <p align="center">
   <img src="https://img.shields.io/badge/Java-17-blue" alt="Java 17">
@@ -58,7 +58,7 @@ las municipalidades de San Miguel, Pueblo Libre y Jesús María, Lima, Perú.**
 
 ## Arquitectura de la solución
 
-![Arquitectura desplegada en Google Cloud](docs/images/arquitectura-gcp.png)
+![Arquitectura desplegada en Google Cloud](docs/arquitectura-general.png)
 
 La solución utiliza una arquitectura monolítica modular desplegada sobre
 Google Cloud.
