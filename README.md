@@ -27,9 +27,7 @@ los eventos municipales. La solución permite crear y aprobar eventos, publicarl
 en un portal ciudadano, gestionar inscripciones, validar comprobantes de pago,
 generar códigos QR, registrar asistencias y consultar reportes operativos.
 
-**El sistema fue desarrollado como proyecto de tesis de Ingeniería de las
-Telecomunicaciones y se diseñó tomando como referencia información pública de
-las municipalidades de San Miguel, Pueblo Libre y Jesús María, Lima, Perú.**
+> **Proyecto de tesis de Ingeniería de las Telecomunicaciones**, diseñado con información pública de las municipalidades de San Miguel, Pueblo Libre y Jesús María, Lima, Perú.
 
 ## Funcionalidades principales
 
@@ -42,40 +40,6 @@ las municipalidades de San Miguel, Pueblo Libre y Jesús María, Lima, Perú.**
 - Gestión de usuarios y autorización basada en roles.
 - Notificaciones internas y envío de correos electrónicos.
 - Encuestas de satisfacción y reportes posteriores al evento.
-
-## Flujo principal
-
-### Diagrama del flujo principal
-<div align="center">
-  <img src="docs/diagrama-mermaid-flujo-principal.png" height="700">
-</div>
-
-### Resumen del flujo principal
-
-<p align="center">
-  <img src="docs/flujo-principal-resumen/crear-editrar-evento.png" width="49%" height="185" alt="Crear o editar evento">
-  <img src="docs/flujo-principal-resumen/crear-editar-evento-pt2.png" width="49%" height="185" alt="Continuación de creación del evento">
-</p>
-
-<p align="center">
-  <img src="docs/flujo-principal-resumen/portal-publico.png" width="49%" height="185" alt="Portal público">
-  <img src="docs/flujo-principal-resumen/detalle-evento.png" width="49%" height="185" alt="Detalle de un evento">
-</p>
-
-<p align="center">
-  <img src="docs/flujo-principal-resumen/detalle-evento-pt2.png" width="49%" height="185" alt="Portal público">
-  <img src="docs/flujo-principal-resumen/detalle-evento-pt3.png" width="49%" height="185" alt="Detalle de un evento">
-</p>
-
-<p align="center">
-  <img src="docs/flujo-principal-resumen/validacion-comprobantes.png" width="49%" height="185" alt="Portal público">
-  <img src="docs/flujo-principal-resumen/repote-evento.png" width="49%" height="185" alt="Detalle de un evento">
-</p>
-
-<p align="center">
-  <img src="docs/flujo-principal-resumen/reportes-eventos-pt2.png" width="49%" height="185" alt="Portal público">
-  <img src="docs/flujo-principal-resumen/exportar-reportes-eventos.png" width="49%" height="185" alt="Detalle de un evento">
-</p>
 
 ## Roles
 
@@ -114,6 +78,40 @@ recursos son almacenados en Google Cloud Storage.
 | Integraciones | SMTP, Google Maps, API de consulta de DNI |
 | Pruebas | JMeter |
 
+## Flujo principal
+
+### Diagrama del flujo principal
+<div align="center">
+  <img src="docs/diagrama-mermaid-flujo-principal.png" height="700">
+</div>
+
+### Resumen del flujo principal
+
+<p align="center">
+  <img src="docs/flujo-principal-resumen/crear-editrar-evento.png" width="49%" height="185" alt="Crear o editar evento">
+  <img src="docs/flujo-principal-resumen/crear-editar-evento-pt2.png" width="49%" height="185" alt="Continuación de creación del evento">
+</p>
+
+<p align="center">
+  <img src="docs/flujo-principal-resumen/portal-publico.png" width="49%" height="185" alt="Portal público">
+  <img src="docs/flujo-principal-resumen/detalle-evento.png" width="49%" height="185" alt="Detalle de un evento">
+</p>
+
+<p align="center">
+  <img src="docs/flujo-principal-resumen/detalle-evento-pt2.png" width="49%" height="185" alt="Portal público">
+  <img src="docs/flujo-principal-resumen/detalle-evento-pt3.png" width="49%" height="185" alt="Detalle de un evento">
+</p>
+
+<p align="center">
+  <img src="docs/flujo-principal-resumen/validacion-comprobantes.png" width="49%" height="185" alt="Portal público">
+  <img src="docs/flujo-principal-resumen/repote-evento.png" width="49%" height="185" alt="Detalle de un evento">
+</p>
+
+<p align="center">
+  <img src="docs/flujo-principal-resumen/reportes-eventos-pt2.png" width="49%" height="185" alt="Portal público">
+  <img src="docs/flujo-principal-resumen/exportar-reportes-eventos.png" width="49%" height="185" alt="Detalle de un evento">
+</p>
+
 ## Seguridad
 
 - Autenticación centralizada mediante Keycloak.
@@ -144,8 +142,7 @@ Proyecto desarrollado como tesis para la obtención del título profesional de
 Ingeniero de las Telecomunicaciones.
 
 ## Licencia
-
-Este repositorio se publica con fines académicos y de demostración profesional.
+> Este repositorio se publica con fines académicos y de demostración profesional.
 No está autorizado su uso comercial ni su redistribución sin autorización del
 autor.
 
