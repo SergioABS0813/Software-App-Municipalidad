@@ -46,41 +46,6 @@ function getTodayInputDate() {
   return year + '-' + month + '-' + day;
 }
 
-const institutionalUsers = [
-  {
-    email: 'admin@munisanmiguel.gob.pe',
-    fullName: 'Sergio Bustamante',
-    password: 'admin123',
-    role: 'ADMINISTRADOR',
-  },
-  {
-    email: 'directivo@munisanmiguel.gob.pe',
-    fullName: 'Mariana Fuentes',
-    password: 'directivo123',
-    role: 'DIRECTIVO',
-  },
-  {
-    email: 'operativo@munisanmiguel.gob.pe',
-    fullName: 'Carlos Ramirez',
-    password: 'operativo123',
-    role: 'OPERATIVO',
-  },
-  {
-    apellidos: 'Bustamante Villanueva',
-    acceptsDataUse: true,
-    celular: '987654321',
-    correo: 'vecino@gmail.com',
-    dni: '12345678',
-    email: 'vecino@gmail.com',
-    fechaNacimiento: '1998-04-16',
-    fullName: 'Sergio André Bustamante Villanueva',
-    nombreCompleto: 'Sergio André Bustamante Villanueva',
-    nombres: 'Sergio André',
-    password: 'vecino123',
-    role: 'VECINO',
-  },
-];
-
 const emptyRegistration = {
   fullName: '',
   documentNumber: '',
@@ -456,7 +421,6 @@ function PublicPortal() {
   const [registrationActionError, setRegistrationActionError] = useState('');
   const [authenticatedUser, setAuthenticatedUser] = useState(readStoredCitizenUser);
   const [detailOriginPath, setDetailOriginPath] = useState(eventsListPath);
-  const [loginNotice, setLoginNotice] = useState('');
   const [sessionExpiredMessage, setSessionExpiredMessage] = useState('');
   const [paymentForm, setPaymentForm] = useState(emptyPaymentForm);
   const [paymentError, setPaymentError] = useState('');
@@ -780,7 +744,6 @@ function PublicPortal() {
     setSelectedEventRegistration(null);
     setIsLoadingRegistrationStatus(false);
     setRegistrationActionError('');
-    setLoginNotice('');
     setPaymentForm(emptyPaymentForm);
     setPaymentError('');
     setPaymentNotice('');
@@ -810,7 +773,6 @@ function PublicPortal() {
     setSelectedEventRegistration(null);
     setIsLoadingRegistrationStatus(false);
     setRegistrationActionError('');
-    setLoginNotice('');
     setPaymentForm(emptyPaymentForm);
     setPaymentError('');
     setPaymentNotice('');
@@ -984,7 +946,6 @@ function PublicPortal() {
     const redirectTo = `/eventos/${selectedEvent.id}`;
 
     setIsLoginRequiredOpen(false);
-    setLoginNotice('');
     setPaymentForm(emptyPaymentForm);
     setPaymentError('');
     setPaymentNotice('');
@@ -1000,8 +961,7 @@ function PublicPortal() {
     });
   }
 
-  function openLogin(notice = '') {
-    setLoginNotice(typeof notice === 'string' ? notice : '');
+  function openLogin() {
     setSelectedEvent(null);
     setIsConfirmOpen(false);
     setIsLoginRequiredOpen(false);
@@ -1016,7 +976,6 @@ function PublicPortal() {
   }
 
   function openRegister() {
-    setLoginNotice('');
     setPaymentForm(emptyPaymentForm);
     setPaymentError('');
     setPaymentNotice('');
@@ -1035,7 +994,6 @@ function PublicPortal() {
   }
 
   function openRecoverPassword() {
-    setLoginNotice('');
     setPaymentForm(emptyPaymentForm);
     setPaymentError('');
     setPaymentNotice('');
@@ -1067,7 +1025,6 @@ function PublicPortal() {
     setSelectedEvent(null);
     setIsConfirmOpen(false);
     setIsLoginRequiredOpen(false);
-    setLoginNotice('');
     setPaymentForm(emptyPaymentForm);
     setPaymentError('');
     setPaymentNotice('');
@@ -1106,11 +1063,10 @@ function PublicPortal() {
       const redirectEvent = portalEvents.find((event) => String(event.id) === redirectEventId);
 
       setAuthenticatedUser(citizenUser);
-      setLoginNotice('');
-    setPaymentForm(emptyPaymentForm);
-    setPaymentError('');
-    setPaymentNotice('');
-    setIsUploadingPaymentReceipt(false);
+      setPaymentForm(emptyPaymentForm);
+      setPaymentError('');
+      setPaymentNotice('');
+      setIsUploadingPaymentReceipt(false);
       setCurrentView('portal');
       setSelectedEvent(redirectEvent ?? null);
       setIsConfirmOpen(false);
@@ -1123,7 +1079,6 @@ function PublicPortal() {
 
     setAuthenticatedUser(user);
     clearCitizenSession();
-    setLoginNotice('');
     setPaymentForm(emptyPaymentForm);
     setPaymentError('');
     setPaymentNotice('');
@@ -1158,8 +1113,7 @@ function PublicPortal() {
 
   return (
     <main className="citizen-portal">
-      {currentView !== 'login' &&
-        currentView !== 'register' &&
+      {currentView !== 'register' &&
         currentView !== 'recoverPassword' &&
         currentView !== 'admin' &&
         currentView !== 'directivo' &&
@@ -1173,15 +1127,7 @@ function PublicPortal() {
         />
       )}
 
-      {currentView === 'login' ? (
-        <LoginView
-          notice={loginNotice}
-          onBack={closeEventDetail}
-          onLoginSuccess={openInstitutionalDashboard}
-          onRecoverPassword={openRecoverPassword}
-          onRegister={openRegister}
-        />
-      ) : currentView === 'register' ? (
+      {currentView === 'register' ? (
         <VecinoRegisterPage
           onBack={closeEventDetail}
           onLogin={openLogin}
@@ -1605,137 +1551,6 @@ function AccountSettingsPage({ user, onBack, onUserUpdate }) {
           </LoadingButton>
         </div>
       </form>
-    </section>
-  );
-}
-
-function LoginView({ notice, onBack, onLoginSuccess, onRecoverPassword, onRegister }) {
-  const [credentials, setCredentials] = useState({
-    email: '',
-    password: '',
-  });
-  const [loginError, setLoginError] = useState('');
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-
-  function updateCredential(field, value) {
-    setCredentials((currentCredentials) => ({
-      ...currentCredentials,
-      [field]: value,
-    }));
-    setLoginError('');
-  }
-
-  function submitLogin(event) {
-    event.preventDefault();
-
-    const user = institutionalUsers.find(
-      (institutionalUser) =>
-        institutionalUser.email === credentials.email.trim().toLowerCase() &&
-        institutionalUser.password === credentials.password,
-    );
-
-    if (!user) {
-      setLoginError('Credenciales incorrectas. Verifica el correo y la contraseña.');
-      return;
-    }
-
-    onLoginSuccess(user);
-  }
-
-  return (
-    <section className="login-shell" aria-labelledby="login-title">
-      <div className="login-form-side">
-        <button className="login-brand" type="button" onClick={onBack}>
-          <img
-            alt="Logo Municipalidad de San Miguel"
-            className="municipality-logo brand-logo"
-            src={municipalLogo}
-          />
-          <strong>Municipalidad de San Miguel</strong>
-        </button>
-
-        <form
-          className="login-card"
-          onSubmit={submitLogin}
-        >
-          <div className="login-title">
-            <span>Portal de eventos</span>
-            <h1 id="login-title">Iniciar sesión</h1>
-            <p>Accede a tu cuenta para continuar.</p>
-          </div>
-
-          <label>
-            Correo electrónico
-            <input
-              autoComplete="email"
-              placeholder="Ingrese su correo electrónico"
-              type="email"
-              value={credentials.email}
-              onChange={(event) => updateCredential('email', event.target.value)}
-            />
-          </label>
-          <label>
-            Contraseña
-            <span className="password-control">
-              <input
-                autoComplete="current-password"
-                placeholder='Ingrese su contraseña'
-                type={isPasswordVisible ? 'text' : 'password'}
-                value={credentials.password}
-                onChange={(event) =>
-                  updateCredential('password', event.target.value)
-                }
-              />
-              <button
-                aria-label={
-                  isPasswordVisible ? 'Ocultar contraseña' : 'Mostrar contraseña'
-                }
-                className="password-toggle"
-                type="button"
-                onClick={() =>
-                  setIsPasswordVisible((currentValue) => !currentValue)
-                }
-              >
-                {isPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
-              </button>
-            </span>
-          </label>
-          <div className="login-options">
-            <label className="remember-control">
-              <input type="checkbox" />
-              Recordarme
-            </label>
-            <button type="button" onClick={onRecoverPassword}>
-              Recuperar contraseña
-            </button>
-          </div>
-          <button className="primary-button" type="submit">
-            Ingresar
-          </button>
-          <p className="login-register-link">
-            <span>¿Aún no tienes cuenta vecinal?</span>
-            <button type="button" onClick={onRegister}>
-              Crear cuenta
-            </button>
-          </p>
-          {notice && <p className="login-success">{notice}</p>}
-          {loginError && <p className="login-error">{loginError}</p>}
-          <div className="login-test-users" aria-label="Credenciales de prueba">
-            <span>Admin: admin@munisanmiguel.gob.pe / admin123</span>
-            <span>Directivo: directivo@munisanmiguel.gob.pe / directivo123</span>
-            <span>Operativo: operativo@munisanmiguel.gob.pe / operativo123</span>
-            <span>Vecino: vecino@gmail.com / vecino123</span>
-          </div>
-        </form>
-
-        <p className="login-footer">
-          <button type="button" onClick={onBack}>
-            Volver a eventos
-          </button>
-        </p>
-      </div>
-
-      <div className="login-art-side" aria-hidden="true" />
     </section>
   );
 }

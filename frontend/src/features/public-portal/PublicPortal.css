@@ -2301,23 +2301,6 @@
   justify-content: space-between;
 }
 
-.remember-control {
-  align-items: center;
-  color: var(--color-text-muted);
-  display: flex !important;
-  gap: 8px;
-  grid-template-columns: unset;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.remember-control input {
-  flex: 0 0 auto;
-  height: 15px;
-  min-height: 15px;
-  width: 15px;
-}
-
 .login-options button,
 .login-footer button {
   background: transparent;
@@ -2385,18 +2368,6 @@
   font-weight: 750;
   line-height: 1.45;
   margin: 0;
-  padding: 10px 12px;
-}
-
-.login-test-users {
-  background: var(--brand-soft);
-  border-radius: 8px;
-  color: var(--color-text-muted);
-  display: grid;
-  gap: 6px;
-  font-size: 0.72rem;
-  font-weight: 750;
-  line-height: 1.4;
   padding: 10px 12px;
 }
 
